@@ -5,16 +5,18 @@
         Title="{loc:Loc app.name}"
         Width="1220" Height="800"
         MinWidth="1040" MinHeight="700"
-        Background="#0A1120"
-        TransparencyLevelHint="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         SystemDecorations="None"
         WindowStartupLocation="CenterScreen">
 
-  <!-- 禁用系统标题栏，改用自建标题栏；外层圆角容器让整个窗口四角变圆。
-       用深色不透明底，避免透明/亚克力在无边框窗口下露出系统白边。 -->
+  <!-- 禁用系统标题栏，改用自建标题栏。
+       窗口本身透明（四角露出桌面 => 圆角可见），内容 Border 自己不透明并
+       用 CornerRadius + ClipToBounds 裁出圆角；AcrylicBlur 会引入系统白色，
+       所以这里用纯 Transparent 避免白边。 -->
   <Border CornerRadius="16" ClipToBounds="True"
           Background="{DynamicResource AppBg}"
-          BorderBrush="#0A1120" BorderThickness="1"
+          BorderBrush="#1B2740" BorderThickness="1"
           BoxShadow="0 18 50 0 #400A1226">
     <Grid RowDefinitions="44,*">
     <!-- 自建标题栏 -->

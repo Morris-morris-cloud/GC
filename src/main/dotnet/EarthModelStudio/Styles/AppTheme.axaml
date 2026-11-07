@@ -252,28 +252,40 @@
     <Setter Property="FontSize" Value="12.5" />
   </Style>
 
-  <!-- 自建标题栏按钮 -->
+  <!--
+    自建标题栏按钮只做背景/前景色渐变，不参与全局的 scale 动画：
+    titlebtn 用优先级更高的选择器把 RenderTransform 固定为恒等变换，
+    并清空 Transitions 里的 TransformOperationsTransition，彻底避开
+    hover 时 RenderTransform 类型/过渡器不匹配导致的渲染异常。
+  -->
   <Style Selector="Button.titlebtn">
     <Setter Property="Width" Value="38" />
     <Setter Property="Height" Value="30" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="#A9B8D4" />
     <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="CornerRadius" Value="7" />
     <Setter Property="Margin" Value="2,0" />
+    <Setter Property="RenderTransform" Value="scale(1)" />
     <Setter Property="Transitions">
       <Transitions>
         <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
         <BrushTransition Property="Background" Duration="0:0:0.12" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.12" />
       </Transitions>
     </Setter>
   </Style>
   <Style Selector="Button.titlebtn:pointerover">
     <Setter Property="Background" Value="#223252" />
     <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="RenderTransform" Value="scale(1)" />
+  </Style>
+  <Style Selector="Button.titlebtn:pressed">
+    <Setter Property="RenderTransform" Value="scale(1)" />
   </Style>
   <Style Selector="Button.titlebtn.close:pointerover">
     <Setter Property="Background" Value="#D64545" />

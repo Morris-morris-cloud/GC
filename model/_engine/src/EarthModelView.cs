@@ -216,8 +216,7 @@ public sealed class EarthModelView : UserControl, IDisposable
     // ---------------------------------------------------------------- 顶部主工具栏
     private Control BuildTopBar()
     {
-        var close = MakeButton(_texts["close"], () => _context.RequestClose());
-
+        // 关闭按钮统一放在窗口右上角的自建标题栏，这里不再重复放左上角
         var title = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
         title.Children.Add(new TextBlock
         {
@@ -268,14 +267,13 @@ public sealed class EarthModelView : UserControl, IDisposable
         actions.Children.Add(MakeButton(_texts["classroom"], () => SetLessonsVisible(!_showLessons)));
         actions.Children.Add(MakeButton("⛶", ToggleFullScreen, large: true));
 
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto") };
-        grid.Children.Add(close);
-        Grid.SetColumn(title, 1);
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto") };
+        Grid.SetColumn(title, 0);
         title.Margin = new Thickness(14, 0, 0, 0);
         grid.Children.Add(title);
-        Grid.SetColumn(_viewSwitch, 2);
+        Grid.SetColumn(_viewSwitch, 1);
         grid.Children.Add(_viewSwitch);
-        Grid.SetColumn(actions, 4);
+        Grid.SetColumn(actions, 3);
         grid.Children.Add(actions);
 
         return new Border { Background = PanelBg, Padding = new Thickness(16, 9), Child = grid };
@@ -716,10 +714,23 @@ public sealed class EarthModelView : UserControl, IDisposable
                 ? _texts.Pick(season.TeachingI18n, _texts["orbitTeach"])
                 : _texts["orbitTeach"];
 
-        if (_showCloseup && (double.IsNaN(_lastDeclination) || Math.Abs(_lastDeclination - decl) > 0.04))
+        // 特写的直射纬度用缓动逼近目标，而不是瞬间跳变：
+        // 公转时拖动/改变轨道角，晨昏线会平滑地移过去（每次 timer 步进一帧）。
+        if (_showCloseup)
         {
-            _closeup.DeclinationDeg = decl;
-            _lastDeclination = decl;
+            var target = decl;
+            var current = _closeup.DeclinationDeg;
+            var diff = target - current;
+            if (Math.Abs(diff) < 0.02)
+            {
+                _closeup.DeclinationDeg = target;
+            }
+            else
+            {
+                // 每 140ms 走剩余距离的 ~18%，形成自然的 ease-out 动画
+                _closeup.DeclinationDeg = current + diff * 0.18;
+            }
+            _lastDeclination = target;
         }
     }
 

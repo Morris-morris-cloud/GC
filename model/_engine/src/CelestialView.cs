@@ -679,7 +679,11 @@ public class CelestialView : Control, IDisposable
     private Vector3 RotationLight(Matrix4x4 cam, double tiltDeg)
     {
         var axisCam = Vector3.TransformNormal(AxisWorld(tiltDeg), cam);
-        var forwardRight = Vector3.Normalize(new Vector3(0.86f, 0f, 0.50f));
+        // 特写模式：光从正右方水平射来，晨昏线竖直居中、正对观察者，
+        // 便于课堂直观看昼夜半球；主画布仍用斜向光体现立体感。
+        var forwardRight = InsetMode
+            ? new Vector3(1f, 0f, 0f)
+            : Vector3.Normalize(new Vector3(0.86f, 0f, 0.50f));
         var u = forwardRight - axisCam * Vector3.Dot(forwardRight, axisCam);
         if (u.Length() < 0.001f) u = new Vector3(1, 0, 0);
         u = Vector3.Normalize(u);
