@@ -65,8 +65,10 @@ public sealed class UpdateService
     {
         if (!string.IsNullOrWhiteSpace(settings.UpdateLocalRoot) &&
             Directory.Exists(settings.UpdateLocalRoot!))
-            return new DirectoryRemote(settings.UpdateLocalRoot!);
-        return new GitCodeRemote(settings.UpdateManifestUrl, settings.UpdateRepository);
+            return new DirectoryRemote(settings.UpdateLocalRoot!);   // 离线 U 盘源：仍读本地 version.json
+        // 在线源：启动器版本与发布包走 GitCode Release（tag + 附件），
+        // 模型清单/文件仍走仓库 contents API；无 Release 时自动回退仓库 version.json。
+        return new GitCodeReleaseRemote(settings.UpdateManifestUrl, settings.UpdateRepository);
     }
 
     public async Task<UpdateResult> RunAsync(bool force,
