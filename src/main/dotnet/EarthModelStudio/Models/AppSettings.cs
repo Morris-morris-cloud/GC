@@ -13,11 +13,14 @@ public sealed class AppSettings
     /// <summary>light | dark</summary>
     public string Theme { get; set; } = "light";
 
-    /// <summary>渲染帧率：24 / 30 / 60</summary>
-    public int RenderFps { get; set; } = 30;
+    /// <summary>渲染帧率：24 / 30 / 60 / 90 / 120（上限 120，关闭 VSync 同步）</summary>
+    public int RenderFps { get; set; } = 120;
 
     /// <summary>启动时运行内存分配（MB）——决定场景缓存/纹理预算。</summary>
     public int MemoryMb { get; set; } = 2048;
+
+    /// <summary>自动模式：根据设备可用内存自动计算预算（忽略 MemoryMb）。</summary>
+    public bool MemoryAuto { get; set; } = true;
 
     /// <summary>启动时检查模型源更新。</summary>
     public bool CheckSourceOnStartup { get; set; }

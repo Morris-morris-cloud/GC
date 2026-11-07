@@ -25,7 +25,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
     private readonly GitCodeRemote _content;
     private readonly HttpClient _http;
     private readonly string _releasesUrl;
-    private readonly Dictionary<string, (string Url, string? Sha256, long Size)> _assets = new();
+    private readonly Dictionary<string, (string Url, string? Sha256, long Size, string Name)> _assets = new();
 
     public GitCodeReleaseRemote(string? manifestUrl, string? repository, HttpClient? http = null)
     {
@@ -101,7 +101,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             if (rid == null || string.IsNullOrWhiteSpace(asset.Url)) continue;
             // 同名平台取第一个有效附件
             if (!_assets.ContainsKey(rid))
-                _assets[rid] = (asset.Url, asset.Sha256, asset.Size);
+                _assets[rid] = (asset.Url, asset.Sha256, asset.Size, asset.Name);
         }
 
         // 把附件地址写回 packages：有附件就用附件的直链与校验值，
@@ -114,6 +114,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
                 version.Launcher.Packages[rid] = pkg;
             }
             pkg.Url = info.Url;
+            pkg.AssetName = info.Name;
             if (!string.IsNullOrWhiteSpace(info.Sha256)) pkg.Sha256 = info.Sha256;
             if (info.Size > 0) pkg.Size = info.Size;
         }
@@ -141,13 +142,17 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             {
                 foreach (var a in assets.EnumerateArray())
                 {
+                    // 跳过 GitCode 自动生成的源码包（type=source），只取真正的发布附件
+                    var type = Str(a, "type");
+                    if (string.Equals(type, "source", StringComparison.OrdinalIgnoreCase)) continue;
                     info.Assets.Add(new ReleaseAsset
                     {
                         Name = Str(a, "name") ?? Str(a, "file_name") ?? "",
                         BrowserDownloadUrl = Str(a, "browser_download_url"),
                         DownloadUrl = Str(a, "download_url") ?? Str(a, "url"),
                         Size = Num(a, "size"),
-                        Sha256 = Str(a, "sha256") ?? Str(a, "digest")
+                        Sha256 = Str(a, "sha256") ?? Str(a, "digest"),
+                        Type = type
                     });
                 }
             }

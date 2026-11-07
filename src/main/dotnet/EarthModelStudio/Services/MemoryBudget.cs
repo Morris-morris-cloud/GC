@@ -21,6 +21,27 @@ public sealed class MemoryBudget
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// 自动预算：取设备可用物理内存的一部分（约 1/4），
+    /// 夹在 512–8192 MB 之间，低配设备也不会因为预算过大而卡顿。
+    /// </summary>
+    public static int AutoComputeMb()
+    {
+        try
+        {
+            var info = GC.GetGCMemoryInfo();
+            var totalMb = info.TotalAvailableMemoryBytes / (1024.0 * 1024.0);
+            if (totalMb > 0)
+                return (int)Math.Clamp(Math.Round(totalMb / 4.0 / 256.0) * 256, 512, 8192);
+        }
+        catch { /* 平台不支持时回退默认值 */ }
+        return 2048;
+    }
+
+    /// <summary>按设置应用：auto 时自动计算，否则用手动值。</summary>
+    public void ApplyAuto(bool auto, int manualMb)
+        => Apply(auto ? AutoComputeMb() : manualMb);
+
     /// <summary>内存情况变化（例如模型窗口开关）时刷新展示。</summary>
     public void Refresh() => Changed?.Invoke();
 

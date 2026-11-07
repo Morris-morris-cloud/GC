@@ -314,24 +314,36 @@ public sealed class UpdateService
         Directory.CreateDirectory(_paths.UpdateRoot);
         var payload = Path.Combine(_paths.UpdateRoot, "payload");
         if (Directory.Exists(payload)) Directory.Delete(payload, true);
-        var zip = Path.Combine(_paths.CacheRoot, "launcher-" + Safe(launcher.Version) + ".zip");
-        await File.WriteAllBytesAsync(zip, bytes, ct);
-        try
+        Directory.CreateDirectory(payload);
+
+        // 单文件发布包（.exe / .app.zip 里的可执行文件不在此列）就是程序本体，不能解压。
+        // 直接按附件原名放进 payload，脚本会把 payload/ 整体覆盖到安装目录。
+        var assetName = package!.AssetName;
+        bool singleFile = !string.IsNullOrWhiteSpace(assetName) &&
+                          !assetName!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                          !assetName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+        string executableName;
+        if (singleFile)
         {
-            ZipSafety.ExtractToDirectory(zip, payload);
+            executableName = Path.GetFileName(assetName!);
+            await File.WriteAllBytesAsync(Path.Combine(payload, executableName), bytes, ct);
         }
-        finally
+        else
         {
-            try { File.Delete(zip); } catch { }
+            var zip = Path.Combine(_paths.CacheRoot, "launcher-" + Safe(launcher.Version) + ".zip");
+            await File.WriteAllBytesAsync(zip, bytes, ct);
+            try { ZipSafety.ExtractToDirectory(zip, payload); }
+            finally { try { File.Delete(zip); } catch { } }
+            FlattenPayload(payload);
+            executableName = Path.GetFileName(Environment.ProcessPath ?? "");
         }
-        FlattenPayload(payload);
 
         Json.Write(Path.Combine(_paths.UpdateRoot, "pending.json"), new PendingUpdate
         {
             Version = launcher.Version,
             Rid = rid,
             InstallDirectory = _paths.InstallDirectory,
-            Executable = Path.GetFileName(Environment.ProcessPath ?? ""),
+            Executable = executableName,
             Payload = "payload",
             DownloadedAt = DateTime.UtcNow.ToString("O")
         });

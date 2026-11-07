@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using EarthModelStudio.Models;
 
 namespace EarthModelStudio.Services;
@@ -17,24 +18,40 @@ public sealed class SettingsService
     public void Load()
     {
         Current = Json.Read<AppSettings>(_paths.SettingsFile) ?? new AppSettings();
-        if (Current.Sources.Count == 0) SeedSources();
+        SeedDefaultSource();
         if (Current.MemoryMb < 256) Current.MemoryMb = 2048;
     }
 
     /// <summary>
-    /// 自动更新由 UpdateService 负责（版本清单 version.json），这里不预置任何在线源；
-    /// 只给「下载」页留一条空的自定义源占位。
+    /// 默认下载源（gitcode 官方仓库）始终内置在列表里，且不允许删除：
+    /// 它是启动器自动更新的同源仓库，用户清掉会导致模型无法回退。
+    /// 老配置里没有这条时自动补上；已有的用户自定义源保持不变。
     /// </summary>
-    private void SeedSources()
+    public const string DefaultSourceId = "gitcode-official";
+    public const string DefaultSourceUrl = "https://gitcode.com/2509_92447106/GC";
+
+    private void SeedDefaultSource()
     {
-        Current.Sources.Add(new ModelSource
+        var existing = Current.Sources.FirstOrDefault(s =>
+            string.Equals(s.Id, DefaultSourceId, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
         {
-            Id = "custom",
-            Name = "自定义源",
-            Url = "",
-            Enabled = false
-        });
-        Save();
+            Current.Sources.Insert(0, new ModelSource
+            {
+                Id = DefaultSourceId,
+                Name = "Morris GC (GitCode)",
+                Url = DefaultSourceUrl,
+                Enabled = true,
+                BuiltIn = true
+            });
+            Save();
+        }
+        else
+        {
+            // 强制保证内置标记与地址，避免旧配置被用户改坏后失去保护
+            existing.BuiltIn = true;
+            if (string.IsNullOrWhiteSpace(existing.Url)) existing.Url = DefaultSourceUrl;
+        }
     }
 
     public void Save()

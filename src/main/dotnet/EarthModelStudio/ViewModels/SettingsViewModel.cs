@@ -24,11 +24,12 @@ public partial class SettingsViewModel : ObservableObject
 
     public ObservableCollection<SettingsSourceViewModel> Sources { get; } = new();
     public ObservableCollection<LanguageOption> Languages { get; } = new();
-    public int[] FrameRates { get; } = { 24, 30, 60 };
+    public int[] FrameRates { get; } = { 24, 30, 60, 90, 120 };
 
     [ObservableProperty] private LanguageOption? _selectedLanguage;
-    [ObservableProperty] private int _selectedFps = 30;
+    [ObservableProperty] private int _selectedFps = 120;
     [ObservableProperty] private double _memoryValue = 2048;
+    [ObservableProperty] private bool _memoryAuto = true;
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private bool _autoUpdate = true;
 
@@ -46,7 +47,9 @@ public partial class SettingsViewModel : ObservableObject
     public string PendingText => string.IsNullOrWhiteSpace(_services.Settings.Current.PendingLauncherVersion)
         ? L.I["update.none"] : _services.Settings.Current.PendingLauncherVersion!;
 
-    public string MemoryValueText => $"{(int)Math.Round(MemoryValue)} MB";
+    public string MemoryValueText => MemoryAuto
+        ? $"{L.I["set.memory.auto"]} ({_services.Memory.BudgetMb} MB)"
+        : $"{(int)Math.Round(MemoryValue)} MB";
     public string UsageText => _services.Memory.UsageText;
     public string ModelRoot => _services.Paths.ModelRoot;
     public string DataRoot => _services.Paths.DataRoot;
@@ -69,6 +72,7 @@ public partial class SettingsViewModel : ObservableObject
         var settings = _services.Settings.Current;
         SelectedFps = settings.RenderFps;
         MemoryValue = settings.MemoryMb;
+        MemoryAuto = settings.MemoryAuto;
         AutoUpdate = settings.AutoUpdateOnStartup;
 
         Sources.Clear();
@@ -133,6 +137,15 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(UsageText));
     }
 
+    partial void OnMemoryAutoChanged(bool value)
+    {
+        if (_loading) return;
+        _services.Settings.Apply(s => s.MemoryAuto = value);
+        _services.Memory.ApplyAuto(value, (int)Math.Round(MemoryValue));
+        OnPropertyChanged(nameof(MemoryValueText));
+        OnPropertyChanged(nameof(UsageText));
+    }
+
     [RelayCommand]
     private void OpenModelFolder() => Shell.OpenFolder(_services.Paths.ModelRoot);
 
@@ -160,6 +173,7 @@ public partial class SettingsViewModel : ObservableObject
 
     internal void RemoveSource(SettingsSourceViewModel source)
     {
+        if (source.Model.BuiltIn) return;   // 内置默认源不允许删除
         _services.Settings.Current.Sources.Remove(source.Model);
         _services.Settings.Save();
         Sources.Remove(source);
@@ -184,6 +198,8 @@ public partial class SettingsSourceViewModel : ObservableObject
 
     public string Name => string.IsNullOrWhiteSpace(Model.Name) ? Model.Id : Model.Name;
     public string UrlText => string.IsNullOrWhiteSpace(Model.Url) ? L.I["dl.noSource"] : Model.Url;
+    /// <summary>内置默认源不可删除。</summary>
+    public bool CanRemove => !Model.BuiltIn;
 
     public bool Enabled
     {

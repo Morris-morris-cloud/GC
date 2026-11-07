@@ -93,6 +93,7 @@ public partial class DownloadViewModel : ObservableObject
 
     internal void RemoveSource(SourceItemViewModel source)
     {
+        if (source.Model.BuiltIn) return;   // 内置默认源不允许删除
         _services.Settings.Current.Sources.Remove(source.Model);
         _services.Settings.Save();
         var wasSelected = SelectedSource == source;
@@ -325,6 +326,8 @@ public partial class SourceItemViewModel : ObservableObject
     public string Name => string.IsNullOrWhiteSpace(Model.Name) ? Model.Id : Model.Name;
     public string HostText => string.IsNullOrWhiteSpace(Model.Url) ? L.I["dl.noSource"] : Model.DisplayHost;
     public bool HasUrl => !string.IsNullOrWhiteSpace(Model.Url);
+    /// <summary>内置默认源不可删除（下载页隐藏删除按钮）。</summary>
+    public bool CanRemove => !Model.BuiltIn;
 
     public bool Enabled
     {

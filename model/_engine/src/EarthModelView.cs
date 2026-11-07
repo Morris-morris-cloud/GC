@@ -85,7 +85,7 @@ public sealed class EarthModelView : UserControl, IDisposable
             ShowOrbit = true,
             ShowGraticule = true,
             ShowKeyLatitudes = true,
-            FrameRate = 60,
+            FrameRate = 120,
             View = IsRevolution ? SceneView.Revolution : SceneView.Rotation
         };
         _canvas.JumpToOrbit(StartAngle);

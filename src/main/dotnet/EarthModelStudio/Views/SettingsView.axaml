@@ -50,7 +50,10 @@
                        Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
           </Grid>
           <TextBlock Classes="muted" Text="{loc:Loc set.memory.desc}" TextWrapping="Wrap" />
+          <CheckBox Content="{loc:Loc set.memory.auto}" IsChecked="{Binding MemoryAuto}"
+                    Margin="0,2,0,0" />
           <Slider Minimum="512" Maximum="8192" TickFrequency="256" IsSnapToTickEnabled="False"
+                  IsEnabled="{Binding !MemoryAuto}"
                   Value="{Binding MemoryValue}" Margin="0,4,0,0" />
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Classes="faint" Text="{loc:Loc set.memory.hint}" TextWrapping="Wrap" />
@@ -75,7 +78,7 @@
                       <TextBlock Text="{Binding UrlText}" Classes="faint" TextTrimming="CharacterEllipsis" MaxWidth="520" />
                     </StackPanel>
                     <Button Grid.Column="2" Classes="ghost small" Content="✕"
-                            Command="{Binding RemoveCommand}" VerticalAlignment="Center" />
+                            IsVisible="{Binding CanRemove}" Command="{Binding RemoveCommand}" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -142,14 +145,6 @@
           <Grid ColumnDefinitions="200,*">
             <TextBlock Classes="h3" Text="{loc:Loc set.version}" />
             <TextBlock Grid.Column="1" Classes="muted" Text="{Binding VersionText}" />
-          </Grid>
-          <Grid ColumnDefinitions="200,*">
-            <TextBlock Classes="h3" Text="{loc:Loc set.platform}" />
-            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding PlatformText}" TextWrapping="Wrap" />
-          </Grid>
-          <Grid ColumnDefinitions="200,*">
-            <TextBlock Classes="h3" Text="{loc:Loc set.modelFormat}" />
-            <TextBlock Grid.Column="1" Classes="muted" Text="{loc:Loc set.modelFormat.desc}" TextWrapping="Wrap" />
           </Grid>
           <Grid ColumnDefinitions="200,*">
             <TextBlock Classes="h3" Text="{loc:Loc set.license}" />

@@ -1,5 +1,5 @@
 {
-  "app.name": "Earth Model Studio",
+  "app.name": "Morris GC",
   "app.tagline": "Astronomy teaching models · visual launcher",
   "app.version": "Version",
   "app.platform": "Platform",
@@ -74,6 +74,7 @@
   "set.memory.current": "In use",
   "set.memory.unit": "MB",
   "set.memory.hint": "2048 MB or more is recommended; 1024 MB for low-end devices.",
+  "set.memory.auto": "Auto (allocate based on device memory)",
   "set.preallocate": "Preload land data at startup",
   "set.preallocate.desc": "Faster first frame, slightly slower startup.",
   "set.sources": "Model sources",

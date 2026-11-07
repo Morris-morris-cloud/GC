@@ -38,7 +38,8 @@ public sealed class AppServices
 
         var services = new AppServices(paths);
         L.I.Initialize(services.Settings.Current.Language);
-        services.Memory.Apply(services.Settings.Current.MemoryMb);
+        services.Memory.ApplyAuto(services.Settings.Current.MemoryAuto,
+                                  services.Settings.Current.MemoryMb);
 
         Current = services;
         return services;

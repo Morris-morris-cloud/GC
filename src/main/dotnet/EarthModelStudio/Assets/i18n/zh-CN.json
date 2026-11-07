@@ -1,5 +1,5 @@
 {
-  "app.name": "地球模型工作室",
+  "app.name": "Morris GC",
   "app.tagline": "天文教学模型 · 可视化启动器",
   "app.version": "版本",
   "app.platform": "平台",
@@ -74,6 +74,7 @@
   "set.memory.current": "当前占用",
   "set.memory.unit": "MB",
   "set.memory.hint": "建议 2048 MB 以上，低配设备可选 1024 MB。",
+  "set.memory.auto": "自动（根据设备内存分配）",
   "set.preallocate": "启动时预加载模型地表数据",
   "set.preallocate.desc": "打开后首帧更快，启动耗时略增。",
   "set.sources": "模型源",

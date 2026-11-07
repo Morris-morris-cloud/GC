@@ -113,14 +113,25 @@ JSON
   echo "    运行目录 -> $REL/.GC （settings.json + model/ + cache/ + update/）"
 }
 
+# 系统/架构名（用于 Release 附件命名：GC-版本-系统-架构-是否内置dotnet）
+rid_label() {
+  case "$1" in
+    win-x64)   echo "Win-Amd64" ;;
+    win-arm64) echo "Win-Arm64" ;;
+    osx-arm64) echo "Mac-Arm64" ;;
+    *)         echo "$1" ;;
+  esac
+}
+
+# $1=RID $2=输出目录 $3=self-contained(true/false)
 publish_rid() {
-  RID="$1"; OUT="$2"
+  RID="$1"; OUT="$2"; SELF="$3"
   echo ""
-  echo "==> 编译 ${RID} -> ${OUT}"
+  echo "==> 编译 ${RID} (self-contained=${SELF}) -> ${OUT}"
   dotnet publish "$APP_PROJ" \
     -c Release \
     -r "$RID" \
-    --self-contained true \
+    --self-contained "$SELF" \
     -p:Version="$VERSION" \
     -p:DebugType=none \
     -p:PublishSingleFile=true \
@@ -142,20 +153,35 @@ pack_models() {
 }
 
 # 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
+# 命名：GC-<版本>-<系统>-<架构>-<是否内置dotnet>.zip
+#   selfcontained = 内置 .NET 运行时（免安装，体积大）
+#   framework     = 不内置（需机器已装 .NET 8，体积小）
+# 3 平台 × 2 种 = 6 个发布包
 pack_launcher() {
-  echo "==> 生成启动器更新包（不含 .GC）"
+  echo "==> 生成 6 个启动器发布包（不含 .GC）"
   WIN64="$ROOT_DIR/dist/win-x64"
   WINARM="$ROOT_DIR/dist/win-arm64"
   MACBIN="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
   [ -d "$MACBIN" ] || MACBIN="$ROOT_DIR/dist/mac-arm64"
-  [ -d "$WIN64" ] && ( cd "$WIN64" && zip -qr "$ROOT_DIR/dist/GC-win-x64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
-  [ -d "$WINARM" ] && ( cd "$WINARM" && zip -qr "$ROOT_DIR/dist/GC-win-arm64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
-  [ -d "$MACBIN" ] && ( cd "$MACBIN" && zip -qr "$ROOT_DIR/dist/GC-osx-arm64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
+  pack_one "Win-Amd64" "$WIN64"
+  pack_one "Win-Arm64" "$WINARM"
+  pack_one "Mac-Arm64" "$MACBIN"
   stamp_versions
-  ls -lh "$ROOT_DIR"/dist/GC-*.zip 2>/dev/null || true
+  ls -lh "$ROOT_DIR"/dist/GC-"$VERSION"-*.zip 2>/dev/null || true
+}
+
+# 同一份产物打两个包（内置 / 不内置 dotnet 的区分由 publish 阶段分别输出到
+# dist/<rid>-selfcontained 与 dist/<rid>-framework，文件名后缀标识即可）
+pack_one() {
+  LABEL="$1"; SRC="$2"
+  [ -d "$SRC" ] || return 0
+  for KIND in selfcontained framework; do
+    DIR="${SRC}-${KIND}"
+    [ -d "$DIR" ] || DIR="$SRC"
+    ZIP="$ROOT_DIR/dist/GC-${VERSION}-${LABEL}-${KIND}.zip"
+    ( cd "$DIR" && zip -qr "$ZIP" . -x "./.GC" "./.GC/*" "*.DS_Store" )
+    echo "    -> $(basename "$ZIP")"
+  done
 }
 
 package_mac_app() {
@@ -203,18 +229,24 @@ case "$TASK" in
   publish)
     mkdir -p "$ROOT_DIR/dist"
     stamp_versions
-    publish_rid "osx-arm64" "dist/mac-arm64"
-    publish_rid "win-x64"   "dist/win-x64"
-    publish_rid "win-arm64" "dist/win-arm64"
+    # 3 平台 × {内置dotnet, 不内置dotnet} = 6 个发布包
+    for RID in osx-arm64 win-x64 win-arm64; do
+      publish_rid "$RID" "dist/$RID-selfcontained" true
+      publish_rid "$RID" "dist/$RID-framework" false
+    done
+    # 兼容原有 .app 结构与 .GC 骨架（取内置版作为代表）
+    [ -d "$ROOT_DIR/dist/mac-arm64" ] || cp -R "$ROOT_DIR/dist/osx-arm64-selfcontained" "$ROOT_DIR/dist/mac-arm64"
+    [ -d "$ROOT_DIR/dist/win-x64" ] || cp -R "$ROOT_DIR/dist/win-x64-selfcontained" "$ROOT_DIR/dist/win-x64"
+    [ -d "$ROOT_DIR/dist/win-arm64" ] || cp -R "$ROOT_DIR/dist/win-arm64-selfcontained" "$ROOT_DIR/dist/win-arm64"
     package_mac_app
     prepare_runtime_layout "dist/win-x64"
     prepare_runtime_layout "dist/win-arm64"
     prepare_runtime_layout "dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
     pack_launcher
     echo ""
-    echo "==> 三个平台编译完成（发布包不含模型，首次启动自动下载）："
-    du -sh "$ROOT_DIR/dist"/* 2>/dev/null || true
-    echo "    把 version.json / model/ 推送到 gitcode，启动器就会自动检查更新"
+    echo "==> 三平台 × 2 模式 = 6 个发布包完成（不含模型，首次启动自动下载）："
+    ls -lh "$ROOT_DIR"/dist/GC-"$VERSION"-*.zip 2>/dev/null || true
+    echo "    把 6 个 zip 传 Release，把 version.json / model/ 推送到 gitcode"
     ;;
   models)
     build_models

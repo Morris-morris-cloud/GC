@@ -8,6 +8,7 @@ using Avalonia.Animation.Easings;
 using Avalonia.Threading;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using EarthModelStudio.Models;
 using EarthModelStudio.Services;
@@ -142,6 +143,35 @@ public partial class MainWindow : Window
         _players.Add(window);
         window.Show(this);
         window.Activate();
+    }
+
+    // ---- 自建标题栏 ------------------------------------------------------
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
+    }
+
+    private void OnMinimizeClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
+        => WindowState = WindowState.Minimized;
+
+    // 关闭动画：先淡出再真正 Close（第 4 项）
+    private async void OnCloseClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isClosing) return;
+        Opacity = 1;
+        Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(180),
+                Easing = new CubicEaseIn()
+            }
+        };
+        Opacity = 0;
+        await Task.Delay(190);
+        Close();
     }
 
     private void OnClosed(object? sender, EventArgs e)

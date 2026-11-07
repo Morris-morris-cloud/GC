@@ -32,6 +32,8 @@ public sealed class RepoPackage
     public string? Path { get; set; }
     public string? Sha256 { get; set; }
     public long Size { get; set; }
+    /// <summary>Release 附件名（用于判断是 zip 还是单文件 exe / .app.zip）。</summary>
+    public string? AssetName { get; set; }
 }
 
 public sealed class RepoModel

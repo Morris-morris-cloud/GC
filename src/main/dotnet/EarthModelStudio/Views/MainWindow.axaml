@@ -6,9 +6,32 @@
         Width="1220" Height="800"
         MinWidth="1040" MinHeight="700"
         Background="{DynamicResource AppBg}"
+        SystemDecorations="None"
         WindowStartupLocation="CenterScreen">
 
-  <Grid ColumnDefinitions="236,*" RowDefinitions="*,Auto">
+  <!-- 禁用系统标题栏，改用自建标题栏（第 13/14 项） -->
+  <Grid RowDefinitions="44,*">
+    <!-- 自建标题栏 -->
+    <Border x:Name="TitleBar" Grid.Row="0" Background="{DynamicResource SideBg}"
+            PointerPressed="OnTitleBarPointerPressed">
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="16,0,8,0">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Border Width="22" Height="22" CornerRadius="7" Background="#1C2C4C">
+            <TextBlock Text="◎" FontSize="13" Foreground="#8FB6FF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="{loc:Loc app.name}" Foreground="#F2F6FF" FontSize="12.5"
+                     FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+        <Button x:Name="MinimizeButton" Grid.Column="1" Classes="titlebtn"
+                Content="—" Click="OnMinimizeClick" />
+        <Button x:Name="CloseButton" Grid.Column="2" Classes="titlebtn close"
+                Content="✕" Click="OnCloseClick" />
+      </Grid>
+    </Border>
+
+    <!-- 原内容整体下移一行 -->
+    <Grid Grid.Row="1" ColumnDefinitions="236,*" RowDefinitions="*,Auto">
 
     <!-- 侧栏 -->
     <Border Grid.Column="0" Grid.RowSpan="2" Background="{DynamicResource SideBg}">
@@ -70,5 +93,6 @@
                 VerticalAlignment="Center" />
       </Grid>
     </Border>
+    </Grid>
   </Grid>
 </Window>

@@ -53,7 +53,7 @@ public class CelestialView : Control, IDisposable
         AvaloniaProperty.Register<CelestialView, bool>(nameof(ExaggerateTilt));
 
     public static readonly StyledProperty<int> FrameRateProperty =
-        AvaloniaProperty.Register<CelestialView, int>(nameof(FrameRate), 30);
+        AvaloniaProperty.Register<CelestialView, int>(nameof(FrameRate), 120);
 
     public static readonly StyledProperty<bool> ShowHudProperty =
         AvaloniaProperty.Register<CelestialView, bool>(nameof(ShowHud), true);
@@ -379,7 +379,8 @@ public class CelestialView : Control, IDisposable
     {
         base.OnAttachedToVisualTree(e);
         _camElevTarget = DefaultElevation;
-        _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, OnTick);
+        // 8ms 轮询以支撑最高 120 FPS（模型内部仍按 FrameRate 限流）；不依赖系统 VSync 节拍
+        _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(8), DispatcherPriority.Render, OnTick);
         _lastTick = Stopwatch.GetTimestamp();
         _timer.Start();
     }

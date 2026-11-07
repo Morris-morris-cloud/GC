@@ -246,4 +246,42 @@
     <Setter Property="FontSize" Value="12.5" />
   </Style>
 
+  <!-- 自建标题栏按钮 -->
+  <Style Selector="Button.titlebtn">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="#A9B8D4" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Margin" Value="2,0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button.titlebtn:pointerover">
+    <Setter Property="Background" Value="#223252" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+  <Style Selector="Button.titlebtn.close:pointerover">
+    <Setter Property="Background" Value="#D64545" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+  <!-- 所有按钮按下时的缩放反馈（MENU 按钮同样生效） -->
+  <Style Selector="Button">
+    <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+  </Style>
+  <Style Selector="Button:pressed">
+    <Setter Property="RenderTransform">
+      <ScaleTransform ScaleX="0.94" ScaleY="0.94" />
+    </Setter>
+  </Style>
+
 </Styles>
