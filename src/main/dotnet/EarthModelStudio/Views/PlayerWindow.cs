@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
 using System.Collections.Generic;
 using EarthModelStudio.Models;
@@ -28,10 +29,63 @@ public sealed class PlayerWindow : Window
         MinHeight = 680;
         Background = new SolidColorBrush(Color.Parse("#05070F"));
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Content = model.View;
+        // 与启动器一致：去掉系统标题栏，自己做一个极简顶栏（否则 Esc 之外无法关闭）
+        SystemDecorations = Avalonia.Controls.SystemDecorations.None;
+
+        var titleBar = new Border
+        {
+            Height = 34,
+            Background = new SolidColorBrush(Color.Parse("#0A1120")),
+            Child = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = package.LocalizedName,
+                        Foreground = new SolidColorBrush(Color.Parse("#A9B8D4")),
+                        FontSize = 11.5,
+                        Margin = new Thickness(14, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        [Grid.ColumnProperty] = 0
+                    },
+                    new Button
+                    {
+                        Content = "✕",
+                        Width = 40,
+                        Height = 28,
+                        Background = Brushes.Transparent,
+                        Foreground = new SolidColorBrush(Color.Parse("#A9B8D4")),
+                        BorderThickness = new Thickness(0),
+                        FontSize = 13,
+                        CornerRadius = new CornerRadius(7),
+                        Margin = new Thickness(0, 0, 8, 0),
+                        HorizontalContentAlignment = HorizontalAlignment.Center,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        [Grid.ColumnProperty] = 1
+                    }
+                }
+            }
+        };
+        titleBar.PointerPressed += OnTitleBarPointerPressed;
+        if (titleBar.Child is Grid g)
+            foreach (var child in g.Children)
+                if (child is Button b) b.Click += (_, _) => Close();
+
+        Content = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(titleBar, Dock.Top);
+        ((DockPanel)Content).Children.Add(titleBar);
+        ((DockPanel)Content).Children.Add(model.View);
 
         KeyDown += OnKeyDown;
         Closed += OnClosed;
+    }
+
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)

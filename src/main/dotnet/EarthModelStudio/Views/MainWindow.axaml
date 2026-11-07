@@ -5,14 +5,20 @@
         Title="{loc:Loc app.name}"
         Width="1220" Height="800"
         MinWidth="1040" MinHeight="700"
-        Background="{DynamicResource AppBg}"
+        Background="#0A1120"
+        TransparencyLevelHint="None"
         SystemDecorations="None"
         WindowStartupLocation="CenterScreen">
 
-  <!-- 禁用系统标题栏，改用自建标题栏（第 13/14 项） -->
-  <Grid RowDefinitions="44,*">
+  <!-- 禁用系统标题栏，改用自建标题栏；外层圆角容器让整个窗口四角变圆。
+       用深色不透明底，避免透明/亚克力在无边框窗口下露出系统白边。 -->
+  <Border CornerRadius="16" ClipToBounds="True"
+          Background="{DynamicResource AppBg}"
+          BorderBrush="#0A1120" BorderThickness="1"
+          BoxShadow="0 18 50 0 #400A1226">
+    <Grid RowDefinitions="44,*">
     <!-- 自建标题栏 -->
-    <Border x:Name="TitleBar" Grid.Row="0" Background="{DynamicResource SideBg}"
+    <Border x:Name="TitleBar" Grid.Row="0" Background="{DynamicResource TitleBarBg}"
             PointerPressed="OnTitleBarPointerPressed">
       <Grid ColumnDefinitions="*,Auto,Auto" Margin="16,0,8,0">
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -33,22 +39,16 @@
     <!-- 原内容整体下移一行 -->
     <Grid Grid.Row="1" ColumnDefinitions="236,*" RowDefinitions="*,Auto">
 
-    <!-- 侧栏 -->
-    <Border Grid.Column="0" Grid.RowSpan="2" Background="{DynamicResource SideBg}">
-      <Grid RowDefinitions="Auto,*,Auto" Margin="16,22,16,18">
+    <!-- 侧栏：品牌已在标题栏展示，这里只留一句副标题，避免重复 -->
+    <Border Grid.Column="0" Grid.RowSpan="2" Background="{DynamicResource SideBgBrush}">
+      <Grid RowDefinitions="Auto,*,Auto" Margin="16,20,16,18">
 
-        <StackPanel Orientation="Horizontal" Spacing="11">
-          <Border Width="38" Height="38" CornerRadius="12" Background="#1C2C4C">
-            <TextBlock Text="◎" FontSize="20" Foreground="#8FB6FF"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <StackPanel VerticalAlignment="Center" Spacing="1">
-            <TextBlock Text="{loc:Loc app.name}" Foreground="#F2F6FF" FontSize="13.5" FontWeight="SemiBold" />
-            <TextBlock Text="{loc:Loc app.tagline}" Foreground="#7C90B4" FontSize="10" />
-          </StackPanel>
+        <StackPanel Spacing="3" Margin="2,0,0,0">
+          <TextBlock Text="{loc:Loc app.tagline}" Foreground="#7C90B4" FontSize="10.5"
+                     TextWrapping="Wrap" />
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="0,30,0,0" Spacing="6">
+        <StackPanel Grid.Row="1" Margin="0,26,0,0" Spacing="6">
           <TextBlock Text="MENU" Foreground="#4C5F80" FontSize="9.5" FontWeight="SemiBold" Margin="14,0,0,4" />
           <Button Classes="nav" Classes.active="{Binding IsHomeActive}"
                   Command="{Binding GoHomeCommand}" Content="{loc:Loc nav.home}" />
@@ -95,4 +95,5 @@
     </Border>
     </Grid>
   </Grid>
+  </Border>
 </Window>

@@ -1,30 +1,30 @@
 {
   "schema": 1,
-  "generated": "2026-11-07T10:46:02Z",
+  "generated": "2026-11-07T12:01:09Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
-    "version": "1.0.0",
-    "revision": "0d59eff631",
+    "version": "1.0.1",
+    "revision": "ba909d4dc3",
     "packages": {
       "win-x64": {
         "path": "dist/GC-win-x64.zip",
         "url": "",
-        "sha256": "7bfb1cfab07934642eff4c52078a8f5f034f1d2432a7613f04674403c70f2b6d",
-        "size": 78755039
+        "sha256": "2704fbc3e3acba5630a13a313af0eca45128827ed90e4718fd143a554ca70c3c",
+        "size": 39379924
       },
       "win-arm64": {
         "path": "dist/GC-win-arm64.zip",
         "url": "",
-        "sha256": "9fddf07fa18cbdb368e37204cfb96f5828207e5fe74ecb31fa66b61fa400fd1c",
-        "size": 75360988
+        "sha256": "c8f69370b9e381418a6568aca11cac44cb034e0ab2a99f7e14fcbef1dc503a44",
+        "size": 37684316
       },
       "osx-arm64": {
         "path": "dist/GC-osx-arm64.zip",
         "url": "",
-        "sha256": "3517548b598eda62c92d873528f39e305c52c6fb246fa5ba5f3613f8b8cb315a",
-        "size": 39847910
+        "sha256": "8588892dcfb982b7b52c3d74f3493fd8f27a327a0571095ab62dd4130857e082",
+        "size": 39852236
       },
       "osx-x64": {
         "path": "dist/GC-osx-x64.zip",
@@ -39,12 +39,12 @@
   "models": [
     {
       "id": "earth-revolution",
-      "version": "1.0-0a73a257ec",
+      "version": "1.0-7380e0cff3",
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
-      "version": "1.0-6c97454f58",
+      "version": "1.0-c74907bbce",
       "dir": "model/earth-rotation"
     }
   ]

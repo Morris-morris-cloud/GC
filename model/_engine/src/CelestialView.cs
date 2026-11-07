@@ -705,40 +705,52 @@ public class CelestialView : Control, IDisposable
         var tropic = TropicDegrees(runtime);
         var polar = 90.0 - tropic;
 
-        DrawParallel(ctx, cam, planet, center, radius, 0, EquatorPen,
-            labels ? Texts["lat.equator"] : null, LabelBrush);
-        DrawParallel(ctx, cam, planet, center, radius, tropic, TropicPen,
-            labels ? Texts["lat.tropicN"] : null, TropicBrush);
-        DrawParallel(ctx, cam, planet, center, radius, -tropic, TropicPen,
-            labels ? Texts["lat.tropicS"] : null, TropicBrush);
-        DrawParallel(ctx, cam, planet, center, radius, polar, PolarPen,
-            labels ? Texts["lat.polarN"] : null, PolarBrush);
-        DrawParallel(ctx, cam, planet, center, radius, -polar, PolarPen,
-            labels ? Texts["lat.polarS"] : null, PolarBrush);
-    }
-
-    private void DrawParallel(DrawingContext ctx, Matrix4x4 cam, Matrix4x4 planet,
-        Point center, double radius, double lat, IPen pen, string? label, IBrush labelBrush)
-    {
-        DrawSpherePolyline(ctx, cam, planet, center, radius, pen,
-            t => LatLonToUnit(lat, t * 360.0), 144);
-        if (label == null) return;
-
-        // 找该纬线上「最靠右且可见」的点作为标签锚点：
-        // 地球自转时标签始终留在可见半球右侧，不会忽隐忽现
-        Vector3 best = default;
-        var bestScore = double.NegativeInfinity;
-        for (var lon = -180; lon < 180; lon += 6)
+        // 五条纬线一起画：先画线，再统一布置标签，避免自转时多个标签
+        // 被投影到相近位置而互相覆盖 / 抖动（原来的逐条独立绘制会重叠）。
+        var lines = new (double Lat, IPen Pen, string? Label, IBrush Brush)[]
         {
-            var world = Vector3.Transform(LatLonToUnit(lat, lon), planet);
-            var c = Vector3.Transform(world, cam);
-            if (c.Z < 0.10f) continue;
-            var score = c.X * 2.0 + c.Z;
-            if (score > bestScore) { bestScore = score; best = c; }
+            (0, EquatorPen, labels ? Texts["lat.equator"] : null, LabelBrush),
+            (tropic, TropicPen, labels ? Texts["lat.tropicN"] : null, TropicBrush),
+            (-tropic, TropicPen, labels ? Texts["lat.tropicS"] : null, TropicBrush),
+            (polar, PolarPen, labels ? Texts["lat.polarN"] : null, PolarBrush),
+            (-polar, PolarPen, labels ? Texts["lat.polarS"] : null, PolarBrush)
+        };
+
+        foreach (var l in lines)
+            DrawSpherePolyline(ctx, cam, planet, center, radius, l.Pen,
+                t => LatLonToUnit(l.Lat, t * 360.0), 144);
+
+        if (!labels) return;
+
+        // 收集每个标签的锚点，按屏幕 Y 排序后做垂直去重叠
+        var placed = new List<(double Y, double X, string Text, IBrush Brush)>();
+        foreach (var l in lines)
+        {
+            if (l.Label == null) continue;
+            Vector3 best = default;
+            var bestScore = double.NegativeInfinity;
+            for (var lon = -180; lon < 180; lon += 6)
+            {
+                var world = Vector3.Transform(LatLonToUnit(l.Lat, lon), planet);
+                var c = Vector3.Transform(world, cam);
+                if (c.Z < 0.10f) continue;
+                var score = c.X * 2.0 + c.Z;
+                if (score > bestScore) { bestScore = score; best = c; }
+            }
+            if (double.IsNegativeInfinity(bestScore)) continue;
+            placed.Add((center.Y - best.Y * radius, center.X + best.X * radius, l.Label, l.Brush));
         }
-        if (double.IsNegativeInfinity(bestScore)) return;
-        var p = new Point(center.X + best.X * radius, center.Y - best.Y * radius);
-        DrawLabelChip(ctx, label, p, InsetMode ? 9.0 : 10.5, labelBrush, toRight: false);
+
+        placed.Sort((a, b) => a.Y.CompareTo(b.Y));
+        const double minGap = 16.0;
+        var lastY = double.NegativeInfinity;
+        foreach (var p in placed)
+        {
+            var y = p.Y;
+            if (y - lastY < minGap) y = lastY + minGap;
+            lastY = y;
+            DrawLabelChip(ctx, p.Text, new Point(p.X, y), InsetMode ? 9.0 : 10.5, p.Brush, toRight: false);
+        }
     }
 
     /// <summary>带深色底衬的标签：压在明亮的地球上也读得清，且不会被画布边缘裁掉。</summary>
@@ -746,7 +758,11 @@ public class CelestialView : Control, IDisposable
         double fontSize, IBrush brush, bool toRight)
     {
         var formatted = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), fontSize, brush);
+            new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), fontSize, brush)
+        {
+            TextAlignment = TextAlignment.Left,
+            Trimming = TextTrimming.None
+        };
         var x = toRight ? anchor.X + 9 : Math.Max(3, anchor.X - formatted.Width - 9);
         var y = anchor.Y - formatted.Height - 4;
         ctx.DrawRectangle(ChipBg, null,

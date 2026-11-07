@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -23,18 +22,26 @@ namespace EarthModelStudio.Services;
 public sealed class GitCodeReleaseRemote : IModelRemote
 {
     private readonly GitCodeRemote _content;
-    private readonly HttpClient _http;
     private readonly string _releasesUrl;
     private readonly Dictionary<string, (string Url, string? Sha256, long Size, string Name)> _assets = new();
 
-    public GitCodeReleaseRemote(string? manifestUrl, string? repository, HttpClient? http = null)
+    // 共享静态 HttpClient：避免每次检查更新都创建新实例导致端口耗尽；
+    // headers 只在一处设置，多个线程并发读取是线程安全的。
+    private static readonly HttpClient Http = CreateHttp();
+
+    private static HttpClient CreateHttp()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("EarthModelStudio-Updater/1.0");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        return client;
+    }
+
+    public GitCodeReleaseRemote(string? manifestUrl, string? repository)
     {
         _content = new GitCodeRemote(manifestUrl, repository);
         var (owner, repo) = ParseOwnerRepo(repository);
         _releasesUrl = $"https://api.gitcode.com/api/v5/repos/{owner}/{repo}/releases";
-        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("EarthModelStudio-Updater/1.0");
-        _http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         DisplayName = (string.IsNullOrWhiteSpace(repository)
             ? GitCodeRemote.DefaultRepository : repository!.TrimEnd('/')) + " (Release)";
     }
@@ -77,7 +84,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
-        var text = await _http.GetStringAsync(_releasesUrl, timeout.Token);
+        var text = await Http.GetStringAsync(_releasesUrl, timeout.Token);
         var trimmed = text.TrimStart();
         if (trimmed.Length == 0 || trimmed[0] != '[') return;   // 可能是错误页/对象
 

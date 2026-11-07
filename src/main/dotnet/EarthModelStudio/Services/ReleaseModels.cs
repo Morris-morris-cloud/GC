@@ -20,13 +20,19 @@ public sealed class ReleaseInfo
     /// <summary>从 tag_name / name 里抽出的版本号（去掉前缀 v、GC- 等）。</summary>
     public string Version => NormalizeVersion(TagName, Name);
 
+    private static readonly string[] VersionPrefixes =
+        { "v", "V", "GC-", "gc-", "release-", "Release-" };
+
+    private static readonly string[] PrereleaseTags =
+        { "alpha", "beta", "rc", "pre", "dev", "snapshot" };
+
     public static string NormalizeVersion(string tag, string name)
     {
         var raw = !string.IsNullOrWhiteSpace(tag) ? tag : name;
         if (string.IsNullOrWhiteSpace(raw)) return "";
         raw = raw!.Trim();
         // "v1.0.1" / "GC-1.0.1" / "release-1.0.1" -> 取第一段像版本号的部分
-        foreach (var prefix in new[] { "v", "V", "GC-", "gc-", "release-", "Release-" })
+        foreach (var prefix in VersionPrefixes)
             if (raw.StartsWith(prefix, StringComparison.Ordinal)) { raw = raw[prefix.Length..]; break; }
         // 形如 GC-1.0.1-Win-amd64 时只取版本段；但 2.3.0-beta 这类预发布串要保留完整。
         // 用「后缀是否常见预发布标签」区分，避免把 "-Win" 误当成预发布。
@@ -34,9 +40,7 @@ public sealed class ReleaseInfo
         if (dash > 0 && System.Version.TryParse(raw[..dash], out _))
         {
             var tail = raw[(dash + 1)..].ToLowerInvariant();
-            bool isPrerelease = tail.StartsWith("alpha") || tail.StartsWith("beta") ||
-                                tail.StartsWith("rc") || tail.StartsWith("pre") ||
-                                tail.StartsWith("dev") || tail.StartsWith("snapshot");
+            var isPrerelease = Array.Exists(PrereleaseTags, p => tail.StartsWith(p, StringComparison.Ordinal));
             if (!isPrerelease) raw = raw[..dash];
         }
         return raw;

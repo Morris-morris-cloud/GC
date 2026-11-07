@@ -42,7 +42,7 @@ $TestProj = 'src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.cspro
 $PreviewProj = 'model/_engine/PreviewGen/PreviewGen.csproj'
 $StampProj = 'model/_engine/VersionStamp/VersionStamp.csproj'
 $Sln = 'EarthModelStudio.sln'
-$Version = '1.0.0'
+$Version = '1.0.1'
 
 function Stamp-Versions {
     Write-Host '==> 自动计算模型版本并生成 version.json'
@@ -123,6 +123,8 @@ function Prepare-RuntimeLayout([string]$RelDir) {
 
 function Publish-Rid([string]$Rid, [string]$OutDir) {
     Write-Host "==> 编译 $Rid -> $OutDir"
+    # 先删旧产物目录，避免残留文件混进新包
+    if (Test-Path "$Root/$OutDir") { Remove-Item -Recurse -Force "$Root/$OutDir" }
     dotnet publish $AppProj -c Release -r $Rid --self-contained true `
         -p:Version=$Version -p:DebugType=none -p:PublishSingleFile=true `
         -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o "$Root/$OutDir"
@@ -186,10 +188,16 @@ function Pack-Launcher {
 }
 
 switch ($Task) {
-    'build' { dotnet build $Sln -c Debug }
+    'build' {
+        Get-ChildItem "$Root/dist/GC-*.zip","$Root/dist/models-*.zip" -ErrorAction SilentlyContinue |
+            Remove-Item -Force
+        dotnet build $Sln -c Debug
+    }
     'run' { dotnet run --project $AppProj -c Debug }
     'test' { dotnet run --project $TestProj -c Debug -- "$Root/build/screenshots" }
     'publish' {
+        # 先清理 dist 旧产物，再重新生成
+        if (Test-Path "$Root/dist") { Remove-Item -Recurse -Force "$Root/dist" }
         New-Item -ItemType Directory -Force -Path "$Root/dist" | Out-Null
         Stamp-Versions
         Publish-Rid 'osx-arm64' 'dist/mac-arm64'
