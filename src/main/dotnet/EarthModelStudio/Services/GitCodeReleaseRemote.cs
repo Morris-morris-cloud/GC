@@ -133,7 +133,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             {
                 TagName = Str(el, "tag_name") ?? Str(el, "tag") ?? "",
                 Name = Str(el, "name") ?? "",
-                Draft = Bool(el, "draft"),
+                Draft = Bool(el, "draft") ?? false,
                 Prerelease = Bool(el, "prerelease") ?? Bool(el, "pre_release") ?? false,
                 PublishedAt = Str(el, "published_at") ?? Str(el, "created_at")
             };
