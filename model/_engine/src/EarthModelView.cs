@@ -14,8 +14,8 @@ using EarthModelStudio.ModelSdk;
 namespace NeoRF.EarthModels;
 
 /// <summary>
-/// 模型自己的界面：画布 + 工具栏 + 速度条 + 教学要点。
-/// 带过渡动画、缩放控件与「暂停后可拖动」提示；启动器只负责开窗口。
+/// 模型自己的界面：画布 + 触控友好工具栏 + 课堂演示卡 + 节气定格与步进。
+/// 启动器只负责下载、开窗口和进度条，不参与任何模型渲染或教学交互。
 /// </summary>
 public sealed class EarthModelView : UserControl
 {
@@ -27,6 +27,7 @@ public sealed class EarthModelView : UserControl
     private static readonly IBrush MutedBrush = new SolidColorBrush(Color.Parse("#7E93B8"));
     private static readonly IBrush FaintBrush = new SolidColorBrush(Color.Parse("#61779C"));
     private static readonly IBrush BodyBrush = new SolidColorBrush(Color.Parse("#8CA0C4"));
+    private static readonly IBrush WarmBrush = new SolidColorBrush(Color.Parse("#FFC46B"));
 
     private static readonly TimeSpan HoverDuration = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan PanelDuration = TimeSpan.FromMilliseconds(190);
@@ -37,12 +38,22 @@ public sealed class EarthModelView : UserControl
     private readonly List<string> _views;
     private readonly List<ModelButton> _viewButtons = new();
     private readonly CelestialView _canvas;
+    private readonly CelestialView _closeup;
+    private readonly DispatcherTimer _uiTimer;
 
     private Border? _viewSwitch;
     private StackPanel? _seasonPanel;
     private Border? _lessons;
+    private Border? _closeupHost;
     private ModelButton? _playButton;
+    private ModelButton? _overheadButton;
+    private ModelButton? _closeupButton;
     private TextBlock? _zoomText;
+    private TextBlock? _cardState;
+    private TextBlock? _cardTitle;
+    private TextBlock? _cardDate;
+    private TextBlock? _cardDirect;
+    private TextBlock? _cardNote;
 
     private bool _playing = true;
     private bool _labels = true;
@@ -50,6 +61,9 @@ public sealed class EarthModelView : UserControl
     private bool _grid = true;
     private bool _tilt;
     private bool _showLessons = true;
+    private bool _showCloseup = true;
+    private bool _overhead;
+    private double _lastDeclination = double.NaN;
 
     public EarthModelView(IModelContext context, SceneRuntime runtime)
     {
@@ -67,6 +81,7 @@ public sealed class EarthModelView : UserControl
             ShowLabels = true,
             ShowOrbit = true,
             ShowGraticule = true,
+            ShowKeyLatitudes = true,
             FrameRate = 60,
             View = IsRevolution ? SceneView.Revolution : SceneView.Rotation
         };
@@ -77,26 +92,52 @@ public sealed class EarthModelView : UserControl
             if (_zoomText != null) _zoomText.Text = $"{zoom * 100:0}%";
         };
 
-        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+        // 课堂特写：同一套渲染器，把当前直射纬度放大给全班看
+        _closeup = new CelestialView
+        {
+            Scene = runtime,
+            Texts = _texts,
+            View = SceneView.Rotation,
+            IsPlaying = false,
+            ShowHud = false,
+            ShowLabels = true,
+            ShowGraticule = false,
+            ShowKeyLatitudes = true,
+            InsetMode = true,
+            Width = 240,
+            Height = 240
+        };
+        _closeup.JumpToSpin(20);
+
+        _uiTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(140),
+            DispatcherPriority.Render, (_, _) => RefreshTeaching());
+
+        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto") };
 
         var top = BuildTopBar();
         root.Children.Add(top);
 
+        var options = BuildOptionsBar();
+        Grid.SetRow(options, 1);
+        root.Children.Add(options);
+
         var stage = new Grid();
         stage.Children.Add(_canvas);
-        _lessons = BuildLessonsPanel();
+        stage.Children.Add(BuildZoomPad());
+        _lessons = BuildClassroomCard();
         stage.Children.Add(_lessons);
-        Grid.SetRow(stage, 1);
+        Grid.SetRow(stage, 2);
         root.Children.Add(stage);
 
         var bottom = BuildBottomBar();
-        Grid.SetRow(bottom, 2);
+        Grid.SetRow(bottom, 3);
         root.Children.Add(bottom);
 
         Content = root;
         ApplyVisibility();
+        RefreshTeaching();
 
-        // 打开时整窗淡入，避免“啪”地出现
+        // 打开时整窗淡入，避免「啪」地出现
         Opacity = 0;
         Transitions = new Transitions
         {
@@ -107,16 +148,24 @@ public sealed class EarthModelView : UserControl
                 Easing = new CubicEaseOut()
             }
         };
-        AttachedToVisualTree += (_, _) => Opacity = 1;
+        AttachedToVisualTree += (_, _) =>
+        {
+            Opacity = 1;
+            _uiTimer.Start();
+            if (TopLevel.GetTopLevel(this) is Window window) window.KeyDown += OnKeyDown;
+        };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _uiTimer.Stop();
+            if (TopLevel.GetTopLevel(this) is Window window) window.KeyDown -= OnKeyDown;
+        };
     }
 
     private string CurrentView { get; set; } = "rotation";
-
     private double StartAngle => IsRevolution ? 60 : 0;
-
     private bool IsRevolution => string.Equals(CurrentView, "revolution", StringComparison.OrdinalIgnoreCase);
-
     private bool HasViewSwitch => _views.Count > 1;
+    private List<SeasonPoint> Seasons => _runtime.Scene.Orbit.Seasons;
 
     private static string NormalizeView(string? view)
         => string.Equals(view, "revolution", StringComparison.OrdinalIgnoreCase) ? "revolution" : "rotation";
@@ -134,7 +183,7 @@ public sealed class EarthModelView : UserControl
         return list;
     }
 
-    // ---------------------------------------------------------------- 顶部
+    // ---------------------------------------------------------------- 顶部主工具栏
     private Control BuildTopBar()
     {
         var close = MakeButton(_texts["close"], () => _context.RequestClose());
@@ -144,7 +193,7 @@ public sealed class EarthModelView : UserControl
         {
             Text = _texts.Pick(_runtime.Scene.NameI18n, _texts["title"]),
             Foreground = TitleBrush,
-            FontSize = 13,
+            FontSize = 14,
             FontWeight = FontWeight.SemiBold
         });
         title.Children.Add(new TextBlock
@@ -172,42 +221,22 @@ public sealed class EarthModelView : UserControl
         var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 7,
+            Spacing = 8,
             VerticalAlignment = VerticalAlignment.Center
         };
-
-        // 缩放：− / 百分比 / + / 复位
-        actions.Children.Add(MakeButton("−", () => _canvas.ZoomBy(1 / 1.25), compact: true));
-        _zoomText = new TextBlock
-        {
-            Text = "100%",
-            Foreground = TextBrush,
-            FontSize = 11,
-            Width = 38,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Center
-        };
-        actions.Children.Add(_zoomText);
-        actions.Children.Add(MakeButton("+", () => _canvas.ZoomBy(1.25), compact: true));
-        actions.Children.Add(MakeButton("⟲", () =>
-        {
-            _canvas.ResetView();
-            _canvas.JumpToOrbit(StartAngle);
-            _canvas.JumpToSpin(20);
-        }, compact: true));
-
         _playButton = MakeButton(_texts["pause"], TogglePlay);
+        _playButton.MinWidth = 74;
         actions.Children.Add(_playButton);
         actions.Children.Add(MakeButton(_texts["reset"], () =>
         {
             _canvas.ResetAnimation();
             _canvas.JumpToOrbit(StartAngle);
+            RefreshTeaching();
         }));
-        actions.Children.Add(MakeToggle(_texts["labels"], _labels, on => { _labels = on; _canvas.ShowLabels = on; }));
-        actions.Children.Add(MakeToggle(_texts["orbit"], _orbit, on => { _orbit = on; _canvas.ShowOrbit = on; }));
-        actions.Children.Add(MakeToggle(_texts["grid"], _grid, on => { _grid = on; _canvas.ShowGraticule = on; }));
-        actions.Children.Add(MakeToggle(_texts["tilt"], _tilt, on => { _tilt = on; _canvas.ExaggerateTilt = on; }));
-        actions.Children.Add(MakeButton(_texts["lessons"], () => SetLessonsVisible(!_showLessons)));
+        actions.Children.Add(MakeButton("◀", () => Step(-5), large: true));
+        actions.Children.Add(MakeButton("▶", () => Step(5), large: true));
+        actions.Children.Add(MakeButton(_texts["classroom"], () => SetLessonsVisible(!_showLessons)));
+        actions.Children.Add(MakeButton("⛶", ToggleFullScreen, large: true));
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto") };
         grid.Children.Add(close);
@@ -219,7 +248,55 @@ public sealed class EarthModelView : UserControl
         Grid.SetColumn(actions, 4);
         grid.Children.Add(actions);
 
-        return new Border { Background = PanelBg, Padding = new Thickness(16, 11), Child = grid };
+        return new Border { Background = PanelBg, Padding = new Thickness(16, 9), Child = grid };
+    }
+
+    // ---------------------------------------------------------------- 显示选项行
+    private Control BuildOptionsBar()
+    {
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        row.Children.Add(MakeToggle(_texts["labels"], _labels, on => { _labels = on; _canvas.ShowLabels = on; }));
+        row.Children.Add(MakeToggle(_texts["orbit"], _orbit, on => { _orbit = on; _canvas.ShowOrbit = on; }));
+        row.Children.Add(MakeToggle(_texts["grid"], _grid, on => { _grid = on; _canvas.ShowGraticule = on; }));
+        row.Children.Add(MakeToggle(_texts["tilt"], _tilt, on => { _tilt = on; _canvas.ExaggerateTilt = on; }));
+        _closeupButton = MakeToggle(_texts["closeup"], _showCloseup, on =>
+        {
+            _showCloseup = on;
+            ApplyVisibility();
+        });
+        row.Children.Add(_closeupButton);
+        _overheadButton = MakeToggle(_texts["overhead"], _overhead, on =>
+        {
+            _overhead = on;
+            // 视角只由这个显式控件改变；拖动永远不会碰它
+            _canvas.CameraElevation = on ? (IsRevolution ? 74 : 62) : double.NaN;
+        });
+        row.Children.Add(_overheadButton);
+
+        var shortcut = new TextBlock
+        {
+            Text = _texts["shortcutHint"],
+            Foreground = FaintBrush,
+            FontSize = 10.5,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        grid.Children.Add(row);
+        Grid.SetColumn(shortcut, 1);
+        grid.Children.Add(shortcut);
+        return new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#A00A1020")),
+            Padding = new Thickness(16, 7),
+            Child = grid
+        };
     }
 
     private ModelButton MakeViewButton(string view, string label)
@@ -251,11 +328,63 @@ public sealed class EarthModelView : UserControl
         CurrentView = NormalizeView(view);
         _canvas.View = IsRevolution ? SceneView.Revolution : SceneView.Rotation;
         _canvas.JumpToOrbit(StartAngle);
+        _canvas.CameraElevation = _overhead ? (IsRevolution ? 74 : 62) : double.NaN;
         foreach (var button in _viewButtons)
             button.SetBase(string.Equals(button.Tag as string, CurrentView, StringComparison.OrdinalIgnoreCase)
                 ? Accent
                 : ControlBg);
         ApplyVisibility();
+        RefreshTeaching();
+    }
+
+    // ---------------------------------------------------------------- 画布浮动缩放板（触控大按钮）
+    private Control BuildZoomPad()
+    {
+        var plus = MakeButton("＋", () => _canvas.ZoomBy(1.25), large: true);
+        var minus = MakeButton("－", () => _canvas.ZoomBy(1 / 1.25), large: true);
+        var reset = MakeButton("⟲", () => _canvas.ResetView(), large: true);
+        foreach (var b in new[] { plus, minus, reset })
+        {
+            b.MinWidth = 62;
+            b.MinHeight = 48;
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
+
+        _zoomText = new TextBlock
+        {
+            Text = "100%",
+            Foreground = TextBrush,
+            FontSize = 13,
+            FontWeight = FontWeight.SemiBold,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 2, 0, 2)
+        };
+
+        var stack = new StackPanel { Spacing = 6, Width = 62 };
+        stack.Children.Add(new TextBlock
+        {
+            Text = _texts["zoom"],
+            Foreground = MutedBrush,
+            FontSize = 10.5,
+            TextAlignment = TextAlignment.Center
+        });
+        stack.Children.Add(plus);
+        stack.Children.Add(_zoomText);
+        stack.Children.Add(minus);
+        stack.Children.Add(reset);
+
+        return new Border
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(16, 0, 0, 16),
+            Background = new SolidColorBrush(Color.Parse("#C00B1226")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#26374F")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(10),
+            Child = stack
+        };
     }
 
     // ---------------------------------------------------------------- 底部
@@ -274,7 +403,8 @@ public sealed class EarthModelView : UserControl
             Maximum = 4,
             Value = 1,
             Margin = new Thickness(12, 0, 0, 0),
-            Width = 180
+            Width = 180,
+            Height = 38
         };
         var speedText = new TextBlock
         {
@@ -296,14 +426,14 @@ public sealed class EarthModelView : UserControl
             Foreground = FaintBrush,
             FontSize = 10.5,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(22, 0, 0, 0),
+            Margin = new Thickness(20, 0, 0, 0),
             TextTrimming = TextTrimming.CharacterEllipsis
         };
 
         _seasonPanel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 6,
+            Spacing = 7,
             VerticalAlignment = VerticalAlignment.Center
         };
         _seasonPanel.Children.Add(new TextBlock
@@ -313,10 +443,7 @@ public sealed class EarthModelView : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 6, 0)
         });
-        _seasonPanel.Children.Add(MakeSeasonButton(0));
-        _seasonPanel.Children.Add(MakeSeasonButton(90));
-        _seasonPanel.Children.Add(MakeSeasonButton(180));
-        _seasonPanel.Children.Add(MakeSeasonButton(270));
+        foreach (var season in Seasons) _seasonPanel.Children.Add(MakeSeasonButton(season));
 
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*,Auto") };
         grid.Children.Add(speedLabel);
@@ -329,41 +456,93 @@ public sealed class EarthModelView : UserControl
         Grid.SetColumn(_seasonPanel, 4);
         grid.Children.Add(_seasonPanel);
 
-        return new Border { Background = PanelBg, Padding = new Thickness(16, 10), Child = grid };
+        return new Border { Background = PanelBg, Padding = new Thickness(16, 8), Child = grid };
     }
 
-    private ModelButton MakeSeasonButton(double angle)
+    private ModelButton MakeSeasonButton(SeasonPoint season)
     {
-        var key = angle switch
-        {
-            0 => "season.springEquinox",
-            90 => "season.summerSolstice",
-            180 => "season.autumnEquinox",
-            _ => "season.winterSolstice"
-        };
-        return MakeButton(_texts[key], () =>
-        {
-            if (!IsRevolution) SwitchView("revolution");
-            _canvas.JumpToOrbit(angle);
-        });
+        var captured = season;
+        var button = MakeButton(_texts[season.Key], () => JumpToSeason(captured));
+        button.MinHeight = 44;
+        return button;
     }
 
-    // ---------------------------------------------------------------- 教学要点
-    private Border BuildLessonsPanel()
+    // ---------------------------------------------------------------- 课堂演示卡
+    private Border BuildClassroomCard()
     {
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         header.Children.Add(new TextBlock
         {
-            Text = _texts["lessons"],
+            Text = _texts["classroom"],
             Foreground = TitleBrush,
             FontWeight = FontWeight.SemiBold,
-            FontSize = 12.5,
+            FontSize = 13,
             VerticalAlignment = VerticalAlignment.Center
         });
         var close = MakeButton("✕", () => SetLessonsVisible(false));
         close.SetBase(Brushes.Transparent);
         Grid.SetColumn(close, 1);
         header.Children.Add(close);
+
+        _cardState = new TextBlock
+        {
+            Text = _texts["running"],
+            Foreground = MutedBrush,
+            FontSize = 11,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        _cardTitle = new TextBlock
+        {
+            Foreground = TitleBrush,
+            FontSize = 20,
+            FontWeight = FontWeight.Bold
+        };
+        _cardDate = new TextBlock { Foreground = MutedBrush, FontSize = 12 };
+        _cardDirect = new TextBlock
+        {
+            Foreground = WarmBrush,
+            FontSize = 27,
+            FontWeight = FontWeight.Bold
+        };
+        _cardNote = new TextBlock
+        {
+            Foreground = BodyBrush,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 18
+        };
+
+        _closeupHost = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            BorderBrush = new SolidColorBrush(Color.Parse("#26374F")),
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 2),
+            Child = _closeup
+        };
+
+        var readouts = new StackPanel { Spacing = 2 };
+        readouts.Children.Add(_cardState);
+        readouts.Children.Add(_cardTitle);
+        readouts.Children.Add(_cardDate);
+        readouts.Children.Add(new TextBlock
+        {
+            Text = _texts["directPoint"],
+            Foreground = MutedBrush,
+            FontSize = 11,
+            Margin = new Thickness(0, 8, 0, 0)
+        });
+        readouts.Children.Add(_cardDirect);
+        readouts.Children.Add(_cardNote);
+        readouts.Children.Add(new TextBlock
+        {
+            Text = _texts["closeup"],
+            Foreground = MutedBrush,
+            FontSize = 11,
+            Margin = new Thickness(0, 6, 0, 0)
+        });
+        readouts.Children.Add(_closeupHost);
 
         var list = new StackPanel { Spacing = 2 };
         foreach (var lesson in _runtime.Scene.Lessons)
@@ -394,8 +573,9 @@ public sealed class EarthModelView : UserControl
                 BorderThickness = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Left,
-                Padding = new Thickness(8, 7),
+                Padding = new Thickness(8, 9),
                 Margin = new Thickness(0, 1),
+                MinHeight = 44,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 Transitions = new Transitions
                 {
@@ -410,26 +590,39 @@ public sealed class EarthModelView : UserControl
         }
 
         var content = new StackPanel { Spacing = 8 };
-        content.Children.Add(header);
-        content.Children.Add(new ScrollViewer
+        content.Children.Add(readouts);
+        content.Children.Add(new TextBlock
         {
-            Content = list,
-            MaxHeight = 380,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            Text = _texts["lessons"],
+            Foreground = TitleBrush,
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 12.5
         });
+        content.Children.Add(list);
+
+        var bodyGrid = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        bodyGrid.Children.Add(header);
+        var scroller = new ScrollViewer
+        {
+            Content = content,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        Grid.SetRow(scroller, 1);
+        bodyGrid.Children.Add(scroller);
 
         var panel = new Border
         {
             HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            Width = 272,
-            Margin = new Thickness(0, 58, 16, 80),
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Width = 296,
+            Margin = new Thickness(0, 12, 16, 12),
             Background = new SolidColorBrush(Color.Parse("#D00B1226")),
             CornerRadius = new CornerRadius(14),
             Padding = new Thickness(13),
             BorderBrush = new SolidColorBrush(Color.Parse("#26374F")),
             BorderThickness = new Thickness(1),
-            Child = content,
+            Child = bodyGrid,
             RenderTransform = new TranslateTransform(0, 0)
         };
         panel.Transitions = new Transitions
@@ -470,6 +663,38 @@ public sealed class EarthModelView : UserControl
         timer.Start();
     }
 
+    /// <summary>课堂卡与地球特写跟随当前轨道位置刷新（播放时每 140ms 更新一次）。</summary>
+    private void RefreshTeaching()
+    {
+        if (_cardTitle == null) return;
+        var season = IsRevolution ? _canvas.NearestSeason(6) : null;
+        var decl = _canvas.SubsolarLatitude;
+
+        _cardState!.Text = _playing ? _texts["running"] : _texts["frozen"];
+        _cardState.Foreground = _playing ? MutedBrush : WarmBrush;
+        _cardTitle.Text = season != null
+            ? _texts[season.Key]
+            : (IsRevolution ? _texts["seasons"] : _texts.Pick(_runtime.Scene.NameI18n, _texts["title"]));
+        _cardDate!.Text = _canvas.CurrentDate + (season?.Date != null ? " · " + season.Date : "");
+        _cardDirect!.Text = season?.DeclinationDeg.HasValue == true
+            ? FormatDeclination(season.DeclinationDeg.Value)
+            : _canvas.DeclinationLabel;
+        _cardNote!.Text = season != null
+            ? _texts.Pick(season.TeachingI18n, _texts["orbitTeach"])
+            : _texts["orbitTeach"];
+
+        if (_showCloseup && (double.IsNaN(_lastDeclination) || Math.Abs(_lastDeclination - decl) > 0.04))
+        {
+            _closeup.DeclinationDeg = decl;
+            _lastDeclination = decl;
+        }
+    }
+
+    private string FormatDeclination(double d)
+        => Math.Abs(d) < 0.05
+            ? "0° " + _texts["lat.equator"]
+            : $"{Math.Abs(d):0.0}°" + (d > 0 ? _texts["northShort"] : _texts["southShort"]);
+
     private void ApplyLesson(Lesson lesson)
     {
         if (!string.IsNullOrWhiteSpace(lesson.View))
@@ -477,20 +702,101 @@ public sealed class EarthModelView : UserControl
             var view = NormalizeView(lesson.View);
             if (!string.Equals(view, CurrentView, StringComparison.OrdinalIgnoreCase)) SwitchView(view);
         }
+        // 讲要点时自动定格，读数不再跳动，方便指读板书
+        SetPlaying(false);
         if (lesson.AngleDeg.HasValue) _canvas.JumpToOrbit(lesson.AngleDeg.Value);
+        RefreshTeaching();
+    }
+
+    // ---------------------------------------------------------------- 教学操作
+    private void SetPlaying(bool play)
+    {
+        _playing = play;
+        _canvas.IsPlaying = play;
+        if (_playButton?.Content is TextBlock block)
+            block.Text = play ? _texts["pause"] : _texts["play"];
+        RefreshTeaching();
+    }
+
+    private void TogglePlay() => SetPlaying(!_playing);
+
+    private void Step(double deltaDeg)
+    {
+        SetPlaying(false);
+        if (IsRevolution) _canvas.StepOrbit(deltaDeg);
+        else _canvas.StepSpin(deltaDeg);
+        RefreshTeaching();
+    }
+
+    private void JumpToSeason(SeasonPoint season)
+    {
+        if (!IsRevolution) SwitchView("revolution");
+        SetPlaying(false);
+        _canvas.JumpToOrbit(season.AngleDeg);
+        RefreshTeaching();
+    }
+
+    private void JumpToSeasonIndex(int index)
+    {
+        if (index < 0 || index >= Seasons.Count) return;
+        JumpToSeason(Seasons[index]);
+    }
+
+    private void ToggleFullScreen()
+    {
+        try
+        {
+            if (TopLevel.GetTopLevel(this) is Window window)
+                window.WindowState = window.WindowState == WindowState.FullScreen
+                    ? WindowState.Normal
+                    : WindowState.FullScreen;
+        }
+        catch (Exception ex)
+        {
+            _context.Log("全屏切换失败: " + ex.Message);
+        }
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Space:
+                TogglePlay();
+                e.Handled = true;
+                break;
+            case Key.Left:
+                Step(-5);
+                e.Handled = true;
+                break;
+            case Key.Right:
+                Step(5);
+                e.Handled = true;
+                break;
+            case Key.D1: JumpToSeasonIndex(0); e.Handled = true; break;
+            case Key.D2: JumpToSeasonIndex(1); e.Handled = true; break;
+            case Key.D3: JumpToSeasonIndex(2); e.Handled = true; break;
+            case Key.D4: JumpToSeasonIndex(3); e.Handled = true; break;
+            case Key.F: ToggleFullScreen(); e.Handled = true; break;
+            case Key.Add: _canvas.ZoomBy(1.25); e.Handled = true; break;
+            case Key.Subtract: _canvas.ZoomBy(1 / 1.25); e.Handled = true; break;
+            case Key.D0: _canvas.ResetView(); e.Handled = true; break;
+        }
     }
 
     // ---------------------------------------------------------------- 工具
-    private ModelButton MakeButton(string text, Action onClick, bool compact = false)
+    private ModelButton MakeButton(string text, Action onClick, bool large = false)
     {
         var button = new ModelButton
         {
-            Content = new TextBlock { Text = text, FontSize = 11.5 },
+            Content = new TextBlock { Text = text, FontSize = large ? 20 : 12.5 },
             Foreground = TextBrush,
             BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(8),
-            Padding = compact ? new Thickness(8, 4) : new Thickness(9, 5),
-            MinWidth = compact ? 26 : 0,
+            CornerRadius = new CornerRadius(9),
+            Padding = large ? new Thickness(10, 8) : new Thickness(13, 9),
+            MinWidth = large ? 46 : 44,
+            MinHeight = 40,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Cursor = new Cursor(StandardCursorType.Hand)
         };
@@ -499,19 +805,12 @@ public sealed class EarthModelView : UserControl
         return button;
     }
 
-    private void TogglePlay()
-    {
-        _playing = !_playing;
-        _canvas.IsPlaying = _playing;
-        if (_playButton?.Content is TextBlock block)
-            block.Text = _playing ? _texts["pause"] : _texts["play"];
-    }
-
     private void ApplyVisibility()
     {
         if (_viewSwitch != null) _viewSwitch.IsVisible = HasViewSwitch;
         if (_lessons != null) _lessons.IsVisible = _showLessons;
         if (_seasonPanel != null) _seasonPanel.IsVisible = IsRevolution;
+        if (_closeupHost != null) _closeupHost.IsVisible = _showCloseup;
     }
 
     /// <summary>带悬停过渡的按钮：本地基础色 + 悬停提亮。</summary>

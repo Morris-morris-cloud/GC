@@ -257,8 +257,17 @@ public class CelestialView : Control
 
         var dx = p.X - _dragLast.X;
         _dragLast = p;
+        DragBy(dx, p.Y - _dragLast.Y + (p.Y - _dragLast.Y));
+        e.Handled = true;
+    }
 
-        // 只驱动地球自身的角度；视角俯仰、轨道平面、经纬网平面一律不动
+    /// <summary>
+    /// 手动转动地球。只接受水平分量：竖直分量在任何情况下都不会改变相机俯仰角，
+    /// 因此轨道面、经纬网、地轴所在的平面始终固定。
+    /// </summary>
+    public void DragBy(double dx, double dy)
+    {
+        _ = dy;
         if (View == SceneView.Revolution)
         {
             _orbitDeg = Wrap360(_orbitDeg + dx * 0.32);
@@ -269,10 +278,8 @@ public class CelestialView : Control
             _spinDeg = Wrap360(_spinDeg + dx * 0.42);
             _spinVelocity = dx * 0.42 * 55;
         }
-
         AnglesChanged?.Invoke();
         InvalidateVisual();
-        e.Handled = true;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
