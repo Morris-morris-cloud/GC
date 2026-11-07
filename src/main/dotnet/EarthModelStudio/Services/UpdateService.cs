@@ -195,6 +195,8 @@ public sealed class UpdateService
     private static bool IsPayload(string id, string relative)
     {
         var rel = relative.Replace('\\', '/');
+        // 拒绝任何形式的父目录穿越与绝对路径
+        if (rel.StartsWith('/') || rel.Contains("..", StringComparison.Ordinal)) return false;
         return rel.Equals(id + ".json", StringComparison.OrdinalIgnoreCase) ||
                rel.StartsWith(id + ".model/", StringComparison.OrdinalIgnoreCase);
     }
@@ -223,7 +225,14 @@ public sealed class UpdateService
             {
                 ct.ThrowIfCancellationRequested();
                 var bytes = await _remote.DownloadAsync(entry, ct);
-                var dest = Path.Combine(staging, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                // 路径穿越防护：规范化后必须仍落在 staging 目录内，
+                // 防止远端清单里的 "../" 或绝对路径写进安装目录之外。
+                var dest = Path.GetFullPath(Path.Combine(staging,
+                    entry.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+                var stagingFull = Path.GetFullPath(staging)
+                    .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!dest.StartsWith(stagingFull, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"非法的模型文件路径: {entry.RelativePath}");
                 var destDir = Path.GetDirectoryName(dest);
                 if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
                 await File.WriteAllBytesAsync(dest, bytes, ct);
@@ -307,7 +316,7 @@ public sealed class UpdateService
         await File.WriteAllBytesAsync(zip, bytes, ct);
         try
         {
-            ZipFile.ExtractToDirectory(zip, payload, true);
+            ZipSafety.ExtractToDirectory(zip, payload);
         }
         finally
         {

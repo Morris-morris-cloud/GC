@@ -83,6 +83,7 @@ public sealed class DirectoryRemote : IModelRemote
         }
         var url = package.Url;
         if (string.IsNullOrWhiteSpace(url)) return null;
+        // 离线 U 盘源与 ./build.sh update-test 都会用本地 zip 路径，必须保持兼容。
         if (url!.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
             return await File.ReadAllBytesAsync(new Uri(url).LocalPath, ct);
         if (Path.IsPathRooted(url) && File.Exists(url))

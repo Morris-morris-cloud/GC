@@ -173,7 +173,7 @@ public sealed class ModelSourceClient
 
             var extractDir = Path.Combine(tmpRoot, "extract");
             Directory.CreateDirectory(extractDir);
-            ZipFile.ExtractToDirectory(zipPath, extractDir, true);
+            ZipSafety.ExtractToDirectory(zipPath, extractDir);
 
             var root = FindModelRoot(extractDir) ?? extractDir;
             foreach (var entry in Directory.GetFileSystemEntries(root))

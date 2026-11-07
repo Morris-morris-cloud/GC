@@ -162,6 +162,10 @@ public sealed class LoadedModel : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        // 顺序：先释放视图（停计时器/Dispose 位图），再释放运行时，最后卸载程序集。
+        // 否则视图里的事件订阅会继续持有 ALC 内的类型，collectible 上下文无法回收。
+        try { (View as IDisposable)?.Dispose(); }
+        catch (Exception ex) { Console.Error.WriteLine($"释放模型视图失败: {ex.Message}"); }
         try { _runtime.Dispose(); } catch (Exception ex) { Console.Error.WriteLine($"释放模型失败: {ex.Message}"); }
         try { _context.Unload(); } catch (Exception ex) { Console.Error.WriteLine($"卸载模型程序集失败: {ex.Message}"); }
     }

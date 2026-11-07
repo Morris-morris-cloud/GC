@@ -33,5 +33,13 @@ public sealed class EarthModelRuntime : IModelRuntime
         return view;
     }
 
-    public void Dispose() => GC.SuppressFinalize(this);
+    /// <summary>
+    /// 释放预烘焙纹理（约 3MB 托管数组）与场景引用。窗口关闭时由启动器调用，
+    /// 避免 collectible ALC 里的类型被长生命周期引用拖住而无法卸载。
+    /// </summary>
+    public void Dispose()
+    {
+        _scene = null;
+        GC.SuppressFinalize(this);
+    }
 }

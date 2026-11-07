@@ -19,6 +19,9 @@ public partial class DownloadViewModel : ObservableObject
     private readonly AppServices _services;
     private readonly MainViewModel _main;
     private bool _initialized;
+    // 每次切源取消上一次加载，并用 generation 序号丢弃过期结果，避免并发写 Models 集合
+    private CancellationTokenSource? _loadCts;
+    private int _loadGeneration;
 
     public ObservableCollection<SourceItemViewModel> Sources { get; } = new();
     public ObservableCollection<RemoteModelRowViewModel> Models { get; } = new();
@@ -157,12 +160,22 @@ public partial class DownloadViewModel : ObservableObject
     private async Task LoadAsync(SourceItemViewModel source, bool force)
     {
         if (!source.Model.Enabled) return;
+
+        // 取消上一次尚未完成的加载，避免快速切换源时并发 Clear/写入同一集合
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        var ct = _loadCts.Token;
+        var generation = ++_loadGeneration;
+
         IsBusy = true;
         StatusMessage = L.I["dl.syncing"];
         try
         {
-            var index = await _services.Sources.FetchAsync(source.Model, force, null, CancellationToken.None);
-            if (SelectedSource != source) return;
+            var index = await _services.Sources.FetchAsync(source.Model, force, null, ct);
+            // 只有「仍是当前选中源 + 仍是最新一次加载」才可以写 UI 集合
+            if (ct.IsCancellationRequested || generation != _loadGeneration || SelectedSource != source)
+                return;
 
             if (index.Error != null)
             {
@@ -189,13 +202,18 @@ public partial class DownloadViewModel : ObservableObject
                 ? $"{L.I.F("dl.ready", Models.Count)} · {L.I["dl.fromCache"]}"
                 : L.I.F("dl.ready", Models.Count);
         }
+        catch (OperationCanceledException)
+        {
+            // 被更新的加载取代或页面关闭：忽略，不覆盖新结果
+        }
         catch (Exception ex)
         {
-            StatusMessage = ex.Message;
+            if (!ct.IsCancellationRequested) StatusMessage = ex.Message;
         }
         finally
         {
-            IsBusy = false;
+            // 只有最后一次加载才复位 Busy，避免旧任务把新任务的忙碌状态清掉
+            if (generation == _loadGeneration) IsBusy = false;
         }
     }
 

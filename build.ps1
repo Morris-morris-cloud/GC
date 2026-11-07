@@ -33,6 +33,10 @@ $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot
 Set-Location $Root
 
+# Avalonia 遥测任务在只读用户目录/CI/沙箱会因写日志失败而中断编译（MSB4018）。
+# 官方 opt-out；Directory.Build.targets 里还有一层项目内的兜底。
+$env:AVALONIA_TELEMETRY_OPTOUT = '1'
+
 $AppProj = 'src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj'
 $TestProj = 'src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj'
 $PreviewProj = 'model/_engine/PreviewGen/PreviewGen.csproj'

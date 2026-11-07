@@ -17,7 +17,7 @@ namespace NeoRF.EarthModels;
 /// 模型自己的界面：画布 + 触控友好工具栏 + 课堂演示卡 + 节气定格与步进。
 /// 启动器只负责下载、开窗口和进度条，不参与任何模型渲染或教学交互。
 /// </summary>
-public sealed class EarthModelView : UserControl
+public sealed class EarthModelView : UserControl, IDisposable
 {
     private static readonly IBrush PanelBg = new SolidColorBrush(Color.Parse("#C40A1020"));
     private static readonly IBrush ControlBg = new SolidColorBrush(Color.Parse("#16233C"));
@@ -155,13 +155,40 @@ public sealed class EarthModelView : UserControl
         {
             Opacity = 1;
             _uiTimer.Start();
-            if (TopLevel.GetTopLevel(this) is Window window) window.KeyDown += OnKeyDown;
+            if (TopLevel.GetTopLevel(this) is Window window)
+            {
+                _hostWindow = window;
+                window.KeyDown += OnKeyDown;
+            }
         };
         DetachedFromVisualTree += (_, _) =>
         {
             _uiTimer.Stop();
-            if (TopLevel.GetTopLevel(this) is Window window) window.KeyDown -= OnKeyDown;
+            if (_hostWindow != null)
+            {
+                _hostWindow.KeyDown -= OnKeyDown;
+                _hostWindow = null;
+            }
         };
+    }
+
+    private Window? _hostWindow;
+
+    /// <summary>
+    /// 窗口关闭时释放计时器、解绑窗口事件并释放两块球面位图，
+    /// 否则 DispatcherTimer / KeyDown 会持有控件，使 collectible ALC 无法卸载。
+    /// </summary>
+    public void Dispose()
+    {
+        _uiTimer.Stop();
+        if (_hostWindow != null)
+        {
+            _hostWindow.KeyDown -= OnKeyDown;
+            _hostWindow = null;
+        }
+        _canvas.Dispose();
+        _closeup.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private string CurrentView { get; set; } = "rotation";

@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly List<PlayerWindow> _players = new();
     private MainViewModel? _viewModel;
     private ContentControl? _pageHost;
+    private bool _isClosing;
 
     public MainWindow()
     {
@@ -74,9 +75,19 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Render);
     }
 
-    private async void OpenPlayerWindow(ModelPackage package)
+    // 事件处理器必须是 void，因此包一层可观察异常的入口：
+    // fire-and-forget 的 Task 也要观察异常，绝不外泄到 Avalonia 事件循环导致进程崩溃。
+    private void OpenPlayerWindow(ModelPackage package) => _ = OpenPlayerWindowSafeAsync(package);
+
+    private async Task OpenPlayerWindowSafeAsync(ModelPackage package)
     {
-        if (_viewModel == null) return;
+        try { await OpenPlayerWindowAsync(package); }
+        catch (Exception ex) { Console.Error.WriteLine($"打开模型窗口失败: {ex}"); }
+    }
+
+    private async Task OpenPlayerWindowAsync(ModelPackage package)
+    {
+        if (_viewModel == null || _isClosing) return;
 
         // 启动进度窗：模型加载、地表纹理生成、界面构建的真实进度
         var loading = new LoadingWindow(package.LocalizedName);
@@ -88,9 +99,18 @@ public partial class MainWindow : Window
         PlayerWindow? window = null;
         LoadedModel? loaded = null;
         Exception? error = null;
+
+        // 关键修复：requestClose 过去捕获的是「尚未赋值的 window」，加载期恒为 null，
+        // 模型在 Prepare/CreateView 里调用 context.RequestClose() 会静默失效。
+        // 改为关闭当前存在的窗口（加载期=进度窗，加载完成=模型窗），统一走 UI 线程。
+        void RequestClose() => Dispatcher.UIThread.Post(() =>
+        {
+            (window ?? (Window?)loading)?.Close();
+        });
+
         try
         {
-            loaded = await _viewModel.Models.LoadAsync(package, () => window?.Close(),
+            loaded = await _viewModel.Models.LoadAsync(package, RequestClose,
                 (value, message) => loading.Report(value, message));
         }
         catch (Exception ex)
@@ -99,6 +119,13 @@ public partial class MainWindow : Window
         }
 
         loading.Close();
+
+        // 加载期间用户关掉了主窗口：不要再弹出幽灵模型窗口，直接释放已加载模型
+        if (_isClosing)
+        {
+            loaded?.Dispose();
+            return;
+        }
 
         if (loaded == null || error != null)
         {
@@ -119,11 +146,14 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _isClosing = true;
         if (_viewModel != null)
         {
             _viewModel.PlayerRequested -= OpenPlayerWindow;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
+        // 先取快照再关闭：PlayerWindow.Closed 回调会 _players.Remove，
+        // 直接遍历原集合会在 foreach 期间修改底层导致异常。
         foreach (var window in _players.ToList()) window.Close();
         _players.Clear();
     }

@@ -31,7 +31,12 @@ public static class ModelInstaller
             {
                 ct.ThrowIfCancellationRequested();
                 var relative = Path.GetRelativePath(model.Directory, file);
-                var dest = Path.Combine(staging, relative);
+                // 路径穿越防护：相对路径必须完整落在 staging 目录内
+                var dest = Path.GetFullPath(Path.Combine(staging, relative));
+                var stagingFull = Path.GetFullPath(staging)
+                    .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!dest.StartsWith(stagingFull, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"非法的模型文件路径: {relative}");
                 var destDir = Path.GetDirectoryName(dest);
                 if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
 
@@ -46,17 +51,29 @@ public static class ModelInstaller
                 progress?.Report((done, total <= 0 ? done : total));
             }
 
-            if (Directory.Exists(target))
+            // 原子替换：先备份旧目录，第二次 Move 失败时完整回滚，绝不把模型库清空
+            var backup = target + ".old";
+            if (Directory.Exists(backup)) Directory.Delete(backup, true);
+            var hasBackup = false;
+            try
             {
-                var backup = target + ".old";
-                if (Directory.Exists(backup)) Directory.Delete(backup, true);
-                Directory.Move(target, backup);
+                if (Directory.Exists(target))
+                {
+                    Directory.Move(target, backup);
+                    hasBackup = true;
+                }
                 Directory.Move(staging, target);
-                try { Directory.Delete(backup, true); } catch { }
             }
-            else
+            catch
             {
-                Directory.Move(staging, target);
+                // 新目录尚未就位时把旧目录还原；staging 由外层 catch 清理
+                if (hasBackup && !Directory.Exists(target) && Directory.Exists(backup))
+                    Directory.Move(backup, target);
+                throw;
+            }
+            if (hasBackup)
+            {
+                try { Directory.Delete(backup, true); } catch { /* 占用时留到下次 */ }
             }
 
             progress?.Report((total, total));

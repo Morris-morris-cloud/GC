@@ -24,7 +24,11 @@
 #       cache/               下载暂存
 #       update/              待下次启动应用的启动器更新
 # ---------------------------------------------------------------------------
-set -e
+set -eu
+
+# Avalonia 遥测任务在只读用户目录/CI/沙箱会因写日志失败而中断编译（MSB4018）。
+# 官方 opt-out；Directory.Build.targets 里还有一层项目内的兜底。
+export AVALONIA_TELEMETRY_OPTOUT=1
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$ROOT_DIR"

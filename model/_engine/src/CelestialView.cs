@@ -25,7 +25,7 @@ public enum SceneView
 /// 纯 CPU 像素着色 + 矢量标注，无外部贴图依赖，三平台表现一致。
 /// 交互约定：单指/鼠标拖动只改变地球自身的角度，视角平面保持不变；双指捏合缩放。
 /// </summary>
-public class CelestialView : Control
+public class CelestialView : Control, IDisposable
 {
     // ---------------------------------------------------------------- 属性
     public static readonly StyledProperty<SceneRuntime?> SceneProperty =
@@ -391,6 +391,20 @@ public class CelestialView : Control
         _timer = null;
     }
 
+    /// <summary>
+    /// 窗口关闭时释放计时器与 WriteableBitmap：DispatcherTimer 的 Tick 事件会持有本控件实例，
+    /// 不置空会让 collectible 的 ModelLoadContext 无法回收（模型卸载不干净）。
+    /// </summary>
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer = null;
+        _sphere?.Dispose();
+        _sphere = null;
+        _sphereSize = 0;
+        GC.SuppressFinalize(this);
+    }
+
     private void OnTick(object? sender, EventArgs e)
     {
         var now = Stopwatch.GetTimestamp();
@@ -531,20 +545,66 @@ public class CelestialView : Control
         else RenderRotation(ctx, size, runtime);
     }
 
+    // 每帧 Render 都会调用：渐变画刷改成静态只读，避免在热路径反复分配。
+    // 全部使用相对坐标，可安全共享；Radius -> RadiusX/RadiusY（旧 API 已过时）。
+    private static readonly IBrush SpaceBg = new LinearGradientBrush
+    {
+        StartPoint = new RelativePoint(0.15, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(0.85, 1, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.Parse("#080D1C"), 0),
+            new GradientStop(Color.Parse("#0B1226"), 0.55),
+            new GradientStop(Color.Parse("#04060E"), 1)
+        }
+    };
+
+    private static readonly IBrush SpaceBand = new RadialGradientBrush
+    {
+        Center = new RelativePoint(0.72, 0.18, RelativeUnit.Relative),
+        GradientOrigin = new RelativePoint(0.72, 0.18, RelativeUnit.Relative),
+        RadiusX = new RelativeScalar(1.1, RelativeUnit.Relative),
+        RadiusY = new RelativeScalar(1.1, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.FromArgb(26, 120, 150, 255), 0),
+            new GradientStop(Color.FromArgb(0, 120, 150, 255), 1)
+        }
+    };
+
+    private static readonly IBrush AtmosphereGlow = new RadialGradientBrush
+    {
+        Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+        GradientOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+        RadiusX = new RelativeScalar(0.5, RelativeUnit.Relative),
+        RadiusY = new RelativeScalar(0.5, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.FromArgb(90, 70, 140, 235), 0.60),
+            new GradientStop(Color.FromArgb(34, 80, 150, 240), 0.80),
+            new GradientStop(Color.FromArgb(0, 80, 150, 240), 1.0)
+        }
+    };
+
+    private static readonly IBrush SunGlow = new RadialGradientBrush
+    {
+        Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+        GradientOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+        RadiusX = new RelativeScalar(0.5, RelativeUnit.Relative),
+        RadiusY = new RelativeScalar(0.5, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.FromArgb(120, 255, 196, 92), 0.10),
+            new GradientStop(Color.FromArgb(48, 255, 168, 60), 0.34),
+            new GradientStop(Color.FromArgb(0, 255, 150, 40), 1.0)
+        }
+    };
+
+    private static readonly IBrush EarthHalo = new SolidColorBrush(Color.FromArgb(56, 70, 140, 235));
+
     private void DrawSpace(DrawingContext ctx, Size size)
     {
-        var bg = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0.15, 0, RelativeUnit.Relative),
-            EndPoint = new RelativePoint(0.85, 1, RelativeUnit.Relative),
-            GradientStops =
-            {
-                new GradientStop(Color.Parse("#080D1C"), 0),
-                new GradientStop(Color.Parse("#0B1226"), 0.55),
-                new GradientStop(Color.Parse("#04060E"), 1)
-            }
-        };
-        ctx.FillRectangle(bg, new Rect(size));
+        ctx.FillRectangle(SpaceBg, new Rect(size));
 
         foreach (var star in Stars)
         {
@@ -557,18 +617,7 @@ public class CelestialView : Control
             ctx.DrawEllipse(brush, null, new Point(star.X * size.Width, star.Y * size.Height), star.R, star.R);
         }
 
-        var band = new RadialGradientBrush
-        {
-            Center = new RelativePoint(0.72, 0.18, RelativeUnit.Relative),
-            GradientOrigin = new RelativePoint(0.72, 0.18, RelativeUnit.Relative),
-            Radius = 1.1,
-            GradientStops =
-            {
-                new GradientStop(Color.FromArgb(26, 120, 150, 255), 0),
-                new GradientStop(Color.FromArgb(0, 120, 150, 255), 1)
-            }
-        };
-        ctx.FillRectangle(band, new Rect(size));
+        ctx.FillRectangle(SpaceBand, new Rect(size));
     }
 
     private void DrawLoading(DrawingContext ctx, Size size)
@@ -594,19 +643,7 @@ public class CelestialView : Control
         // 太阳光由「直射纬度」反推：直射点严格落在对应纬线上，且始终朝向右前方可见半球
         var light = RotationLight(cam, tilt);
 
-        var glow = new RadialGradientBrush
-        {
-            Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            GradientOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            Radius = 0.5,
-            GradientStops =
-            {
-                new GradientStop(Color.FromArgb(90, 70, 140, 235), 0.60),
-                new GradientStop(Color.FromArgb(34, 80, 150, 240), 0.80),
-                new GradientStop(Color.FromArgb(0, 80, 150, 240), 1.0)
-            }
-        };
-        ctx.DrawEllipse(glow, null, center, radius * 1.16, radius * 1.16);
+        ctx.DrawEllipse(AtmosphereGlow, null, center, radius * 1.16, radius * 1.16);
 
         var px = PixelSizeFor(radius);
         if (px > 8 && runtime.Texture != null)
@@ -841,25 +878,15 @@ public class CelestialView : Control
         var lightWorld = Vector3.Normalize(-earthPos);
         var lightCam = Vector3.TransformNormal(lightWorld, cam);
 
-        var sunGlow = new RadialGradientBrush
-        {
-            Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            GradientOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            Radius = 0.5,
-            GradientStops =
-            {
-                new GradientStop(Color.FromArgb(120, 255, 196, 92), 0.10),
-                new GradientStop(Color.FromArgb(48, 255, 168, 60), 0.34),
-                new GradientStop(Color.FromArgb(0, 255, 150, 40), 1.0)
-            }
-        };
-        ctx.DrawEllipse(sunGlow, null, center, sunR * 6.2, sunR * 6.2);
+        ctx.DrawEllipse(SunGlow, null, center, sunR * 6.2, sunR * 6.2);
 
+        // sunBody 依赖场景里的 runtime.Star，不能静态化；仅把过时 API 换成 RadiusX/Y
         var sunBody = new RadialGradientBrush
         {
             Center = new RelativePoint(0.42, 0.38, RelativeUnit.Relative),
             GradientOrigin = new RelativePoint(0.42, 0.38, RelativeUnit.Relative),
-            Radius = 0.62,
+            RadiusX = new RelativeScalar(0.62, RelativeUnit.Relative),
+            RadiusY = new RelativeScalar(0.62, RelativeUnit.Relative),
             GradientStops =
             {
                 new GradientStop(Color.Parse("#FFF3D0"), 0),
@@ -877,7 +904,7 @@ public class CelestialView : Control
         var px = PixelSizeFor(earthR);
         if (px > 8)
         {
-            ctx.DrawEllipse(new SolidColorBrush(Color.FromArgb(56, 70, 140, 235)), null,
+            ctx.DrawEllipse(EarthHalo, null,
                 earthScreen, earthR * 1.35, earthR * 1.35);
             var bmp = EnsureSphereBitmap(px);
             if (runtime.Texture != null)
@@ -1002,6 +1029,8 @@ public class CelestialView : Control
     private WriteableBitmap EnsureSphereBitmap(int px)
     {
         if (_sphere != null && _sphereSize == px) return _sphere;
+        // 自适应分辨率会频繁改 px，旧位图必须先释放，否则每帧都可能泄漏一张 ~0.8MB 位图
+        _sphere?.Dispose();
         _sphere = new WriteableBitmap(new PixelSize(px, px), new Avalonia.Vector(96, 96),
             PixelFormat.Bgra8888, AlphaFormat.Premul);
         _sphereSize = px;

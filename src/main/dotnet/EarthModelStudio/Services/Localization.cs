@@ -64,6 +64,8 @@ public sealed class L : INotifyPropertyChanged
         Language = code;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Language)));
+        // 顺带清理已回收的弱引用，避免 _watchers 只增不减
+        _watchers.RemoveAll(w => !w.TryGetTarget(out _));
         foreach (var w in _watchers)
             if (w.TryGetTarget(out var ls)) ls.Refresh();
         LanguageChanged?.Invoke();
