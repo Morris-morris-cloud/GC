@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "type": "planet",
+  "defaultView": "revolution",
+  "views": [
+    "revolution"
+  ],
+  "nameI18n": {
+    "zh-CN": "地球公转",
+    "en": "Earth Revolution"
+  },
+  "descriptionI18n": {
+    "zh-CN": "地球绕太阳公转一年：地轴指向不变，太阳直射点南北往返，形成四季。",
+    "en": "One year around the Sun: the fixed axial direction moves the subsolar point and creates the seasons."
+  },
+  "star": {
+    "name": "Sun",
+    "nameI18n": {
+      "zh-CN": "太阳",
+      "en": "Sun"
+    },
+    "color": "#FFC24B",
+    "radiusScale": 0.5
+  },
+  "planet": {
+    "name": "Earth",
+    "nameI18n": {
+      "zh-CN": "地球",
+      "en": "Earth"
+    },
+    "axialTiltDeg": 23.5,
+    "tropicDeg": 23.5,
+    "rotationHours": 23.93,
+    "orbitDays": 365.26,
+    "oceanColor": "#1C5FA8",
+    "landColor": "#4E8C4C",
+    "iceColor": "#E9EFF6",
+    "landFile": "land.json",
+    "showGraticule": false
+  },
+  "orbit": {
+    "semiMajorAxis": 4.0,
+    "eccentricity": 0.0167,
+    "show": true,
+    "seasons": [
+      {
+        "angleDeg": 0,
+        "key": "season.springEquinox",
+        "date": "3/21",
+        "declinationDeg": 0,
+        "teachingI18n": {
+          "zh-CN": "太阳直射赤道，全球昼夜平分。此后直射点由赤道向北移动。",
+          "en": "The Sun is overhead at the equator and day equals night everywhere. The subsolar point now moves north."
+        }
+      },
+      {
+        "angleDeg": 90,
+        "key": "season.summerSolstice",
+        "date": "6/22",
+        "declinationDeg": 23.5,
+        "teachingI18n": {
+          "zh-CN": "太阳直射北回归线 23.5°N。北半球昼最长、夜最短，北极圈内出现极昼。",
+          "en": "The Sun is overhead at the Tropic of Cancer (23.5°N). The northern hemisphere has its longest day."
+        }
+      },
+      {
+        "angleDeg": 180,
+        "key": "season.autumnEquinox",
+        "date": "9/23",
+        "declinationDeg": 0,
+        "teachingI18n": {
+          "zh-CN": "太阳再次直射赤道，全球昼夜平分。此后直射点向南移动。",
+          "en": "The Sun is overhead at the equator again. The subsolar point now moves south."
+        }
+      },
+      {
+        "angleDeg": 270,
+        "key": "season.winterSolstice",
+        "date": "12/22",
+        "declinationDeg": -23.5,
+        "teachingI18n": {
+          "zh-CN": "太阳直射南回归线 23.5°S。北半球昼最短、夜最长，北极圈内出现极夜。",
+          "en": "The Sun is overhead at the Tropic of Capricorn (23.5°S). The northern hemisphere has its shortest day."
+        }
+      }
+    ]
+  },
+  "lessons": [
+    {
+      "titleI18n": {
+        "zh-CN": "一年绕太阳一圈",
+        "en": "One lap per year"
+      },
+      "bodyI18n": {
+        "zh-CN": "公转方向与自转相同，周期约 365.26 天；轨道接近圆形。",
+        "en": "The orbit takes about 365.26 days and runs the same direction as the spin."
+      },
+      "view": "revolution",
+      "angleDeg": 0
+    },
+    {
+      "titleI18n": {
+        "zh-CN": "地轴指向不变",
+        "en": "The axis keeps its direction"
+      },
+      "bodyI18n": {
+        "zh-CN": "公转过程中地轴始终指向北极星附近，黄赤交角 23.5° 保持不变。",
+        "en": "During the whole orbit the axis keeps pointing near Polaris, so the 23.5° tilt stays fixed in space."
+      },
+      "view": "revolution",
+      "angleDeg": 90
+    },
+    {
+      "titleI18n": {
+        "zh-CN": "夏至与冬至",
+        "en": "Solstices"
+      },
+      "bodyI18n": {
+        "zh-CN": "夏至太阳直射北回归线 23.5°N，北半球昼最长；冬至直射南回归线 23.5°S。",
+        "en": "At the June solstice the Sun is overhead at 23.5°N; at the December solstice at 23.5°S."
+      },
+      "view": "revolution",
+      "angleDeg": 90
+    },
+    {
+      "titleI18n": {
+        "zh-CN": "春分与秋分",
+        "en": "Equinoxes"
+      },
+      "bodyI18n": {
+        "zh-CN": "春分、秋分太阳直射赤道，全球昼夜平分，是四季的转折点。",
+        "en": "At the equinoxes the Sun is overhead at the equator and day equals night everywhere."
+      },
+      "view": "revolution",
+      "angleDeg": 180
+    }
+  ]
+}

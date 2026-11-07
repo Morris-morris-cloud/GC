@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EarthModelStudio.ViewModels"
+             xmlns:views="using:EarthModelStudio.Views"
+             x:Class="EarthModelStudio.App"
+             RequestedThemeVariant="Light">
+
+  <Application.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:HomeViewModel}">
+      <views:HomeView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DownloadViewModel}">
+      <views:DownloadView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+      <views:SettingsView />
+    </DataTemplate>
+  </Application.DataTemplates>
+
+  <Application.Resources>
+    <Color x:Key="SystemAccentColor">#2F6BFF</Color>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://EarthModelStudio/Styles/AppTheme.axaml" />
+  </Application.Styles>
+</Application>

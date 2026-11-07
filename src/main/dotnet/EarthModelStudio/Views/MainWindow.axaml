@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:EarthModelStudio.Services"
+        x:Class="EarthModelStudio.Views.MainWindow"
+        Title="{loc:Loc app.name}"
+        Width="1220" Height="800"
+        MinWidth="1040" MinHeight="700"
+        Background="{DynamicResource AppBg}"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid ColumnDefinitions="236,*">
+
+    <!-- 侧栏 -->
+    <Border Grid.Column="0" Background="{DynamicResource SideBg}">
+      <Grid RowDefinitions="Auto,*,Auto" Margin="16,22,16,18">
+
+        <StackPanel Orientation="Horizontal" Spacing="11">
+          <Border Width="38" Height="38" CornerRadius="12" Background="#1C2C4C">
+            <TextBlock Text="◎" FontSize="20" Foreground="#8FB6FF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <TextBlock Text="{loc:Loc app.name}" Foreground="#F2F6FF" FontSize="13.5" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc app.tagline}" Foreground="#7C90B4" FontSize="10" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,30,0,0" Spacing="6">
+          <TextBlock Text="MENU" Foreground="#4C5F80" FontSize="9.5" FontWeight="SemiBold" Margin="14,0,0,4" />
+          <Button Classes="nav" Classes.active="{Binding IsHomeActive}"
+                  Command="{Binding GoHomeCommand}" Content="{loc:Loc nav.home}" />
+          <Button Classes="nav" Classes.active="{Binding IsDownloadActive}"
+                  Command="{Binding GoDownloadCommand}" Content="{loc:Loc nav.download}" />
+          <Button Classes="nav" Classes.active="{Binding IsSettingsActive}"
+                  Command="{Binding GoSettingsCommand}" Content="{loc:Loc nav.settings}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Spacing="4">
+          <Border Height="1" Background="{DynamicResource SideLine}" Margin="0,0,0,10" />
+          <TextBlock Text="{Binding VersionText}" Foreground="#6F82A6" FontSize="10.5" Margin="14,0,0,0" />
+          <TextBlock Text="{Binding PlatformText}" Foreground="#4F6080" FontSize="10" Margin="14,0,0,0" />
+        </StackPanel>
+
+      </Grid>
+    </Border>
+
+    <!-- 内容：页面切换由 MainWindow 做淡入过渡，避免硬切 -->
+    <ContentControl x:Name="PageHost" Grid.Column="1" Content="{Binding Current}" />
+  </Grid>
+</Window>

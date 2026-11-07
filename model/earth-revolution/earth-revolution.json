@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "earth-revolution",
+  "name": "Earth Revolution",
+  "nameI18n": {
+    "zh-CN": "地球公转",
+    "en": "Earth Revolution"
+  },
+  "version": "1.0.0",
+  "author": "NeoRF",
+  "description": "四季更替、黄赤交角与二分二至",
+  "descriptionI18n": {
+    "zh-CN": "地球绕太阳公转一年：地轴指向不变，太阳直射点南北往返，形成四季。",
+    "en": "One year around the Sun: the fixed axial direction moves the subsolar point and creates the seasons."
+  },
+  "tags": [
+    "astronomy",
+    "geography",
+    "revolution"
+  ],
+  "entry": "scene.json",
+  "license": "MIT",
+  "updatedAt": "2026-11-07",
+  "assembly": "EarthRevolutionModel.dll",
+  "type": "NeoRF.EarthModels.RevolutionModelFactory",
+  "preview": "preview.png",
+  "apiVersion": 1
+}
