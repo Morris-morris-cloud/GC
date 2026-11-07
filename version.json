@@ -1,30 +1,30 @@
 {
   "schema": 1,
-  "generated": "2026-11-07T12:01:09Z",
+  "generated": "2026-11-07T12:37:08Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
     "version": "1.0.1",
-    "revision": "ba909d4dc3",
+    "revision": "342aa82114",
     "packages": {
       "win-x64": {
         "path": "dist/GC-win-x64.zip",
         "url": "",
-        "sha256": "2704fbc3e3acba5630a13a313af0eca45128827ed90e4718fd143a554ca70c3c",
-        "size": 39379924
+        "sha256": "e965ac928e786ce7cda599f89acffbd801f5f9ebc56a9b105e57ab2650505038",
+        "size": 39378508
       },
       "win-arm64": {
         "path": "dist/GC-win-arm64.zip",
         "url": "",
-        "sha256": "c8f69370b9e381418a6568aca11cac44cb034e0ab2a99f7e14fcbef1dc503a44",
-        "size": 37684316
+        "sha256": "cde265b004fb56f5bf8e8f61d443e2bec4c5690ece2f68b516d4d0cff4f721e2",
+        "size": 37684753
       },
       "osx-arm64": {
         "path": "dist/GC-osx-arm64.zip",
         "url": "",
-        "sha256": "8588892dcfb982b7b52c3d74f3493fd8f27a327a0571095ab62dd4130857e082",
-        "size": 39852236
+        "sha256": "1d8b412165a6bb0d27ac32b704a0d1baea4d593368d5605a3f054967dad4a991",
+        "size": 39853077
       },
       "osx-x64": {
         "path": "dist/GC-osx-x64.zip",

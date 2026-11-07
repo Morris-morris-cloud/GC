@@ -19,6 +19,23 @@
 
   <Application.Resources>
     <Color x:Key="SystemAccentColor">#2F6BFF</Color>
+
+    <!--
+      FluentTheme 的按钮模板在 :pointerover / :pressed 时会用这些主题资源
+      覆盖 ContentPresenter 的画刷。若与 AppTheme.axaml 里通过 Button 属性
+      设置的 hover 颜色不一致，两套机制会互相覆盖，导致光标移动时渲染错乱。
+      这里把它们统一指向与按钮样式相同的颜色。
+    -->
+    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#EDF2FC</SolidColorBrush>
+    <SolidColorBrush x:Key="ButtonBackgroundPressed">#DDE7F8</SolidColorBrush>
+    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#BAC9E6</SolidColorBrush>
+    <SolidColorBrush x:Key="ButtonBorderBrushPressed">#9FB4DD</SolidColorBrush>
+    <SolidColorBrush x:Key="ButtonForegroundPointerOver">#111A2E</SolidColorBrush>
+    <SolidColorBrush x:Key="ButtonForegroundPressed">#111A2E</SolidColorBrush>
+
+    <SolidColorBrush x:Key="AccentButtonBackground">#2F6BFF</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver">#1F4FD0</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentButtonBackgroundPressed">#183FA8</SolidColorBrush>
   </Application.Resources>
 
   <Application.Styles>

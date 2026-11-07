@@ -120,17 +120,15 @@
     <Setter Property="Padding" Value="7,2" />
   </Style>
 
-  <!-- 按钮 -->
-  <!-- 全局过渡：悬停、选中、进度都不再「啪」地跳变 -->
-  <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Transitions">
-      <Transitions>
-        <BrushTransition Property="Background" Duration="0:0:0.14" />
-        <BrushTransition Property="BorderBrush" Duration="0:0:0.14" />
-        <BrushTransition Property="Foreground" Duration="0:0:0.14" />
-      </Transitions>
-    </Setter>
-  </Style>
+  <!-- ===================================================================
+       按钮（重写版）
+       原则：只通过 Button 自身的 Background/Foreground/BorderBrush + 伪类
+       设置来换色，一律不覆盖 /template/ ContentPresenter 的属性，也不使用
+       RenderTransform 动画。FluentTheme 的按钮模板通过 TemplateBinding 读取
+       这些属性，混用「Button 属性」与「模板内部元素属性」会在 hover 状态
+       切换时互相覆盖，造成光标移动时的渲染错乱。
+       所有过渡都是纯画刷过渡（BrushTransition），类型固定，不会转换失败。
+       =================================================================== -->
   <Style Selector="Button">
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Padding" Value="14,7" />
@@ -145,67 +143,99 @@
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Transitions">
       <Transitions>
-        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+        <BrushTransition Property="Background" Duration="0:0:0.13" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.13" />
       </Transitions>
     </Setter>
   </Style>
-  <Style Selector="Button.primary">
-    <Setter Property="Foreground" Value="White" />
+
+  <!-- 通用 hover / pressed（纯色，无变换） -->
+  <Style Selector="Button:pointerover">
+    <Setter Property="Background" Value="#EDF2FC" />
+    <Setter Property="BorderBrush" Value="#BAC9E6" />
   </Style>
-  <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button:pressed">
+    <Setter Property="Background" Value="#DDE7F8" />
+    <Setter Property="BorderBrush" Value="#9FB4DD" />
+  </Style>
+
+  <!-- 主要按钮 -->
+  <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="Foreground" Value="White" />
-    <Setter Property="CornerRadius" Value="9" />
   </Style>
-  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.primary:pointerover">
     <Setter Property="Background" Value="{DynamicResource AccentDark}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDark}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
+  <Style Selector="Button.primary:pressed">
+    <Setter Property="Background" Value="#183FA8" />
+    <Setter Property="BorderBrush" Value="#183FA8" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <!-- 幽灵按钮 -->
   <Style Selector="Button.ghost">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource InkDim}" />
   </Style>
-  <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-  </Style>
-  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.ghost:pointerover">
     <Setter Property="Background" Value="#EEF2FA" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
   </Style>
+  <Style Selector="Button.ghost:pressed">
+    <Setter Property="Background" Value="#E2E9F6" />
+  </Style>
+
+  <!-- 危险按钮 -->
   <Style Selector="Button.danger">
     <Setter Property="Foreground" Value="{DynamicResource Danger}" />
   </Style>
-  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.danger:pointerover">
     <Setter Property="Background" Value="#FDECEC" />
     <Setter Property="Foreground" Value="{DynamicResource Danger}" />
   </Style>
+  <Style Selector="Button.danger:pressed">
+    <Setter Property="Background" Value="#F8DADA" />
+  </Style>
+
+  <!-- 深色背景上的按钮 -->
+  <Style Selector="Button.onDark">
+    <Setter Property="Background" Value="#1B2740" />
+    <Setter Property="BorderBrush" Value="#2A3A57" />
+    <Setter Property="Foreground" Value="#DCE7FA" />
+  </Style>
+  <Style Selector="Button.onDark:pointerover">
+    <Setter Property="Background" Value="#233351" />
+    <Setter Property="BorderBrush" Value="#3A4E75" />
+  </Style>
+  <Style Selector="Button.onDark:pressed">
+    <Setter Property="Background" Value="#2B3D60" />
+  </Style>
+  <Style Selector="Button.onDark.active">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
   <Style Selector="Button.small">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Padding" Value="10,4" />
     <Setter Property="MinHeight" Value="28" />
     <Setter Property="CornerRadius" Value="8" />
   </Style>
-  <Style Selector="Button.onDark">
-    <Setter Property="Background" Value="#1B2740" />
-    <Setter Property="BorderBrush" Value="#2A3A57" />
-    <Setter Property="Foreground" Value="#DCE7FA" />
-  </Style>
-  <Style Selector="Button.onDark:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#233351" />
-  </Style>
-  <Style Selector="Button.onDark.active /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource Accent}" />
-    <Setter Property="Foreground" Value="White" />
-  </Style>
 
-  <!-- 侧栏 -->
+  <!-- 侧栏导航（主页 / 下载 / 设置） -->
   <Style Selector="Button.nav">
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Foreground" Value="{DynamicResource SideInk}" />
     <Setter Property="Padding" Value="14,10" />
@@ -213,19 +243,22 @@
     <Setter Property="FontSize" Value="13.5" />
     <Setter Property="MinHeight" Value="40" />
   </Style>
-  <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-  </Style>
-  <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.nav:pointerover">
     <Setter Property="Background" Value="#16213A" />
     <Setter Property="Foreground" Value="#E8EFFF" />
   </Style>
-  <Style Selector="Button.nav.active /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.nav:pressed">
+    <Setter Property="Background" Value="#1E2C49" />
+  </Style>
+  <Style Selector="Button.nav.active">
     <Setter Property="Background" Value="#1C2C4C" />
     <Setter Property="Foreground" Value="#FFFFFF" />
     <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="3,0,0,0" />
+  </Style>
+  <Style Selector="Button.nav.active:pointerover">
+    <Setter Property="Background" Value="#22355A" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
   </Style>
 
   <!-- 输入 -->
@@ -252,12 +285,12 @@
     <Setter Property="FontSize" Value="12.5" />
   </Style>
 
-  <!--
-    自建标题栏按钮只做背景/前景色渐变，不参与全局的 scale 动画：
-    titlebtn 用优先级更高的选择器把 RenderTransform 固定为恒等变换，
-    并清空 Transitions 里的 TransformOperationsTransition，彻底避开
-    hover 时 RenderTransform 类型/过渡器不匹配导致的渲染异常。
-  -->
+  <!-- ===================================================================
+       自建标题栏按钮（最小化 − / 关闭 ✕）
+       同样只用纯画刷换色，绝不设置 RenderTransform；
+       且用更高优先级覆盖上面通用的 :pointerover / :pressed，
+       避免深色标题栏上出现浅色 hover 背景。
+       =================================================================== -->
   <Style Selector="Button.titlebtn">
     <Setter Property="Width" Value="38" />
     <Setter Property="Height" Value="30" />
@@ -270,41 +303,23 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="CornerRadius" Value="7" />
     <Setter Property="Margin" Value="2,0" />
-    <Setter Property="RenderTransform" Value="scale(1)" />
-    <Setter Property="Transitions">
-      <Transitions>
-        <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
-        <BrushTransition Property="Background" Duration="0:0:0.12" />
-        <BrushTransition Property="Foreground" Duration="0:0:0.12" />
-      </Transitions>
-    </Setter>
   </Style>
   <Style Selector="Button.titlebtn:pointerover">
     <Setter Property="Background" Value="#223252" />
+    <Setter Property="BorderBrush" Value="Transparent" />
     <Setter Property="Foreground" Value="#FFFFFF" />
-    <Setter Property="RenderTransform" Value="scale(1)" />
   </Style>
   <Style Selector="Button.titlebtn:pressed">
-    <Setter Property="RenderTransform" Value="scale(1)" />
+    <Setter Property="Background" Value="#2C4270" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
   </Style>
   <Style Selector="Button.titlebtn.close:pointerover">
     <Setter Property="Background" Value="#D64545" />
     <Setter Property="Foreground" Value="#FFFFFF" />
   </Style>
-
-  <!--
-    按下反馈用 TransformOperations 语法，与上面 Button 的
-    TransformOperationsTransition 保持一致；若改成 ScaleTransform 对象，
-    状态切换时过渡器无法转换类型，会导致悬停/按下时渲染异常。
-  -->
-  <Style Selector="Button">
-    <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
-  </Style>
-  <Style Selector="Button:pointerover">
-    <Setter Property="RenderTransform" Value="scale(0.98)" />
-  </Style>
-  <Style Selector="Button:pressed">
-    <Setter Property="RenderTransform" Value="scale(0.94)" />
+  <Style Selector="Button.titlebtn.close:pressed">
+    <Setter Property="Background" Value="#B93737" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
   </Style>
 
 </Styles>
