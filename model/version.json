@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "generated": "2026-11-07T09:23:04Z",
+  "repository": "https://gitcode.com/2509_92447106/GC",
+  "branch": "main",
+  "modelDir": "model",
+  "launcher": {
+    "version": "1.0.0",
+    "revision": "eee4fbbfbc",
+    "packages": {
+      "win-x64": {
+        "path": "dist/GC-win-x64.zip",
+        "url": "",
+        "sha256": "dbd4997d111c4a60c5d06eadaf0962f41750bafa5b26946e216200ddf7d6c1cf",
+        "size": 39378935
+      },
+      "win-arm64": {
+        "path": "dist/GC-win-arm64.zip",
+        "url": "",
+        "sha256": "662589f9b315357702d855c46b12c1d088475bdf160c0c042793f2af404f8cb7",
+        "size": 37679907
+      },
+      "osx-arm64": {
+        "path": "dist/GC-osx-arm64.zip",
+        "url": "",
+        "sha256": "01dbf8b4787717aeb804a157ebaf0a75b8fffb1e9ab5e3fb0279fa9299ebee0a",
+        "size": 39853456
+      },
+      "osx-x64": {
+        "path": "dist/GC-osx-x64.zip",
+        "url": ""
+      },
+      "linux-x64": {
+        "path": "dist/GC-linux-x64.zip",
+        "url": ""
+      }
+    }
+  },
+  "models": [
+    {
+      "id": "earth-revolution",
+      "version": "1.0-b8139bb568",
+      "dir": "model/earth-revolution"
+    },
+    {
+      "id": "earth-rotation",
+      "version": "1.0-52ac06496e",
+      "dir": "model/earth-rotation"
+    }
+  ]
+}

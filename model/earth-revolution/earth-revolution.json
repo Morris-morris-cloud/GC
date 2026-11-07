@@ -6,7 +6,6 @@
     "zh-CN": "地球公转",
     "en": "Earth Revolution"
   },
-  "version": "1.0.0",
   "author": "NeoRF",
   "description": "四季更替、黄赤交角与二分二至",
   "descriptionI18n": {
@@ -20,9 +19,10 @@
   ],
   "entry": "scene.json",
   "license": "MIT",
-  "updatedAt": "2026-11-07",
   "assembly": "EarthRevolutionModel.dll",
   "type": "NeoRF.EarthModels.RevolutionModelFactory",
   "preview": "preview.png",
-  "apiVersion": 1
+  "apiVersion": 1,
+  "version": "1.0-b8139bb568",
+  "updatedAt": "2026-11-07T09:23:04Z"
 }

@@ -22,8 +22,8 @@ public sealed class SettingsService
     }
 
     /// <summary>
-    /// 首次启动不预置任何模型源：启动器只做适配，模型内容由用户从链接导入。
-    /// 这里只给一条空的自定义源占位。
+    /// 自动更新由 UpdateService 负责（版本清单 version.json），这里不预置任何在线源；
+    /// 只给「下载」页留一条空的自定义源占位。
     /// </summary>
     private void SeedSources()
     {

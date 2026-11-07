@@ -40,6 +40,14 @@ public partial class App : Application
 
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+            // 主窗口已建好，后台检查模型 / 启动器更新，不阻塞界面
+            if (Environment.GetEnvironmentVariable("EMS_NO_UPDATE") != "1")
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => _ = vm.RunStartupUpdateAsync(),
+                    Avalonia.Threading.DispatcherPriority.Background);
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

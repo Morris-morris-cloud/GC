@@ -15,16 +15,20 @@ public sealed class AppServices
     public ModelSourceClient Sources { get; }
     /// <summary>模型加载器：只负责把模型程序集跑起来，不渲染。</summary>
     public ModelHost ModelHost { get; }
+    /// <summary>启动时检查模型 / 启动器更新。</summary>
+    public UpdateService Updates { get; }
 
     private AppServices(AppPaths paths)
     {
         Paths = paths;
         Settings = new SettingsService(paths);
+        Settings.Load();                         // 先读设置，才知道用在线源还是本地离线源
         Models = new ModelRepository(paths);
         Sources = new ModelSourceClient(paths);
         Downloads = new DownloadCenter(paths, Models);
         Memory = new MemoryBudget();
         ModelHost = new ModelHost(paths, Settings, Memory);
+        Updates = new UpdateService(paths, Settings, UpdateService.CreateRemote(Settings.Current));
     }
 
     public static AppServices Create()
@@ -33,7 +37,6 @@ public sealed class AppServices
         paths.EnsureCreated();
 
         var services = new AppServices(paths);
-        services.Settings.Load();
         L.I.Initialize(services.Settings.Current.Language);
         services.Memory.Apply(services.Settings.Current.MemoryMb);
 
@@ -41,9 +44,5 @@ public sealed class AppServices
         return services;
     }
 
-    public static AppServices Ensure()
-    {
-        if (Current == null) Create();
-        return Current;
-    }
+    public static AppServices Ensure() => Current ?? Create();
 }

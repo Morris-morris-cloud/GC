@@ -45,6 +45,7 @@ public sealed class EarthModelView : UserControl
     private StackPanel? _seasonPanel;
     private Border? _lessons;
     private Border? _closeupHost;
+    private TextBlock? _closeupLabel;
     private ModelButton? _playButton;
     private ModelButton? _overheadButton;
     private ModelButton? _closeupButton;
@@ -71,6 +72,8 @@ public sealed class EarthModelView : UserControl
         _runtime = runtime;
         _texts = ModelStrings.Load(context.DataDirectory, context.Language);
         _views = ResolveViews(runtime.Scene);
+        // 自转模型主画布本身就是放大的地球，不需要再来一份特写
+        _showCloseup = IsRevolution;
 
         Background = new SolidColorBrush(Color.Parse("#05070F"));
 
@@ -535,13 +538,14 @@ public sealed class EarthModelView : UserControl
         });
         readouts.Children.Add(_cardDirect);
         readouts.Children.Add(_cardNote);
-        readouts.Children.Add(new TextBlock
+        _closeupLabel = new TextBlock
         {
             Text = _texts["closeup"],
             Foreground = MutedBrush,
             FontSize = 11,
             Margin = new Thickness(0, 6, 0, 0)
-        });
+        };
+        readouts.Children.Add(_closeupLabel);
         readouts.Children.Add(_closeupHost);
 
         var list = new StackPanel { Spacing = 2 };
@@ -675,13 +679,15 @@ public sealed class EarthModelView : UserControl
         _cardTitle.Text = season != null
             ? _texts[season.Key]
             : (IsRevolution ? _texts["seasons"] : _texts.Pick(_runtime.Scene.NameI18n, _texts["title"]));
-        _cardDate!.Text = _canvas.CurrentDate + (season?.Date != null ? " · " + season.Date : "");
+        _cardDate!.Text = IsRevolution ? _canvas.CurrentDate : _texts["dayNight"];
         _cardDirect!.Text = season?.DeclinationDeg.HasValue == true
             ? FormatDeclination(season.DeclinationDeg.Value)
             : _canvas.DeclinationLabel;
-        _cardNote!.Text = season != null
-            ? _texts.Pick(season.TeachingI18n, _texts["orbitTeach"])
-            : _texts["orbitTeach"];
+        _cardNote!.Text = !IsRevolution
+            ? _texts["rotationTeach"]
+            : season != null
+                ? _texts.Pick(season.TeachingI18n, _texts["orbitTeach"])
+                : _texts["orbitTeach"];
 
         if (_showCloseup && (double.IsNaN(_lastDeclination) || Math.Abs(_lastDeclination - decl) > 0.04))
         {
@@ -811,6 +817,7 @@ public sealed class EarthModelView : UserControl
         if (_lessons != null) _lessons.IsVisible = _showLessons;
         if (_seasonPanel != null) _seasonPanel.IsVisible = IsRevolution;
         if (_closeupHost != null) _closeupHost.IsVisible = _showCloseup;
+        if (_closeupLabel != null) _closeupLabel.IsVisible = _showCloseup;
     }
 
     /// <summary>带悬停过渡的按钮：本地基础色 + 悬停提亮。</summary>

@@ -42,6 +42,7 @@
     "semiMajorAxis": 4.0,
     "eccentricity": 0.0167,
     "show": true,
+    "seasonLayout": "springTopSummerLeft",
     "seasons": [
       {
         "angleDeg": 0,

@@ -28,6 +28,32 @@ public sealed class AppSettings
     public List<ModelSource> Sources { get; set; } = new();
 
     public List<string> RecentModels { get; set; } = new();
+
+    // ---- 自动更新 ----------------------------------------------------------
+
+    /// <summary>启动时检查模型 / 启动器是否为最新版。</summary>
+    public bool AutoUpdateOnStartup { get; set; } = true;
+
+    /// <summary>默认更新仓库地址。</summary>
+    public string UpdateRepository { get; set; } = "https://gitcode.com/2509_92447106/GC";
+
+    /// <summary>版本清单地址覆盖（留空则按 UpdateRepository 拼接）。</summary>
+    public string? UpdateManifestUrl { get; set; }
+
+    /// <summary>本地模型源目录（离线教学场景可指向 U 盘 / 共享盘里的仓库）。</summary>
+    public string? UpdateLocalRoot { get; set; }
+
+    /// <summary>已安装的模型版本：id -> version.json 里的版本。</summary>
+    public Dictionary<string, string> InstalledModelVersions { get; set; } = new();
+
+    /// <summary>当前已经应用过的启动器版本。</summary>
+    public string? LauncherVersion { get; set; }
+
+    /// <summary>已下载、等待下次启动应用的启动器版本。</summary>
+    public string? PendingLauncherVersion { get; set; }
+
+    /// <summary>最近一次更新检查时间（ISO 8601）。</summary>
+    public string? LastUpdateCheck { get; set; }
 }
 
 /// <summary>模型源：一个满足 Earth Model 规范的 git 仓库 / zip / 本地目录。</summary>

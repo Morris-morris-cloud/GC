@@ -2,20 +2,27 @@
 # ---------------------------------------------------------------------------
 # Earth Model Studio 构建脚本（macOS / Linux）
 #
-#   ./build.sh build      编译（Debug）
-#   ./build.sh run        本机运行
-#   ./build.sh test       离屏渲染校验，截图输出到 build/screenshots
-#   ./build.sh publish    一次性编译三个平台 -> dist/
-#   ./build.sh models     编译模型功能程序集 + 生成模型封面（写进 model/<id>/<id>.model）
-#   ./build.sh pack-models 编译模型后把 model/ 整体打包 -> dist/models-x.y.z.zip
-#   ./build.sh clean      清理
+#   ./build.sh build          编译（Debug）
+#   ./build.sh run            本机运行
+#   ./build.sh test           离屏渲染校验，截图输出到 build/screenshots
+#   ./build.sh models         编译模型 dll + 生成封面 + 自动打版本
+#   ./build.sh stamp          只重新生成 version.json 与模型版本
+#   ./build.sh publish        编译三个平台启动器（不内置模型）+ 建立 .GC 运行目录
+#   ./build.sh pack-models    单独打包模型数据（含 version.json）
+#   ./build.sh pack-launcher  生成三个平台的启动器更新包 zip
+#   ./build.sh update-test    离线验证自动更新链路
+#   ./build.sh clean          清理
 #
-# 分层约定：src/ 只是启动器，不含任何模型数据；模型全部放在 model/（外置数据）。
+# 分层：src/ 只是启动器；模型全部在 model/；**发布包不内置模型**。
 #
-# publish 产出（启动器，模型库目录为空）：
-#   dist/mac-arm64/EarthModelStudio.app     macOS Apple Silicon
-#   dist/win-x64/EarthModelStudio.exe       Windows x86_64
-#   dist/win-arm64/EarthModelStudio.exe     Windows on ARM
+# 运行目录（发布包里就长这样）：
+#   <安装目录>/
+#     EarthModelStudio(.exe | .app/...)
+#     .GC/
+#       settings.json        设置与已安装版本
+#       model/               启动时从 gitcode 下载的模型
+#       cache/               下载暂存
+#       update/              待下次启动应用的启动器更新
 # ---------------------------------------------------------------------------
 set -e
 
@@ -24,29 +31,16 @@ cd "$ROOT_DIR"
 
 APP_PROJ="src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj"
 PREVIEW_PROJ="model/_engine/PreviewGen/PreviewGen.csproj"
+STAMP_PROJ="model/_engine/VersionStamp/VersionStamp.csproj"
 TEST_PROJ="src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj"
 SLN="EarthModelStudio.sln"
 VERSION="1.0.0"
 TASK="${1:-build}"
 
-publish_rid() {
-  RID="$1"; OUT="$2"
-  echo ""
-  echo "==> 编译 ${RID} -> ${OUT}"
-  dotnet publish "$APP_PROJ" \
-    -c Release \
-    -r "$RID" \
-    --self-contained true \
-    -p:Version="$VERSION" \
-    -p:DebugType=none \
-    -p:PublishSingleFile=true \
-    -p:IncludeNativeLibrariesForSelfExtract=true \
-    -p:PublishTrimmed=false \
-    -o "$ROOT_DIR/$OUT"
-  # 启动器不带模型：只留一个空模型库目录，模型作为独立内容放置 / 下载
-  rm -rf "$ROOT_DIR/$OUT/model" "$ROOT_DIR/$OUT/examples"
-  mkdir -p "$ROOT_DIR/$OUT/model"
-  cp "$ROOT_DIR/model/README.md" "$ROOT_DIR/$OUT/model/README.md" 2>/dev/null || true
+# 按模型包内容指纹自动写回 <id>.json 的 version，并生成 version.json
+stamp_versions() {
+  echo "==> 自动计算模型版本并生成 version.json"
+  dotnet run --project "$STAMP_PROJ" -c Release -- "$ROOT_DIR" "$VERSION"
 }
 
 # 编译模型自己的功能程序集，并把 dll / 封面直接写进模型包
@@ -70,6 +64,66 @@ build_models() {
   done
   echo "==> 用模型自己的渲染器生成封面"
   dotnet run --project "$PREVIEW_PROJ" -c Release -- "$ROOT_DIR"
+  stamp_versions
+}
+
+# 发布目录只放启动器 + 空的 .GC 运行骨架，绝不放模型
+prepare_runtime_layout() {
+  REL="$1"
+  DEST="$ROOT_DIR/$REL"
+  [ -d "$DEST" ] || return 0
+  rm -rf "$DEST/model" "$DEST/examples"
+  mkdir -p "$DEST/.GC/model" "$DEST/.GC/cache" "$DEST/.GC/update"
+  cat > "$DEST/.GC/model/README.txt" <<'TXT'
+模型库目录（.GC/model/）
+启动时程序会读取 gitcode 仓库的 version.json，把最新版模型下载到这里。
+离线使用也可以手动放入 <模型id>/<模型id>.json + <模型id>/<模型id>.model/。
+
+运行目录：
+  <可执行文件>
+  .GC/settings.json
+  .GC/model/      本目录（下载的模型）
+  .GC/cache/      下载暂存
+  .GC/update/     待下次启动应用的启动器更新
+TXT
+  if [ ! -f "$DEST/.GC/settings.json" ]; then
+    cat > "$DEST/.GC/settings.json" <<'JSON'
+{
+  "language": "auto",
+  "theme": "light",
+  "renderFps": 30,
+  "memoryMb": 2048,
+  "autoUpdateOnStartup": true,
+  "updateRepository": "https://gitcode.com/2509_92447106/GC",
+  "updateManifestUrl": "",
+  "updateLocalRoot": "",
+  "installedModelVersions": {},
+  "launcherVersion": "",
+  "pendingLauncherVersion": "",
+  "lastUpdateCheck": "",
+  "sources": [],
+  "recentModels": []
+}
+JSON
+  fi
+  echo "    运行目录 -> $REL/.GC （settings.json + model/ + cache/ + update/）"
+}
+
+publish_rid() {
+  RID="$1"; OUT="$2"
+  echo ""
+  echo "==> 编译 ${RID} -> ${OUT}"
+  dotnet publish "$APP_PROJ" \
+    -c Release \
+    -r "$RID" \
+    --self-contained true \
+    -p:Version="$VERSION" \
+    -p:DebugType=none \
+    -p:PublishSingleFile=true \
+    -p:IncludeNativeLibrariesForSelfExtract=true \
+    -p:PublishTrimmed=false \
+    -o "$ROOT_DIR/$OUT"
+  rm -rf "$ROOT_DIR/$OUT/model" "$ROOT_DIR/$OUT/examples"
 }
 
 # 把 model/ 里的模型数据单独打包（与启动器分开分发）
@@ -81,6 +135,23 @@ pack_models() {
   ( cd "$ROOT_DIR" && zip -qr "$ZIP" model \
       -x "*.DS_Store" "*/bin/*" "*/obj/*" "*.user" )
   du -sh "$ZIP"
+}
+
+# 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
+pack_launcher() {
+  echo "==> 生成启动器更新包（不含 .GC）"
+  WIN64="$ROOT_DIR/dist/win-x64"
+  WINARM="$ROOT_DIR/dist/win-arm64"
+  MACBIN="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
+  [ -d "$MACBIN" ] || MACBIN="$ROOT_DIR/dist/mac-arm64"
+  [ -d "$WIN64" ] && ( cd "$WIN64" && zip -qr "$ROOT_DIR/dist/GC-win-x64.zip" . \
+      -x "./.GC" "./.GC/*" "*.DS_Store" )
+  [ -d "$WINARM" ] && ( cd "$WINARM" && zip -qr "$ROOT_DIR/dist/GC-win-arm64.zip" . \
+      -x "./.GC" "./.GC/*" "*.DS_Store" )
+  [ -d "$MACBIN" ] && ( cd "$MACBIN" && zip -qr "$ROOT_DIR/dist/GC-osx-arm64.zip" . \
+      -x "./.GC" "./.GC/*" "*.DS_Store" )
+  stamp_versions
+  ls -lh "$ROOT_DIR"/dist/GC-*.zip 2>/dev/null || true
 }
 
 package_mac_app() {
@@ -127,21 +198,38 @@ case "$TASK" in
     ;;
   publish)
     mkdir -p "$ROOT_DIR/dist"
+    stamp_versions
     publish_rid "osx-arm64" "dist/mac-arm64"
     publish_rid "win-x64"   "dist/win-x64"
     publish_rid "win-arm64" "dist/win-arm64"
     package_mac_app
+    prepare_runtime_layout "dist/win-x64"
+    prepare_runtime_layout "dist/win-arm64"
+    prepare_runtime_layout "dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
+    pack_launcher
     echo ""
-    echo "==> 三个平台编译完成（启动器不含模型数据）："
+    echo "==> 三个平台编译完成（发布包不含模型，首次启动自动下载）："
     du -sh "$ROOT_DIR/dist"/* 2>/dev/null || true
-    echo "    模型数据用 ./build.sh pack-models 单独打包，或放进 <安装目录>/model 后再启动"
+    echo "    把 version.json / model/ 推送到 gitcode，启动器就会自动检查更新"
     ;;
   models)
     build_models
     ;;
+  stamp)
+    stamp_versions
+    ;;
+  bundle)
+    echo "已弃用：发布包不再内置模型。请改用 ./build.sh stamp 与 gitcode 自动更新。"
+    ;;
   pack-models)
     build_models
     pack_models
+    ;;
+  pack-launcher)
+    pack_launcher
+    ;;
+  update-test)
+    dotnet run --project "$TEST_PROJ" -c Debug -- --update-test "$ROOT_DIR"
     ;;
   clean)
     rm -rf "$ROOT_DIR/build" "$ROOT_DIR/dist"
@@ -153,7 +241,7 @@ case "$TASK" in
     ;;
   *)
     echo "未知任务: $TASK"
-    echo "可用: build | run | test | publish | models | pack-models | clean | doctor"
+    echo "可用: build | run | test | publish | models | stamp | pack-models | pack-launcher | update-test | clean | doctor"
     exit 1
     ;;
 esac

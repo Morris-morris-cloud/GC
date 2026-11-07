@@ -30,6 +30,21 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private int _selectedFps = 30;
     [ObservableProperty] private double _memoryValue = 2048;
     [ObservableProperty] private string _statusMessage = "";
+    [ObservableProperty] private bool _autoUpdate = true;
+
+    public string UpdateSourceText => _services.Updates.Remote.DisplayName;
+    public string LastCheckText
+    {
+        get
+        {
+            var value = _services.Settings.Current.LastUpdateCheck;
+            if (string.IsNullOrWhiteSpace(value)) return L.I["update.never"];
+            return DateTimeOffset.TryParse(value, out var time)
+                ? time.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : value!;
+        }
+    }
+    public string PendingText => string.IsNullOrWhiteSpace(_services.Settings.Current.PendingLauncherVersion)
+        ? L.I["update.none"] : _services.Settings.Current.PendingLauncherVersion!;
 
     public string MemoryValueText => $"{(int)Math.Round(MemoryValue)} MB";
     public string UsageText => _services.Memory.UsageText;
@@ -54,6 +69,7 @@ public partial class SettingsViewModel : ObservableObject
         var settings = _services.Settings.Current;
         SelectedFps = settings.RenderFps;
         MemoryValue = settings.MemoryMb;
+        AutoUpdate = settings.AutoUpdateOnStartup;
 
         Sources.Clear();
         foreach (var source in settings.Sources)
@@ -65,6 +81,15 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(MemoryHint));
         OnPropertyChanged(nameof(ModelRoot));
         OnPropertyChanged(nameof(DataRoot));
+        OnPropertyChanged(nameof(UpdateSourceText));
+        OnPropertyChanged(nameof(LastCheckText));
+        OnPropertyChanged(nameof(PendingText));
+    }
+
+    partial void OnAutoUpdateChanged(bool value)
+    {
+        if (_loading) return;
+        _services.Settings.Apply(s => s.AutoUpdateOnStartup = value);
     }
 
     private void BuildLanguages()

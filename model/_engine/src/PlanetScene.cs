@@ -50,6 +50,8 @@ public sealed class OrbitDefinition
     public double SemiMajorAxis { get; set; } = 4.0;
     public double Eccentricity { get; set; } = 0.0167;
     public bool Show { get; set; } = true;
+    /// <summary>节气方位声明：springTopSummerLeft = 上春分 / 左夏至（引擎按此布局绘制轨道）。</summary>
+    public string SeasonLayout { get; set; } = "springTopSummerLeft";
     public List<SeasonPoint> Seasons { get; set; } = new();
 }
 

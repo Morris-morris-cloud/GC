@@ -8,10 +8,10 @@
         Background="{DynamicResource AppBg}"
         WindowStartupLocation="CenterScreen">
 
-  <Grid ColumnDefinitions="236,*">
+  <Grid ColumnDefinitions="236,*" RowDefinitions="*,Auto">
 
     <!-- 侧栏 -->
-    <Border Grid.Column="0" Background="{DynamicResource SideBg}">
+    <Border Grid.Column="0" Grid.RowSpan="2" Background="{DynamicResource SideBg}">
       <Grid RowDefinitions="Auto,*,Auto" Margin="16,22,16,18">
 
         <StackPanel Orientation="Horizontal" Spacing="11">
@@ -45,6 +45,30 @@
     </Border>
 
     <!-- 内容：页面切换由 MainWindow 做淡入过渡，避免硬切 -->
-    <ContentControl x:Name="PageHost" Grid.Column="1" Content="{Binding Current}" />
+    <ContentControl x:Name="PageHost" Grid.Column="1" Grid.Row="0" Content="{Binding Current}" />
+
+    <!-- 启动更新状态条：模型立即生效，启动器下次启动生效 -->
+    <Border Grid.Column="1" Grid.Row="1"
+            Background="{DynamicResource Surface}"
+            BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0"
+            Padding="20,9" IsVisible="{Binding UpdateBarVisible}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="⟳" FontSize="16" Foreground="{DynamicResource Accent}"
+                   VerticalAlignment="Center" Margin="0,0,12,0" />
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Text="{Binding UpdateStatus}" FontSize="12.5" FontWeight="SemiBold"
+                     Foreground="{DynamicResource Ink}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding UpdateDetail}" Classes="faint" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding LauncherNotice}" FontSize="11" Foreground="{DynamicResource Warn}"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+        <ProgressBar Grid.Column="2" Width="130" Minimum="0" Maximum="1"
+                     Value="{Binding UpdateProgress}" IsVisible="{Binding UpdateBusy}"
+                     VerticalAlignment="Center" Margin="14,0" />
+        <Button Grid.Column="3" Classes="ghost small" Content="{loc:Loc update.checkNow}"
+                Command="{Binding CheckUpdateCommand}" IsEnabled="{Binding !UpdateBusy}"
+                VerticalAlignment="Center" />
+      </Grid>
+    </Border>
   </Grid>
 </Window>

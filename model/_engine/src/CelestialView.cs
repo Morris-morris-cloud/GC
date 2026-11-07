@@ -152,7 +152,34 @@ public class CelestialView : Control
     }
 
     public string DeclinationLabel => DeclinationText(SubsolarLatitude);
-    public string CurrentDate => DateForAngle(_orbitDeg);
+
+    /// <summary>定格在二分二至时，日期直接取模型数据里的教材日期，避免近似公式差一两天。</summary>
+    public string CurrentDate
+    {
+        get
+        {
+            if (View == SceneView.Revolution)
+            {
+                var season = NearestSeason(2.5);
+                if (season?.Date != null) return FormatSeasonDate(season.Date);
+            }
+            return DateForAngle(_orbitDeg);
+        }
+    }
+
+    private string FormatSeasonDate(string monthDay)
+    {
+        var parts = monthDay.Split('/');
+        if (parts.Length == 2 && int.TryParse(parts[0], out var m) && int.TryParse(parts[1], out var d)
+            && m is >= 1 and <= 12 && d is >= 1 and <= 31)
+        {
+            var date = new DateTime(2025, m, d);
+            var chinese = Texts.Language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+            return date.ToString(chinese ? "M月d日" : "MMM d", CultureInfo.InvariantCulture);
+        }
+        return monthDay;
+    }
+
     public event Action? AnglesChanged;
     /// <summary>缩放目标变化（滚轮、按钮、捏合）。</summary>
     public event Action<double>? ZoomChanged;
@@ -256,8 +283,9 @@ public class CelestialView : Control
         if (!_dragging) return;
 
         var dx = p.X - _dragLast.X;
+        var dy = p.Y - _dragLast.Y;
         _dragLast = p;
-        DragBy(dx, p.Y - _dragLast.Y + (p.Y - _dragLast.Y));
+        DragBy(dx, dy);
         e.Handled = true;
     }
 
@@ -330,8 +358,12 @@ public class CelestialView : Control
         if (!_pinching) { BeginPinch(); return; }
         var pts = _pointers.Values.Take(2).ToArray();
         var d = Math.Max(8.0, Distance(pts[0], pts[1]));
-        SetZoom(_pinchStartZoom * d / _pinchStartDistance, immediate: true);
+        SetZoom(PinchZoom(_pinchStartZoom, _pinchStartDistance, d), immediate: true);
     }
+
+    /// <summary>捏合比例换算：两指间距放大多少倍，缩放就放大多少倍（限幅 0.6–6）。</summary>
+    public static double PinchZoom(double startZoom, double startDistance, double currentDistance)
+        => Math.Clamp(startZoom * Math.Max(8.0, currentDistance) / Math.Max(8.0, startDistance), 0.6, 6.0);
 
     private static double Distance(Point a, Point b)
     {
@@ -654,11 +686,34 @@ public class CelestialView : Control
             t => LatLonToUnit(lat, t * 360.0), 144);
         if (label == null) return;
 
-        var world = Vector3.Transform(LatLonToUnit(lat, 64), planet);
-        var c = Vector3.Transform(world, cam);
-        if (c.Z <= 0.05f) return;
-        var p = new Point(center.X + c.X * radius, center.Y - c.Y * radius);
-        DrawText(ctx, label, p.X + 5, p.Y - 13, 10.5, labelBrush, FontWeight.SemiBold);
+        // 找该纬线上「最靠右且可见」的点作为标签锚点：
+        // 地球自转时标签始终留在可见半球右侧，不会忽隐忽现
+        Vector3 best = default;
+        var bestScore = double.NegativeInfinity;
+        for (var lon = -180; lon < 180; lon += 6)
+        {
+            var world = Vector3.Transform(LatLonToUnit(lat, lon), planet);
+            var c = Vector3.Transform(world, cam);
+            if (c.Z < 0.10f) continue;
+            var score = c.X * 2.0 + c.Z;
+            if (score > bestScore) { bestScore = score; best = c; }
+        }
+        if (double.IsNegativeInfinity(bestScore)) return;
+        var p = new Point(center.X + best.X * radius, center.Y - best.Y * radius);
+        DrawLabelChip(ctx, label, p, InsetMode ? 9.0 : 10.5, labelBrush, toRight: false);
+    }
+
+    /// <summary>带深色底衬的标签：压在明亮的地球上也读得清，且不会被画布边缘裁掉。</summary>
+    private static void DrawLabelChip(DrawingContext ctx, string text, Point anchor,
+        double fontSize, IBrush brush, bool toRight)
+    {
+        var formatted = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), fontSize, brush);
+        var x = toRight ? anchor.X + 9 : Math.Max(3, anchor.X - formatted.Width - 9);
+        var y = anchor.Y - formatted.Height - 4;
+        ctx.DrawRectangle(ChipBg, null,
+            new Rect(x - 5, y - 2, formatted.Width + 10, formatted.Height + 5), 4, 4);
+        ctx.DrawText(formatted, new Point(x, y));
     }
 
     private void DrawGraticule(DrawingContext ctx, Matrix4x4 cam, Matrix4x4 planet, Point center, double radius)
@@ -732,11 +787,12 @@ public class CelestialView : Control
     {
         if (light.Z <= 0.02f) return;
         var p = new Point(center.X + light.X * radius, center.Y - light.Y * radius);
-        ctx.DrawEllipse(SubsolarGlowBrush, null, p, 9, 9);
-        ctx.DrawEllipse(null, SubsolarPen, p, 5, 5);
+        var marker = InsetMode ? 6.5 : 5.0;
+        ctx.DrawEllipse(SubsolarGlowBrush, null, p, marker * 2.5, marker * 2.5);
+        ctx.DrawEllipse(null, SubsolarPen, p, marker, marker);
         if (withLabel)
-            DrawText(ctx, Texts["directPoint"] + " " + DeclinationText(SubsolarLatitude),
-                p.X + 12, p.Y - 9, 11.5, SubsolarBrush, FontWeight.SemiBold);
+            DrawLabelChip(ctx, Texts["directPoint"] + " " + DeclinationText(SubsolarLatitude),
+                p, 11.5, SubsolarBrush, toRight: p.X < center.X);
     }
 
     private void DrawAxis(DrawingContext ctx, Matrix4x4 cam, Matrix4x4 planet, Point center, double radius,
@@ -780,7 +836,7 @@ public class CelestialView : Control
         var cam = CameraMatrix(0, _camElev);
 
         var theta = Deg2Rad(_orbitDeg);
-        var earthPos = new Vector3((float)(-a * Math.Sin(theta)), 0, (float)(a * Math.Cos(theta)));
+        var earthPos = new Vector3((float)(-a * Math.Sin(theta)), 0, (float)(-a * Math.Cos(theta)));
         var earthScreen = ToScreen(earthPos, cam, center);
         var lightWorld = Vector3.Normalize(-earthPos);
         var lightCam = Vector3.TransformNormal(lightWorld, cam);
@@ -864,7 +920,7 @@ public class CelestialView : Control
         for (var i = 0; i <= 240; i++)
         {
             var t = i / 240.0 * Math.PI * 2;
-            var p = new Vector3((float)(-a * Math.Sin(t)), 0, (float)(a * Math.Cos(t)));
+            var p = new Vector3((float)(-a * Math.Sin(t)), 0, (float)(-a * Math.Cos(t)));
             var c = Vector3.Transform(p, cam);
             var sp = new Point(center.X + c.X, center.Y - c.Y);
             if (c.Z < 0)
@@ -899,7 +955,7 @@ public class CelestialView : Control
         foreach (var s in seasons)
         {
             var t = Deg2Rad(s.AngleDeg);
-            var pos = new Vector3((float)(-a * Math.Sin(t)), 0, (float)(a * Math.Cos(t)));
+            var pos = new Vector3((float)(-a * Math.Sin(t)), 0, (float)(-a * Math.Cos(t)));
             var outer = pos * 1.19f;
             var p = ToScreen(outer, cam, center);
             ctx.DrawEllipse(SeasonDotBrush, null, ToScreen(pos, cam, center), 2.4, 2.4);
@@ -985,6 +1041,7 @@ public class CelestialView : Control
     private static readonly IBrush AxisBrush = new SolidColorBrush(Color.FromArgb(220, 255, 214, 130));
     private static readonly IBrush SubsolarBrush = new SolidColorBrush(Color.FromArgb(240, 255, 236, 170));
     private static readonly IBrush SubsolarGlowBrush = new SolidColorBrush(Color.FromArgb(64, 255, 214, 110));
+    private static readonly IBrush ChipBg = new SolidColorBrush(Color.FromArgb(185, 8, 16, 34));
     private static readonly IBrush TropicBrush = new SolidColorBrush(Color.FromArgb(240, 255, 196, 120));
     private static readonly IBrush PolarBrush = new SolidColorBrush(Color.FromArgb(210, 164, 210, 255));
     private static readonly Pen SubsolarPen = new Pen(new SolidColorBrush(Color.FromArgb(230, 255, 226, 150)), 1.4);
