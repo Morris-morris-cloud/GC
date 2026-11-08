@@ -570,6 +570,7 @@ public sealed class GeographyView : Control
             "亚洲-欧洲" => Color.FromRgb(120, 226, 255),  // 青
             "欧洲-非洲" => Color.FromRgb(168, 148, 255),  // 紫
             "北美-南美" => Color.FromRgb(120, 255, 176),  // 绿
+            "南美-南极" => Color.FromRgb(96, 232, 222),   // 青绿（德雷克海峡）
             "亚洲-北美" => Color.FromRgb(255, 140, 220),  // 粉
             "亚洲-大洋洲" => Color.FromRgb(255, 160, 96), // 橙
             "南极洲" => Color.FromRgb(200, 225, 255),     // 冰蓝

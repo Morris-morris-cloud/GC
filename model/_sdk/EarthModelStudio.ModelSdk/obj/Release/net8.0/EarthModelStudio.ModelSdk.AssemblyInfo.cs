@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Earth Model 模型契约：启动器与模型之间唯一的编译期依赖。")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.4.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.4+f69a8fbb7fa563800802d3c2e319ed56365c3b8c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.4+936aec81850fb15f55014c66116d174dc9e2f967")]
 [assembly: System.Reflection.AssemblyProductAttribute("Earth Model Studio")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EarthModelStudio.ModelSdk")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.4.0")]

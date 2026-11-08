@@ -18,6 +18,8 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
+    <!-- 通用封面路径会渲染模型自带的 UserControl，headless 下需要主题样式才会出内容 -->
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
   <ItemGroup>

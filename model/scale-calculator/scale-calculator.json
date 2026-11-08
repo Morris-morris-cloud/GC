@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "scale-calculator",
+  "name": "Scale Calculator",
+  "nameI18n": {
+    "zh-CN": "比例尺计算器",
+    "en": "Scale Calculator"
+  },
+  "author": "Morris GC",
+  "description": "把比例尺变成可以拖、可以量的可视化标尺",
+  "descriptionI18n": {
+    "zh-CN": "三种求解模式、图上/实地双条对比、线段式比例尺自动换挡、比例尺光谱、真实地标实地尺与练习闯关。",
+    "en": "Three solve modes, dual map/real bars, auto-ranging graphic scale, scale spectrum, real-world landmarks and practice quizzes."
+  },
+  "tags": [
+    "geography",
+    "map",
+    "scale",
+    "calculator"
+  ],
+  "entry": "scales.json",
+  "license": "MIT",
+  "assembly": "ScaleCalculatorModel.dll",
+  "type": "NeoRF.ScaleCalculator.ScaleCalculatorFactory",
+  "preview": "preview.png",
+  "apiVersion": 1,
+  "version": "1.0",
+  "updatedAt": "2026-11-08T12:19:03Z",
+  "build": "4cb6aafff8"
+}

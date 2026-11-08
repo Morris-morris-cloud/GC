@@ -1,0 +1,23 @@
+{
+  "presets": [
+    { "n": 10000,     "nameKey": "preset.campus",   "noteKey": "preset.campusNote" },
+    { "n": 50000,     "nameKey": "preset.town",     "noteKey": "preset.townNote" },
+    { "n": 250000,    "nameKey": "preset.city",     "noteKey": "preset.cityNote" },
+    { "n": 1000000,   "nameKey": "preset.province", "noteKey": "preset.provinceNote" },
+    { "n": 10000000,  "nameKey": "preset.china",    "noteKey": "preset.chinaNote" },
+    { "n": 100000000, "nameKey": "preset.world",    "noteKey": "preset.worldNote" }
+  ],
+  "spectrum": [
+    { "n": 10000,     "labelKey": "spec.campus", "scopeKey": "spec.campusScope" },
+    { "n": 250000,    "labelKey": "spec.city",   "scopeKey": "spec.cityScope" },
+    { "n": 10000000,  "labelKey": "spec.china",  "scopeKey": "spec.chinaScope" },
+    { "n": 100000000, "labelKey": "spec.world",  "scopeKey": "spec.worldScope" }
+  ],
+  "landmarks": [
+    { "nameKey": "lm.classroom",        "meters": 10 },
+    { "nameKey": "lm.track",            "meters": 400 },
+    { "nameKey": "lm.marathon",         "meters": 42195 },
+    { "nameKey": "lm.beijingShanghai",  "meters": 1080000 },
+    { "nameKey": "lm.equator",          "meters": 40000000 }
+  ]
+}
