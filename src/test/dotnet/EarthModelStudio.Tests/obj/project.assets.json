@@ -548,7 +548,7 @@
           "lib/net8.0/Tmds.DBus.Protocol.dll": {}
         }
       },
-      "EarthModelStudio/1.0.3": {
+      "EarthModelStudio/1.0.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -556,7 +556,7 @@
           "Avalonia.Desktop": "11.3.9",
           "Avalonia.Themes.Fluent": "11.3.9",
           "CommunityToolkit.Mvvm": "8.2.2",
-          "EarthModelStudio.ModelSdk": "1.0.3"
+          "EarthModelStudio.ModelSdk": "1.0.4"
         },
         "compile": {
           "bin/placeholder/EarthModelStudio.dll": {}
@@ -565,7 +565,7 @@
           "bin/placeholder/EarthModelStudio.dll": {}
         }
       },
-      "EarthModelStudio.ModelSdk/1.0.3": {
+      "EarthModelStudio.ModelSdk/1.0.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -1378,12 +1378,12 @@
         "tmds.dbus.protocol.nuspec"
       ]
     },
-    "EarthModelStudio/1.0.3": {
+    "EarthModelStudio/1.0.4": {
       "type": "project",
       "path": "../../../main/dotnet/EarthModelStudio/EarthModelStudio.csproj",
       "msbuildProject": "../../../main/dotnet/EarthModelStudio/EarthModelStudio.csproj"
     },
-    "EarthModelStudio.ModelSdk/1.0.3": {
+    "EarthModelStudio.ModelSdk/1.0.4": {
       "type": "project",
       "path": "../../../../model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
       "msbuildProject": "../../../../model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj"
@@ -1393,14 +1393,14 @@
     "net8.0": [
       "Avalonia.Headless >= 11.3.9",
       "Avalonia.Skia >= 11.3.9",
-      "EarthModelStudio >= 1.0.3"
+      "EarthModelStudio >= 1.0.4"
     ]
   },
   "packageFolders": {
     "/Users/morris/.nuget/packages/": {}
   },
   "project": {
-    "version": "1.0.3",
+    "version": "1.0.4",
     "restore": {
       "projectUniqueName": "/Users/morris/Downloads/GC#/src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj",
       "projectName": "EarthModelStudio.Tests",

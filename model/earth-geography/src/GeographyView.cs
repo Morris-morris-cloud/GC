@@ -172,22 +172,61 @@ public sealed class GeographyView : Control
         DrawReadout(ctx, size, $"球面 · {Norm(_yawDeg):0}°E {_pitchDeg:0}°");
     }
 
+    /// <summary>
+    /// 球体本体：分层绘制提升立体感
+    ///   ① 外层大气光晕（径向渐变，越靠边缘越亮）
+    ///   ② 海洋底色（左上受光的渐变，模拟日光）
+    ///   ③ 高光点 + 阴影弧（明暗对比塑造球感）
+    /// </summary>
     private static void DrawOceanDisc(DrawingContext ctx, float cx, float cy, float r)
     {
-        var disc = new RadialGradientBrush
+        // ① 大气边缘光：球外一层的柔和蓝晕
+        var halo = new RadialGradientBrush
         {
-            Center = new RelativePoint(0.36, 0.32, RelativeUnit.Relative),
-            GradientOrigin = new RelativePoint(0.36, 0.32, RelativeUnit.Relative),
-            RadiusX = new RelativeScalar(0.85, RelativeUnit.Relative),
-            RadiusY = new RelativeScalar(0.85, RelativeUnit.Relative),
+            Center = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+            GradientOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+            RadiusX = new RelativeScalar(0.5, RelativeUnit.Relative),
+            RadiusY = new RelativeScalar(0.5, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Color.Parse("#12314F"), 0),
-                new GradientStop(Color.Parse("#0A1E33"), 0.62),
-                new GradientStop(Color.Parse("#061120"), 1)
+                new GradientStop(Color.FromArgb(0, 90, 160, 255), 0.82),
+                new GradientStop(Color.FromArgb(70, 90, 170, 255), 0.94),
+                new GradientStop(Color.FromArgb(0, 90, 170, 255), 1.0)
             }
         };
-        ctx.DrawEllipse(disc, null, new Point(cx, cy), r, r);
+        ctx.DrawEllipse(halo, null, new Point(cx, cy), r * 1.14, r * 1.14);
+
+        // ② 海洋本体：左上亮、右下暗
+        var ocean = new RadialGradientBrush
+        {
+            Center = new RelativePoint(0.34, 0.30, RelativeUnit.Relative),
+            GradientOrigin = new RelativePoint(0.34, 0.30, RelativeUnit.Relative),
+            RadiusX = new RelativeScalar(0.95, RelativeUnit.Relative),
+            RadiusY = new RelativeScalar(0.95, RelativeUnit.Relative),
+            GradientStops =
+            {
+                new GradientStop(Color.Parse("#1B4A78"), 0.0),
+                new GradientStop(Color.Parse("#123A5E"), 0.35),
+                new GradientStop(Color.Parse("#0B2440"), 0.68),
+                new GradientStop(Color.Parse("#05121F"), 1.0)
+            }
+        };
+        ctx.DrawEllipse(ocean, null, new Point(cx, cy), r, r);
+
+        // ③ 高光：左上方一个小亮点，强化球面
+        var spec = new RadialGradientBrush
+        {
+            Center = new RelativePoint(0.30, 0.26, RelativeUnit.Relative),
+            GradientOrigin = new RelativePoint(0.30, 0.26, RelativeUnit.Relative),
+            RadiusX = new RelativeScalar(0.30, RelativeUnit.Relative),
+            RadiusY = new RelativeScalar(0.30, RelativeUnit.Relative),
+            GradientStops =
+            {
+                new GradientStop(Color.FromArgb(70, 180, 220, 255), 0.0),
+                new GradientStop(Color.FromArgb(0, 180, 220, 255), 1.0)
+            }
+        };
+        ctx.DrawEllipse(spec, null, new Point(cx, cy), r, r);
     }
 
     // ---- 五带：按纬度带填色（用四边形条带逐格填充，避免整环多边形跨地平线破面）----

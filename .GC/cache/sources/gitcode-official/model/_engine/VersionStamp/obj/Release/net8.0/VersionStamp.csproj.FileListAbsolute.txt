@@ -1,0 +1,14 @@
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/bin/Release/net8.0/VersionStamp
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/bin/Release/net8.0/VersionStamp.deps.json
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/bin/Release/net8.0/VersionStamp.runtimeconfig.json
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/bin/Release/net8.0/VersionStamp.dll
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/bin/Release/net8.0/VersionStamp.pdb
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.GeneratedMSBuildEditorConfig.editorconfig
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.AssemblyInfoInputs.cache
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.AssemblyInfo.cs
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.csproj.CoreCompileInputs.cache
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.dll
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/refint/VersionStamp.dll
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.pdb
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/VersionStamp.genruntimeconfig.cache
+/Users/morris/Downloads/GC#/model/_engine/VersionStamp/obj/Release/net8.0/ref/VersionStamp.dll

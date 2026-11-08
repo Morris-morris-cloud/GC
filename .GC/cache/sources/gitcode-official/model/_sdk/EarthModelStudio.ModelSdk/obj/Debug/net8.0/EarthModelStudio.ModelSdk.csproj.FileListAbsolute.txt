@@ -1,0 +1,13 @@
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/bin/Debug/net8.0/EarthModelStudio.ModelSdk.deps.json
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/bin/Debug/net8.0/EarthModelStudio.ModelSdk.dll
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/bin/Debug/net8.0/EarthModelStudio.ModelSdk.pdb
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.csproj.AssemblyReference.cache
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/Avalonia/Resources.Inputs.cache
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.GeneratedMSBuildEditorConfig.editorconfig
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.AssemblyInfoInputs.cache
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.AssemblyInfo.cs
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.csproj.CoreCompileInputs.cache
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.dll
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/refint/EarthModelStudio.ModelSdk.dll
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/EarthModelStudio.ModelSdk.pdb
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Debug/net8.0/ref/EarthModelStudio.ModelSdk.dll

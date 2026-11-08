@@ -215,11 +215,64 @@ public sealed class ModelSourceClient
             }
         }
 
-        var args = new List<string> { "clone", "--depth", "1" };
-        if (!string.IsNullOrWhiteSpace(branch)) { args.Add("--branch"); args.Add(branch!); }
-        args.Add(url);
-        args.Add(cacheDir);
+        // 只拉取 model/ 目录：整仓 clone 会把 .git / src / dist 一起拖下来
+        // （实测 700MB+），既慢又容易超时，表现就是「读不到模型源」。
+        // 先浅克隆到临时目录，再用 sparse-checkout 只检出 model/。
+        var tmpDir = cacheDir + ".tmp";
+        try
+        {
+            if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
 
+            // 1) 初始化 + 加远程（比 clone 更快，避免先拉全量）
+            var initArgs = new List<string> { "init", "--quiet", tmpDir };
+            if (!await RunGitAsync(initArgs, ct)) return false;
+
+            var remoteArgs = new List<string> { "-C", tmpDir, "remote", "add", "origin", url };
+            if (!await RunGitAsync(remoteArgs, ct)) return false;
+
+            // 2) 只允许 model 目录参与检出
+            await RunGitAsync(new List<string> { "-C", tmpDir, "config", "core.sparseCheckout", "true" }, ct);
+            var sparseFile = Path.Combine(tmpDir, ".git", "info", "sparse-checkout");
+            Directory.CreateDirectory(Path.GetDirectoryName(sparseFile)!);
+            File.WriteAllText(sparseFile, "model/\n");
+
+            // 3) 浅拉指定分支
+            var branchName = string.IsNullOrWhiteSpace(branch) ? "main" : branch!;
+            var fetchArgs = new List<string>
+            {
+                "-C", tmpDir, "fetch", "--depth", "1", "--filter=blob:none", "origin", branchName
+            };
+            if (!await RunGitAsync(fetchArgs, ct)) return false;
+
+            await RunGitAsync(new List<string> { "-C", tmpDir, "checkout", "FETCH_HEAD" }, ct);
+
+            // 4) 把 model/ 移到缓存根，与原有目录结构一致
+            var modelDir = Path.Combine(tmpDir, "model");
+            if (!Directory.Exists(modelDir))
+            {
+                Console.Error.WriteLine("git sparse-checkout 后未找到 model/ 目录");
+                return false;
+            }
+
+            if (Directory.Exists(cacheDir)) Directory.Delete(cacheDir, true);
+            Directory.CreateDirectory(cacheDir);
+            Directory.Move(modelDir, Path.Combine(cacheDir, "model"));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"git 拉取异常: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            try { if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true); } catch { }
+        }
+    }
+
+    /// <summary>安静地跑一条 git 命令，返回是否成功。</summary>
+    private static async Task<bool> RunGitAsync(List<string> args, CancellationToken ct)
+    {
         try
         {
             var psi = new ProcessStartInfo("git")
@@ -233,19 +286,16 @@ public sealed class ModelSourceClient
 
             using var process = Process.Start(psi);
             if (process == null) return false;
-            var stderrTask = process.StandardError.ReadToEndAsync(ct);
+            var errTask = process.StandardError.ReadToEndAsync(ct);
             await process.WaitForExitAsync(ct);
-            var stderr = await stderrTask;
+            var err = await errTask;
             if (process.ExitCode != 0)
-            {
-                Console.Error.WriteLine($"git clone 失败: {stderr}");
-                return false;
-            }
-            return Directory.Exists(Path.Combine(cacheDir, "model")) || Directory.Exists(cacheDir);
+                Console.Error.WriteLine($"git {string.Join(' ', args)} 失败: {err.Trim()}");
+            return process.ExitCode == 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"git clone 异常: {ex.Message}");
+            Console.Error.WriteLine($"git 执行失败: {ex.Message}");
             return false;
         }
     }

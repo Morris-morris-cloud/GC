@@ -51,6 +51,15 @@ public partial class App : Application
                 return await dialog.ShowDialog<bool>(window);
             };
 
+            // 应用图标：窗口标题栏与任务栏也使用同一图标
+            try
+            {
+                using var iconStream = Avalonia.Platform.AssetLoader.Open(
+                    new Uri("avares://EarthModelStudio/Assets/icon.png"));
+                window.Icon = new Avalonia.Controls.WindowIcon(iconStream);
+            }
+            catch { /* 图标缺失不影响启动 */ }
+
             desktop.MainWindow = window;
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
 

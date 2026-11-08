@@ -23,7 +23,7 @@
   "type": "NeoRF.EarthModels.RotationModelFactory",
   "preview": "preview.png",
   "apiVersion": 1,
-  "version": "1.0",
-  "updatedAt": "2026-11-08T09:22:29Z",
-  "build": "0bd5b4507c"
+  "version": "1.1",
+  "updatedAt": "2026-11-08T10:02:58Z",
+  "build": "c478068be1"
 }

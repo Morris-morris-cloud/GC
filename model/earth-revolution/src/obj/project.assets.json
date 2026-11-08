@@ -112,7 +112,7 @@
           "lib/net5.0/MicroCom.Runtime.dll": {}
         }
       },
-      "EarthModelStudio.ModelSdk/1.0.3": {
+      "EarthModelStudio.ModelSdk/1.0.4": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -347,7 +347,7 @@
         "microcom.runtime.nuspec"
       ]
     },
-    "EarthModelStudio.ModelSdk/1.0.3": {
+    "EarthModelStudio.ModelSdk/1.0.4": {
       "type": "project",
       "path": "../../_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
       "msbuildProject": "../../_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj"
@@ -356,14 +356,14 @@
   "projectFileDependencyGroups": {
     "net8.0": [
       "Avalonia >= 11.3.9",
-      "EarthModelStudio.ModelSdk >= 1.0.3"
+      "EarthModelStudio.ModelSdk >= 1.0.4"
     ]
   },
   "packageFolders": {
     "/Users/morris/.nuget/packages/": {}
   },
   "project": {
-    "version": "1.0.3",
+    "version": "1.0.4",
     "restore": {
       "projectUniqueName": "/Users/morris/Downloads/GC#/model/earth-revolution/src/EarthRevolutionModel.csproj",
       "projectName": "EarthRevolutionModel",

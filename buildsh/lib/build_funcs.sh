@@ -219,6 +219,26 @@ PLIST
     [ "$base" = ".DS_Store" ] && continue
     mv "$f" "$APP/Contents/MacOS/"
   done
+  # 应用图标：由 Assets/icon-1024.png 生成 .icns
+  ICONSRC="$ROOT_DIR/src/main/dotnet/EarthModelStudio/Assets/icon-1024.png"
+  if [ -f "$ICONSRC" ] && command -v iconutil >/dev/null 2>&1; then
+    ICONSET="$DIST/AppIcon.iconset"
+    rm -rf "$ICONSET"; mkdir -p "$ICONSET"
+    for sz in 16 32 64 128 256 512; do
+      sips -z $sz $sz "$ICONSRC" --out "$ICONSET/icon_${sz}x${sz}.png" >/dev/null 2>&1
+      d=$((sz * 2))
+      sips -z $d $d "$ICONSRC" --out "$ICONSET/icon_${sz}x${sz}@2x.png" >/dev/null 2>&1
+    done
+    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null && \
+      echo "    + AppIcon.icns"
+    rm -rf "$ICONSET"
+    # Info.plist 增加图标项
+    if [ -f "$APP/Contents/Info.plist" ]; then
+      /usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$APP/Contents/Info.plist" 2>/dev/null || true
+      /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP/Contents/Info.plist" 2>/dev/null || true
+    fi
+  fi
+
   # 发布包不带 .GC 运行骨架（用户首次启动自行创建），避免覆盖用户数据
   rm -rf "$APP/Contents/MacOS/.GC"
   chmod +x "$APP/Contents/MacOS/EarthModelStudio"

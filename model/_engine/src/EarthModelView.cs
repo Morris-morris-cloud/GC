@@ -48,7 +48,6 @@ public sealed class EarthModelView : UserControl, IDisposable
     private TextBlock? _closeupLabel;
     private ModelButton? _playButton;
     private ModelButton? _overheadButton;
-    private ModelButton? _closeupButton;
     private TextBlock? _zoomText;
     private TextBlock? _cardState;
     private TextBlock? _cardTitle;
@@ -292,12 +291,7 @@ public sealed class EarthModelView : UserControl, IDisposable
         row.Children.Add(MakeToggle(_texts["orbit"], _orbit, on => { _orbit = on; _canvas.ShowOrbit = on; }));
         row.Children.Add(MakeToggle(_texts["grid"], _grid, on => { _grid = on; _canvas.ShowGraticule = on; }));
         row.Children.Add(MakeToggle(_texts["tilt"], _tilt, on => { _tilt = on; _canvas.ExaggerateTilt = on; }));
-        _closeupButton = MakeToggle(_texts["closeup"], _showCloseup, on =>
-        {
-            _showCloseup = on;
-            ApplyVisibility();
-        });
-        row.Children.Add(_closeupButton);
+        // 「放大」切换按钮已按需求移除；特写视图本身仍随公转显示
         _overheadButton = MakeToggle(_texts["overhead"], _overhead, on =>
         {
             _overhead = on;

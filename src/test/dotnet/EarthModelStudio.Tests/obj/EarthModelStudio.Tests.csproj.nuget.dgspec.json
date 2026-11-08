@@ -5,7 +5,7 @@
   },
   "projects": {
     "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj": {
-      "version": "1.0.3",
+      "version": "1.0.4",
       "restore": {
         "projectUniqueName": "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
         "projectName": "EarthModelStudio.ModelSdk",
@@ -72,7 +72,7 @@
       }
     },
     "/Users/morris/Downloads/GC#/src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj": {
-      "version": "1.0.3",
+      "version": "1.0.4",
       "restore": {
         "projectUniqueName": "/Users/morris/Downloads/GC#/src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj",
         "projectName": "EarthModelStudio",
@@ -155,7 +155,7 @@
       }
     },
     "/Users/morris/Downloads/GC#/src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj": {
-      "version": "1.0.3",
+      "version": "1.0.4",
       "restore": {
         "projectUniqueName": "/Users/morris/Downloads/GC#/src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj",
         "projectName": "EarthModelStudio.Tests",

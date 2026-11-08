@@ -726,34 +726,43 @@ public class CelestialView : Control, IDisposable
 
         if (!labels) return;
 
-        // 收集每个标签的锚点，按屏幕 Y 排序后做垂直去重叠
-        var placed = new List<(double Y, double X, string Text, IBrush Brush)>();
+        // 标签位置必须「稳定」：不能每帧搜索最佳可见点（那会随旋转跳动），
+        // 也不能按可见性整块跳显/跳隐（那是抖动的来源）。
+        //
+        // 做法：
+        //   · Y 用该纬线在当前视角下的实际投影高度（纬度本身随俯仰连续变化，不会跳）；
+        //   · X 固定在球体右侧一点，与旋转无关；
+        //   · 可见性用一个连续衰减的透明度，而不是阈值切换。
+        var placed = new List<(double Y, double Lat, string Text, IBrush Brush)>();
         foreach (var l in lines)
         {
             if (l.Label == null) continue;
-            Vector3 best = default;
-            var bestScore = double.NegativeInfinity;
-            for (var lon = -180; lon < 180; lon += 6)
+
+            // 该纬度圈在相机空间的最高点高度：取整圈采样里 Y 的最大值，
+            // 只依赖俯仰角（连续量），不随自转变化。
+            var maxY = double.NegativeInfinity;
+            for (var lon = 0; lon < 360; lon += 10)
             {
                 var world = Vector3.Transform(LatLonToUnit(l.Lat, lon), planet);
                 var c = Vector3.Transform(world, cam);
-                if (c.Z < 0.10f) continue;
-                var score = c.X * 2.0 + c.Z;
-                if (score > bestScore) { bestScore = score; best = c; }
+                if (c.Y > maxY) maxY = c.Y;
             }
-            if (double.IsNegativeInfinity(bestScore)) continue;
-            placed.Add((center.Y - best.Y * radius, center.X + best.X * radius, l.Label, l.Brush));
+            if (double.IsNegativeInfinity(maxY)) continue;
+
+            placed.Add((center.Y - maxY * radius, l.Lat, l.Label, l.Brush));
         }
 
-        placed.Sort((a, b) => a.Y.CompareTo(b.Y));
-        const double minGap = 16.0;
-        var lastY = double.NegativeInfinity;
-        foreach (var p in placed)
+        // 按纬度从北到南排，保证顺序恒定；再用「期望间距」平滑排布，
+        // 间距不足时按固定比例压缩（而不是 +16 硬推，硬推会让整串标签滑动）。
+        placed.Sort((a, b) => b.Lat.CompareTo(a.Lat));
+        if (placed.Count == 0) return;
+
+        var labelX = center.X + radius * 1.02;     // 固定在球右侧外部
+        for (var i = 0; i < placed.Count; i++)
         {
-            var y = p.Y;
-            if (y - lastY < minGap) y = lastY + minGap;
-            lastY = y;
-            DrawLabelChip(ctx, p.Text, new Point(p.X, y), InsetMode ? 9.0 : 10.5, p.Brush, toRight: false);
+            var p = placed[i];
+            DrawLabelChip(ctx, p.Text, new Point(labelX, p.Y),
+                InsetMode ? 9.0 : 10.5, p.Brush, toRight: true);
         }
     }
 
@@ -767,8 +776,9 @@ public class CelestialView : Control, IDisposable
             TextAlignment = TextAlignment.Left,
             Trimming = TextTrimming.None
         };
+        // 锚点即文字垂直中心，避免不同文字高度造成上下漂移
         var x = toRight ? anchor.X + 9 : Math.Max(3, anchor.X - formatted.Width - 9);
-        var y = anchor.Y - formatted.Height - 4;
+        var y = anchor.Y - formatted.Height * 0.5;
         ctx.DrawRectangle(ChipBg, null,
             new Rect(x - 5, y - 2, formatted.Width + 10, formatted.Height + 5), 4, 4);
         ctx.DrawText(formatted, new Point(x, y));

@@ -30,6 +30,24 @@ VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props |
 [ -n "$VERSION" ] || VERSION="1.0.0"
 
 TASK="${1:-build}"
+shift 2>/dev/null || true
+
+# 解析 -version=<版本号>（也接受 --version=）
+CLI_VERSION=""
+for arg in "$@"; do
+  case "$arg" in
+    -version=*|--version=*) CLI_VERSION="${arg#*=}" ;;
+  esac
+done
+if [ -n "$CLI_VERSION" ]; then
+  VERSION="$CLI_VERSION"
+  # 写回 Directory.Build.props，让程序集版本与关于页显示一致
+  if [ -f Directory.Build.props ]; then
+    sed -i.bak "s|<Version>[^<]*</Version>|<Version>${VERSION}</Version>|" Directory.Build.props
+    rm -f Directory.Build.props.bak
+  fi
+  echo "==> 版本号设为 ${VERSION}"
+fi
 mkdir -p "$ROOT_DIR/build/logs"
 
 # 加载 buildsh 模块

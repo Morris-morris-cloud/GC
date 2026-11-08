@@ -5,7 +5,7 @@
   },
   "projects": {
     "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj": {
-      "version": "1.0.3",
+      "version": "1.0.4",
       "restore": {
         "projectUniqueName": "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
         "projectName": "EarthModelStudio.ModelSdk",
@@ -49,12 +49,6 @@
             "Avalonia": {
               "target": "Package",
               "version": "[11.3.9, )"
-            },
-            "Microsoft.NET.ILLink.Tasks": {
-              "suppressParent": "All",
-              "target": "Package",
-              "version": "[8.0.31, )",
-              "autoReferenced": true
             }
           },
           "imports": [
@@ -68,27 +62,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Runtime.win-arm64",
-              "version": "[8.0.31, 8.0.31]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Runtime.win-arm64",
-              "version": "[8.0.31, 8.0.31]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
           "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.401/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-arm64": {
-          "#import": []
         }
       }
     }
