@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NeoRF")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.4.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.4+5e0b46b3f3cd9800af177571c7809a7cdc8e9249")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.4+f69a8fbb7fa563800802d3c2e319ed56365c3b8c")]
 [assembly: System.Reflection.AssemblyProductAttribute("Earth Model Studio")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EarthModelStudio")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.4.0")]

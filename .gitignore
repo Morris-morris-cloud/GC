@@ -1,3 +1,6 @@
+# 运行数据目录（settings/model/cache/update），绝不入库
+.GC/
+
 .venv/
 venv/
 env/

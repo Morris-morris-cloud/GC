@@ -217,30 +217,43 @@ public sealed class UpdateService
         try
         {
             var total = files.Sum(f => Math.Max(1L, f.Size));
+            // 并行下载：模型包通常有几十个文件，串行下载会明显拖慢启动。
+            // 并发上限 6，避免被服务端限流；进度用原子计数汇总。
             long done = 0;
-            foreach (var entry in files)
+            var stagingFull = Path.GetFullPath(staging)
+                .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            using var gate = new SemaphoreSlim(6);
+
+            var tasks = files.Select(async entry =>
             {
-                ct.ThrowIfCancellationRequested();
-                var bytes = await _remote.DownloadAsync(entry, ct);
-                // 路径穿越防护：规范化后必须仍落在 staging 目录内，
-                // 防止远端清单里的 "../" 或绝对路径写进安装目录之外。
-                var dest = Path.GetFullPath(Path.Combine(staging,
-                    entry.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
-                var stagingFull = Path.GetFullPath(staging)
-                    .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                if (!dest.StartsWith(stagingFull, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException($"非法的模型文件路径: {entry.RelativePath}");
-                var destDir = Path.GetDirectoryName(dest);
-                if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
-                await File.WriteAllBytesAsync(dest, bytes, ct);
-                done += bytes.Length;
-                progress?.Report(new UpdateProgress
+                await gate.WaitAsync(ct);
+                try
                 {
-                    Value = 0.05 + 0.72 * (index + Math.Min(1, (double)done / Math.Max(1, total))) / Math.Max(1, count),
-                    Message = L.I.F("update.downloadingModel", model.Id),
-                    Detail = entry.RelativePath
-                });
-            }
+                    ct.ThrowIfCancellationRequested();
+                    var bytes = await _remote.DownloadAsync(entry, ct);
+
+                    // 路径穿越防护
+                    var dest = Path.GetFullPath(Path.Combine(staging,
+                        entry.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (!dest.StartsWith(stagingFull, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException($"非法的模型文件路径: {entry.RelativePath}");
+
+                    var destDir = Path.GetDirectoryName(dest);
+                    if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
+                    await File.WriteAllBytesAsync(dest, bytes, ct);
+
+                    var now = Interlocked.Add(ref done, bytes.Length);
+                    progress?.Report(new UpdateProgress
+                    {
+                        Value = 0.05 + 0.72 * (index + Math.Min(1, (double)now / Math.Max(1, total))) / Math.Max(1, count),
+                        Message = L.I.F("update.downloadingModel", model.Id),
+                        Detail = entry.RelativePath
+                    });
+                }
+                finally { gate.Release(); }
+            });
+
+            await Task.WhenAll(tasks);
 
             // 原子替换：先备份旧目录，成功后再删备份；失败自动回滚
             Directory.CreateDirectory(_paths.ModelRoot);

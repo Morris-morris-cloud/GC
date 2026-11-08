@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -118,13 +119,82 @@ public sealed class GitCodeRemote : IModelRemote
         }
     }
 
-    /// <summary>递归列出目录树（含目录项与文件项）。</summary>
+    /// <summary>
+    /// 递归列出目录树（含目录项与文件项）。
+    /// 每个子目录一次 HTTP 请求，因此并行展开同一层的所有目录，
+    /// 否则 3 个模型、十几个目录串行请求会非常慢。
+    /// </summary>
     public async Task<IReadOnlyList<RepoEntry>> ListTreeAsync(string rootPath, CancellationToken ct)
     {
         var result = new List<RepoEntry>();
+        var bag = new System.Collections.Concurrent.ConcurrentBag<RepoEntry>();
         var repoPath = (rootPath ?? _modelDir).Trim('/');
-        await WalkAsync(repoPath, "", 0, result, ct);
+        await WalkParallelAsync(repoPath, "", 0, bag, ct);
+
+        // 稳定排序：目录在前、按路径字典序，保证调用方拿到确定顺序
+        result = bag.OrderBy(e => e.IsDirectory ? 0 : 1)
+                    .ThenBy(e => e.RelativePath, StringComparer.Ordinal)
+                    .ToList();
         return result;
+    }
+
+    private async Task WalkParallelAsync(string repoPath, string relative, int depth,
+        System.Collections.Concurrent.ConcurrentBag<RepoEntry> bag, CancellationToken ct)
+    {
+        if (depth > 8) return;
+        var url = _api + repoPath + "?ref=" + _branch;
+        string text;
+        try { text = await GetWithRetryAsync(url, ct); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"列目录失败 {repoPath}: {ex.Message}");
+            return;
+        }
+        if (!text.TrimStart().StartsWith("[", StringComparison.Ordinal)) return;
+
+        var subDirs = new List<(string Path, string Relative)>();
+
+        using (var doc = JsonDocument.Parse(text))
+        {
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                ct.ThrowIfCancellationRequested();
+                var name = Str(item, "name");
+                if (string.IsNullOrEmpty(name) || name.StartsWith('.')) continue;
+                // 这些目录不是模型运行数据，跳过可显著减少请求
+                // （模型目录里常见的 src/ bin/ obj/ 是源码与构建产物）
+                if (IsIgnoredDir(name)) continue;
+                var path = Str(item, "path");
+                if (string.IsNullOrWhiteSpace(path)) path = repoPath + "/" + name;
+                var isDir = Str(item, "type") == "dir";
+                var childRelative = relative.Length == 0 ? name : relative + "/" + name;
+
+                bag.Add(new RepoEntry
+                {
+                    Name = name,
+                    Path = path!,
+                    RelativePath = childRelative,
+                    IsDirectory = isDir,
+                    DownloadUrl = NullableStr(item, "download_url"),
+                    Sha = NullableStr(item, "sha"),
+                    Size = Num(item, "size")
+                });
+
+                if (isDir) subDirs.Add((path!, childRelative));
+            }
+        }
+
+        if (subDirs.Count == 0) return;
+
+        // 同层并行；并发保持很低——GitCode API 对突发请求会返回 429
+        using var gate = new SemaphoreSlim(2);
+        var tasks = subDirs.Select(async d =>
+        {
+            await gate.WaitAsync(ct);
+            try { await WalkParallelAsync(d.Path, d.Relative, depth + 1, bag, ct); }
+            finally { gate.Release(); }
+        });
+        await Task.WhenAll(tasks);
     }
 
     private async Task WalkAsync(string repoPath, string relative, int depth,
@@ -158,6 +228,43 @@ public sealed class GitCodeRemote : IModelRemote
             });
 
             if (isDir) await WalkAsync(path!, childRelative, depth + 1, result, ct);
+        }
+    }
+
+    /// <summary>遍历时忽略的目录：源码与构建产物不属于模型运行数据。</summary>
+    private static bool IsIgnoredDir(string name) => name switch
+    {
+        "src" => true,
+        "bin" => true,
+        "obj" => true,
+        "node_modules" => true,
+        ".git" => true,
+        ".vs" => true,
+        _ => false
+    };
+
+    /// <summary>
+    /// 带退避重试的 GET。GitCode API 对突发请求返回 429，
+    /// 这里做 3 次指数退避，避免并行遍历时直接失败。
+    /// </summary>
+    private async Task<string> GetWithRetryAsync(string url, CancellationToken ct,
+        int maxAttempts = 3)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await _http.GetStringAsync(url, ct);
+            }
+            catch (HttpRequestException ex) when (attempt < maxAttempts)
+            {
+                // 429 / 5xx 才重试，其余直接抛
+                var retriable = ex.StatusCode is null ||
+                                (int)ex.StatusCode == 429 ||
+                                (int)ex.StatusCode >= 500;
+                if (!retriable) throw;
+                await Task.Delay(TimeSpan.FromMilliseconds(400 * attempt * attempt), ct);
+            }
         }
     }
 
