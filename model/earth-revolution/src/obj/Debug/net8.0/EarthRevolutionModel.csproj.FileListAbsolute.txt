@@ -1,0 +1,13 @@
+/Users/morris/Downloads/GC#/model/earth-revolution/src/bin/Debug/net8.0/EarthRevolutionModel.deps.json
+/Users/morris/Downloads/GC#/model/earth-revolution/src/bin/Debug/net8.0/EarthRevolutionModel.dll
+/Users/morris/Downloads/GC#/model/earth-revolution/src/bin/Debug/net8.0/EarthRevolutionModel.pdb
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.csproj.AssemblyReference.cache
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/Avalonia/Resources.Inputs.cache
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.GeneratedMSBuildEditorConfig.editorconfig
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.AssemblyInfoInputs.cache
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.AssemblyInfo.cs
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.csproj.CoreCompileInputs.cache
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.dll
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/refint/EarthRevolutionModel.dll
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/EarthRevolutionModel.pdb
+/Users/morris/Downloads/GC#/model/earth-revolution/src/obj/Debug/net8.0/ref/EarthRevolutionModel.dll

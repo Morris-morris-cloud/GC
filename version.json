@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "generated": "2026-11-08T09:22:29Z",
+  "repository": "https://gitcode.com/2509_92447106/GC",
+  "branch": "main",
+  "modelDir": "model",
+  "launcher": {
+    "version": "1.0.3",
+    "revision": "a75fbf4d57",
+    "packages": {
+      "win-x64": {
+        "path": "dist/GC-win-x64.zip",
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.3/GC-win-x64.zip"
+      },
+      "win-arm64": {
+        "path": "dist/GC-win-arm64.zip",
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.3/GC-win-arm64.zip"
+      },
+      "osx-arm64": {
+        "path": "dist/GC-osx-arm64.zip",
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.3/GC-osx-arm64.zip"
+      },
+      "osx-x64": {
+        "path": "dist/GC-osx-x64.zip",
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.3/GC-osx-x64.zip"
+      },
+      "linux-x64": {
+        "path": "dist/GC-linux-x64.zip",
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.3/GC-linux-x64.zip"
+      }
+    }
+  },
+  "models": [
+    {
+      "id": "earth-geography",
+      "version": "1.0",
+      "build": "883fdf6c57",
+      "dir": "model/earth-geography"
+    },
+    {
+      "id": "earth-revolution",
+      "version": "1.0",
+      "build": "a24be3664d",
+      "dir": "model/earth-revolution"
+    },
+    {
+      "id": "earth-rotation",
+      "version": "1.0",
+      "build": "0bd5b4507c",
+      "dir": "model/earth-rotation"
+    }
+  ]
+}

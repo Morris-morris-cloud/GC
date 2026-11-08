@@ -1,0 +1,325 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <SolidColorBrush x:Key="AppBg" Color="#F4F6FB" />
+    <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#F7F9FE" />
+    <SolidColorBrush x:Key="Line" Color="#E3E8F3" />
+    <SolidColorBrush x:Key="LineStrong" Color="#D2DAEA" />
+    <SolidColorBrush x:Key="Ink" Color="#111A2E" />
+    <SolidColorBrush x:Key="InkDim" Color="#5B6A86" />
+    <SolidColorBrush x:Key="InkFaint" Color="#8A97B1" />
+    <SolidColorBrush x:Key="Accent" Color="#2F6BFF" />
+    <SolidColorBrush x:Key="AccentDark" Color="#1F4FD0" />
+    <SolidColorBrush x:Key="AccentSoft" Color="#EAF1FF" />
+    <SolidColorBrush x:Key="SideBg" Color="#0D1526" />
+    <SolidColorBrush x:Key="SideLine" Color="#1B2740" />
+    <SolidColorBrush x:Key="SideInk" Color="#A9B8D4" />
+    <SolidColorBrush x:Key="Success" Color="#1F9D6B" />
+    <SolidColorBrush x:Key="Danger" Color="#D64545" />
+    <SolidColorBrush x:Key="Warn" Color="#D98613" />
+
+    <LinearGradientBrush x:Key="HeroBg" StartPoint="0%,0%" EndPoint="100%,100%">
+      <GradientStop Color="#12203C" Offset="0" />
+      <GradientStop Color="#1A3057" Offset="0.55" />
+      <GradientStop Color="#0E1A31" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="TitleBarBg" StartPoint="0%,0%" EndPoint="100%,100%">
+      <GradientStop Color="#101C33" Offset="0" />
+      <GradientStop Color="#0B1322" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="SideBgBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Color="#0E1729" Offset="0" />
+      <GradientStop Color="#0A1120" Offset="1" />
+    </LinearGradientBrush>
+  </Styles.Resources>
+
+  <Style Selector="Window">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+
+  <!-- 文本 -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.h3">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource InkDim}" />
+  </Style>
+  <Style Selector="TextBlock.faint">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Foreground" Value="{DynamicResource InkFaint}" />
+  </Style>
+  <Style Selector="TextBlock.eyebrow">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkFaint}" />
+  </Style>
+  <Style Selector="TextBlock.onDark">
+    <Setter Property="Foreground" Value="#EAF1FF" />
+  </Style>
+  <Style Selector="TextBlock.onDarkDim">
+    <Setter Property="Foreground" Value="#9DB0D0" />
+  </Style>
+
+  <!-- 容器 -->
+  <!-- 容器：卡片悬停浮起，阴影与位移都有过渡 -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.card:pointerover">
+    <Setter Property="BoxShadow" Value="0 10 26 0 #1A213C70" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+    <Setter Property="RenderTransform" Value="translateY(-2px)" />
+  </Style>
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+  <Style Selector="Border.hero">
+    <Setter Property="Background" Value="{DynamicResource HeroBg}" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="BoxShadow" Value="0 12 32 0 #1A0B1A3A" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+  <Style Selector="Border.tag">
+    <Setter Property="Background" Value="#F0F3FA" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="7,2" />
+  </Style>
+
+  <!-- ===================================================================
+       按钮（重写版）
+       原则：只通过 Button 自身的 Background/Foreground/BorderBrush + 伪类
+       设置来换色，一律不覆盖 /template/ ContentPresenter 的属性，也不使用
+       RenderTransform 动画。FluentTheme 的按钮模板通过 TemplateBinding 读取
+       这些属性，混用「Button 属性」与「模板内部元素属性」会在 hover 状态
+       切换时互相覆盖，造成光标移动时的渲染错乱。
+       所有过渡都是纯画刷过渡（BrushTransition），类型固定，不会转换失败。
+       =================================================================== -->
+  <Style Selector="Button">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.13" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.13" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <!-- 通用 hover / pressed（纯色，无变换） -->
+  <Style Selector="Button:pointerover">
+    <Setter Property="Background" Value="#EDF2FC" />
+    <Setter Property="BorderBrush" Value="#BAC9E6" />
+  </Style>
+  <Style Selector="Button:pressed">
+    <Setter Property="Background" Value="#DDE7F8" />
+    <Setter Property="BorderBrush" Value="#9FB4DD" />
+  </Style>
+
+  <!-- 主要按钮 -->
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AccentDark}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentDark}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:pressed">
+    <Setter Property="Background" Value="#183FA8" />
+    <Setter Property="BorderBrush" Value="#183FA8" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <!-- 幽灵按钮 -->
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource InkDim}" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover">
+    <Setter Property="Background" Value="#EEF2FA" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.ghost:pressed">
+    <Setter Property="Background" Value="#E2E9F6" />
+  </Style>
+
+  <!-- 危险按钮 -->
+  <Style Selector="Button.danger">
+    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+  </Style>
+  <Style Selector="Button.danger:pointerover">
+    <Setter Property="Background" Value="#FDECEC" />
+    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+  </Style>
+  <Style Selector="Button.danger:pressed">
+    <Setter Property="Background" Value="#F8DADA" />
+  </Style>
+
+  <!-- 深色背景上的按钮 -->
+  <Style Selector="Button.onDark">
+    <Setter Property="Background" Value="#1B2740" />
+    <Setter Property="BorderBrush" Value="#2A3A57" />
+    <Setter Property="Foreground" Value="#DCE7FA" />
+  </Style>
+  <Style Selector="Button.onDark:pointerover">
+    <Setter Property="Background" Value="#233351" />
+    <Setter Property="BorderBrush" Value="#3A4E75" />
+  </Style>
+  <Style Selector="Button.onDark:pressed">
+    <Setter Property="Background" Value="#2B3D60" />
+  </Style>
+  <Style Selector="Button.onDark.active">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="Button.small">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <!-- 侧栏导航（主页 / 下载 / 设置） -->
+  <Style Selector="Button.nav">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource SideInk}" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="MinHeight" Value="40" />
+  </Style>
+  <Style Selector="Button.nav:pointerover">
+    <Setter Property="Background" Value="#16213A" />
+    <Setter Property="Foreground" Value="#E8EFFF" />
+  </Style>
+  <Style Selector="Button.nav:pressed">
+    <Setter Property="Background" Value="#1E2C49" />
+  </Style>
+  <Style Selector="Button.nav.active">
+    <Setter Property="Background" Value="#1C2C4C" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="3,0,0,0" />
+  </Style>
+  <Style Selector="Button.nav.active:pointerover">
+    <Setter Property="Background" Value="#22355A" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+  <!-- 输入 -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="11,8" />
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Padding" Value="10,4" />
+  </Style>
+  <Style Selector="ProgressBar">
+    <Setter Property="Height" Value="5" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="MinHeight" Value="5" />
+  </Style>
+  <Style Selector="CheckBox">
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+
+  <!-- ===================================================================
+       自建标题栏按钮（最小化 − / 关闭 ✕）
+       同样只用纯画刷换色，绝不设置 RenderTransform；
+       且用更高优先级覆盖上面通用的 :pointerover / :pressed，
+       避免深色标题栏上出现浅色 hover 背景。
+       =================================================================== -->
+  <Style Selector="Button.titlebtn">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="#A9B8D4" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Margin" Value="2,0" />
+  </Style>
+  <Style Selector="Button.titlebtn:pointerover">
+    <Setter Property="Background" Value="#223252" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+  <Style Selector="Button.titlebtn:pressed">
+    <Setter Property="Background" Value="#2C4270" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+  <Style Selector="Button.titlebtn.close:pointerover">
+    <Setter Property="Background" Value="#D64545" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+  <Style Selector="Button.titlebtn.close:pressed">
+    <Setter Property="Background" Value="#B93737" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+</Styles>

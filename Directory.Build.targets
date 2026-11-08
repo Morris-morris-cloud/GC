@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Avalonia.BuildServices 11.3.x 的 AvaloniaStats 任务会向
+    ~/Library/Application Support/AvaloniaUI/BuildServices/buildtasks.log 写遥测日志。
+    只读用户目录 / CI / 沙箱里该写入抛 UnauthorizedAccessException(MSB4018)，
+    会让整个解决方案编译失败（实测）。这是纯统计任务，不影响产物，直接禁用。
+    在 buildTransitive/*.targets 之后导入，同名 Target 覆盖即可（MSBuild 后定义者优先）。
+  -->
+  <Target Name="AvaloniaStats" />
+</Project>

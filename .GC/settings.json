@@ -1,0 +1,21 @@
+{
+  "language": "auto",
+  "theme": "light",
+  "renderFps": 120,
+  "memoryMb": 2048,
+  "memoryAuto": true,
+  "checkSourceOnStartup": false,
+  "sources": [
+    {
+      "id": "gitcode-official",
+      "name": "Morris GC (GitCode)",
+      "url": "https://gitcode.com/2509_92447106/GC",
+      "enabled": true,
+      "builtIn": true
+    }
+  ],
+  "recentModels": [],
+  "autoUpdateOnStartup": true,
+  "updateRepository": "https://gitcode.com/2509_92447106/GC",
+  "installedModelVersions": {}
+}

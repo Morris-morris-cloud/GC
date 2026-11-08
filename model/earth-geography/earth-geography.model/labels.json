@@ -1,0 +1,103 @@
+{
+ "labels": [
+  {
+   "lat": 34,
+   "lon": 90,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "亚洲",
+    "en": "Asia"
+   }
+  },
+  {
+   "lat": 2,
+   "lon": 20,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "非洲",
+    "en": "Africa"
+   }
+  },
+  {
+   "lat": 48,
+   "lon": -100,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "北美洲",
+    "en": "North America"
+   }
+  },
+  {
+   "lat": -15,
+   "lon": -60,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "南美洲",
+    "en": "South America"
+   }
+  },
+  {
+   "lat": -78,
+   "lon": 20,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "南极洲",
+    "en": "Antarctica"
+   }
+  },
+  {
+   "lat": 52,
+   "lon": 18,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "欧洲",
+    "en": "Europe"
+   }
+  },
+  {
+   "lat": -24,
+   "lon": 134,
+   "kind": "continent",
+   "nameI18n": {
+    "zh-CN": "大洋洲",
+    "en": "Oceania"
+   }
+  },
+  {
+   "lat": 0,
+   "lon": -155,
+   "kind": "ocean",
+   "nameI18n": {
+    "zh-CN": "太平洋",
+    "en": "Pacific Ocean"
+   }
+  },
+  {
+   "lat": 12,
+   "lon": -30,
+   "kind": "ocean",
+   "nameI18n": {
+    "zh-CN": "大西洋",
+    "en": "Atlantic Ocean"
+   }
+  },
+  {
+   "lat": -22,
+   "lon": 78,
+   "kind": "ocean",
+   "nameI18n": {
+    "zh-CN": "印度洋",
+    "en": "Indian Ocean"
+   }
+  },
+  {
+   "lat": 85,
+   "lon": 0,
+   "kind": "ocean",
+   "nameI18n": {
+    "zh-CN": "北冰洋",
+    "en": "Arctic Ocean"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:EarthModelStudio.Services"
+        x:Class="EarthModelStudio.Views.ConfirmWindow"
+        Title="{loc:Loc app.name}"
+        Width="440" SizeToContent="Height"
+        CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent">
+
+  <StackPanel Margin="24,20,24,20" Spacing="14">
+    <TextBlock x:Name="TitleText" Classes="h2" Text="{loc:Loc common.confirmTitle}" />
+    <TextBlock x:Name="MessageText" Classes="muted" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+      <Button x:Name="CancelButton" Content="{loc:Loc common.cancel}" Click="OnCancel" />
+      <Button x:Name="ConfirmButton" Classes="primary" Content="{loc:Loc common.confirm}" Click="OnConfirm" />
+    </StackPanel>
+  </StackPanel>
+</Window>
