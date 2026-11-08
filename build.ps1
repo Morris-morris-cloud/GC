@@ -42,7 +42,7 @@ $TestProj = 'src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.cspro
 $PreviewProj = 'model/_engine/PreviewGen/PreviewGen.csproj'
 $StampProj = 'model/_engine/VersionStamp/VersionStamp.csproj'
 $Sln = 'EarthModelStudio.sln'
-$Version = '1.0.1'
+$Version = '1.0.2'
 
 function Stamp-Versions {
     Write-Host '==> 自动计算模型版本并生成 version.json'

@@ -87,6 +87,7 @@ public sealed class GeographyRuntime : IModelRuntime
             Spacing = 8,
             VerticalAlignment = VerticalAlignment.Center
         };
+        actions.Children.Add(MakeModeSwitch(view));
         actions.Children.Add(MakeToggle("五带", view.ShowZones, on => view.ShowZones = on));
         actions.Children.Add(MakeToggle("大洲轮廓", view.ShowCoast, on => view.ShowCoast = on));
         actions.Children.Add(MakeToggle("板块", view.ShowPlates, on => view.ShowPlates = on));
@@ -171,6 +172,30 @@ public sealed class GeographyRuntime : IModelRuntime
         "north-temperate" or "south-temperate" => new SolidColorBrush(Color.Parse("#6ED28C")),
         _ => new SolidColorBrush(Color.Parse("#96C8FF"))
     };
+
+    /// <summary>3D 球面 / 平面等经纬 两态切换。</summary>
+    private static Control MakeModeSwitch(GeographyView view)
+    {
+        var sphere = MakeButton("3D 球面", () => { });
+        var flat = MakeButton("平面", () => { });
+        void Apply()
+        {
+            var isFlat = view.Mode == GeoMode.Flat2D;
+            sphere.Background = new SolidColorBrush(Color.Parse(isFlat ? "#16263C" : "#1F5BD6"));
+            sphere.BorderBrush = new SolidColorBrush(Color.Parse(isFlat ? "#263A56" : "#3B7BFF"));
+            sphere.Foreground = new SolidColorBrush(Color.Parse(isFlat ? "#9FB4D4" : "#FFFFFF"));
+            flat.Background = new SolidColorBrush(Color.Parse(isFlat ? "#1F5BD6" : "#16263C"));
+            flat.BorderBrush = new SolidColorBrush(Color.Parse(isFlat ? "#3B7BFF" : "#263A56"));
+            flat.Foreground = new SolidColorBrush(Color.Parse(isFlat ? "#FFFFFF" : "#9FB4D4"));
+        }
+        sphere.Click += (_, _) => { view.Mode = GeoMode.Sphere3D; Apply(); };
+        flat.Click += (_, _) => { view.Mode = GeoMode.Flat2D; Apply(); };
+        Apply();
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        row.Children.Add(sphere);
+        row.Children.Add(flat);
+        return row;
+    }
 
     private static Button MakeButton(string text, Action onClick)
     {

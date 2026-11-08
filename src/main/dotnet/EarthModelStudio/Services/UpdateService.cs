@@ -287,12 +287,25 @@ public sealed class UpdateService
             string.Equals(pending, launcher.Version, StringComparison.OrdinalIgnoreCase))
             return L.I.F("update.pendingReady", launcher.Version);
 
-        if (!IsNewer(launcher.Version, current)) return null;
-
         var rid = CurrentRid;
         if (!launcher.Packages.TryGetValue(rid, out var package) &&
             !launcher.Packages.TryGetValue("default", out package))
             return L.I.F("update.noRidPackage", launcher.Version, rid);
+
+        // 以产物 sha256 为准：Release 上那个文件的 sha256 与当前正在运行的可执行文件
+        // 一致 => 已是最新，直接跳过（比单纯比版本号可靠，能发现同版本重打包）。
+        // 只有在没有 sha256 时才退回版本号比较。
+        if (!string.IsNullOrWhiteSpace(package!.Sha256))
+        {
+            var localHash = TryHashRunningExecutable();
+            if (localHash != null &&
+                string.Equals(localHash, package.Sha256!.Trim(), StringComparison.OrdinalIgnoreCase))
+                return null;   // sha256 相同：静默跳过
+        }
+        else if (!IsNewer(launcher.Version, current))
+        {
+            return null;
+        }
 
         progress?.Report(new UpdateProgress
         {
@@ -316,11 +329,12 @@ public sealed class UpdateService
         if (Directory.Exists(payload)) Directory.Delete(payload, true);
         Directory.CreateDirectory(payload);
 
-        // 单文件发布包（.exe / .app.zip 里的可执行文件不在此列）就是程序本体，不能解压。
-        // 直接按附件原名放进 payload，脚本会把 payload/ 整体覆盖到安装目录。
+        // 单文件发布包（.exe）就是程序本体，直接落盘不解压；
+        // .app 实际是 zip（内含 .app 目录），要解压后替换整个应用包。
         var assetName = package!.AssetName;
         bool singleFile = !string.IsNullOrWhiteSpace(assetName) &&
-                          !assetName!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                          !assetName!.EndsWith(".app", StringComparison.OrdinalIgnoreCase) &&
+                          !assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
                           !assetName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
         string executableName;
         if (singleFile)
@@ -351,6 +365,26 @@ public sealed class UpdateService
         _settings.Current.PendingLauncherVersion = launcher.Version;
         _settings.Save();
         return L.I.F("update.pendingDownloaded", launcher.Version);
+    }
+
+    /// <summary>
+    /// 当前进程可执行文件的 sha256（小写 hex）。
+    /// 用于与 Release 附件比对：一致说明本地已经是同一份产物，无需重复下载。
+    /// macOS 上单文件发布时会包在 .app 里，Environment.ProcessPath 指向真正的可执行文件。
+    /// </summary>
+    private static string? TryHashRunningExecutable()
+    {
+        try
+        {
+            var path = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+        }
+        catch
+        {
+            return null;   // 读不到就退回版本号比较
+        }
     }
 
     private static void FlattenPayload(string dir)

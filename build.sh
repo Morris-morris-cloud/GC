@@ -38,7 +38,7 @@ PREVIEW_PROJ="model/_engine/PreviewGen/PreviewGen.csproj"
 STAMP_PROJ="model/_engine/VersionStamp/VersionStamp.csproj"
 TEST_PROJ="src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj"
 SLN="EarthModelStudio.sln"
-VERSION="1.0.1"
+VERSION="1.0.2"
 TASK="${1:-build}"
 
 # 按模型包内容指纹自动写回 <id>.json 的 version，并生成 version.json
@@ -144,20 +144,47 @@ pack_models() {
 }
 
 # 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
+# 产物命名：GC-<版本>-<系统>-<架构>.exe / GC-<版本>-<系统>-<架构>.app
+# Windows: 单文件 exe 直接改名（本身就是可执行产物，无需再压缩）
+# macOS:   .app 目录整体打成 zip，但文件名保留 .app 后缀，便于客户端识别
+sys_arch_label() {
+  case "$1" in
+    win-x64)   echo "win-amd64" ;;
+    win-arm64) echo "win-arm64" ;;
+    osx-arm64) echo "mac-arm64" ;;
+    *)         echo "$1" ;;
+  esac
+}
+
 pack_launcher() {
-  echo "==> 生成启动器更新包（不含 .GC）"
+  echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>.exe/.app）"
   WIN64="$ROOT_DIR/dist/win-x64"
   WINARM="$ROOT_DIR/dist/win-arm64"
-  MACBIN="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
-  [ -d "$MACBIN" ] || MACBIN="$ROOT_DIR/dist/mac-arm64"
-  [ -d "$WIN64" ] && ( cd "$WIN64" && zip -qr "$ROOT_DIR/dist/GC-win-x64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
-  [ -d "$WINARM" ] && ( cd "$WINARM" && zip -qr "$ROOT_DIR/dist/GC-win-arm64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
-  [ -d "$MACBIN" ] && ( cd "$MACBIN" && zip -qr "$ROOT_DIR/dist/GC-osx-arm64.zip" . \
-      -x "./.GC" "./.GC/*" "*.DS_Store" )
+  MACAPP="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app"
+  [ -d "$MACAPP" ] || MACAPP="$ROOT_DIR/dist/mac-arm64"
+
+  # Windows：把 exe 重命名为发布名
+  for pair in "win-x64:win-amd64" "win-arm64:win-arm64"; do
+    RID="${pair%%:*}"; LABEL="${pair##*:}"
+    SRC="$ROOT_DIR/dist/$RID"
+    [ -d "$SRC" ] || continue
+    EXE=$(ls "$SRC"/*.exe 2>/dev/null | head -1)
+    [ -n "$EXE" ] || continue
+    DEST="$ROOT_DIR/dist/GC-${VERSION}-${LABEL}.exe"
+    cp "$EXE" "$DEST"
+    echo "    -> $(basename "$DEST")"
+  done
+
+  # macOS：.app 打成分发包，命名保留 .app
+  if [ -d "$MACAPP" ]; then
+    DEST="$ROOT_DIR/dist/GC-${VERSION}-mac-arm64.app"
+    rm -f "$DEST"
+    ( cd "$(dirname "$MACAPP")" && zip -qry "$DEST" "$(basename "$MACAPP")" -x "*.DS_Store" )
+    echo "    -> $(basename "$DEST")"
+  fi
+
   stamp_versions
-  ls -lh "$ROOT_DIR"/dist/GC-*.zip 2>/dev/null || true
+  ls -lh "$ROOT_DIR"/dist/GC-"$VERSION"-* 2>/dev/null || true
 }
 
 package_mac_app() {

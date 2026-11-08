@@ -29,6 +29,15 @@ public sealed class BorderEntry
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("nameI18n")] public Dictionary<string, string>? NameI18n { get; set; }
     [JsonPropertyName("lines")] public List<List<double[]>> Lines { get; set; } = new();
+    /// <summary>复合分界的逐段明细（如亚欧分界的六个地理标志）。</summary>
+    [JsonPropertyName("segments")] public List<BorderSegment>? Segments { get; set; }
+}
+
+public sealed class BorderSegment
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    [JsonPropertyName("nameI18n")] public Dictionary<string, string>? NameI18n { get; set; }
+    [JsonPropertyName("lines")] public List<List<double[]>> Lines { get; set; } = new();
 }
 
 public sealed class BorderData

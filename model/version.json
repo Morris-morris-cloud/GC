@@ -5,7 +5,7 @@
   "branch": "main",
   "modelDir": "model",
   "launcher": {
-    "version": "1.0.1",
+    "version": "1.0.2",
     "revision": "55f1c85a1c",
     "packages": {
       "win-x64": {
