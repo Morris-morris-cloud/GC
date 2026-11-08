@@ -13,12 +13,20 @@ public sealed class PlateEntry
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("nameI18n")] public Dictionary<string, string>? NameI18n { get; set; }
+    /// <summary>标签锚点 [lon, lat]；缺省时用轮廓质心。</summary>
+    [JsonPropertyName("label")] public double[]? Label { get; set; }
     [JsonPropertyName("lines")] public List<List<double[]>> Lines { get; set; } = new();
 }
 
 public sealed class PlateData
 {
     [JsonPropertyName("plates")] public List<PlateEntry> Plates { get; set; } = new();
+}
+
+/// <summary>大陆（六块大陆里的教材五块写法）。结构与板块一致，纯线稿。</summary>
+public sealed class ContinentData
+{
+    [JsonPropertyName("continents")] public List<PlateEntry> Continents { get; set; } = new();
 }
 
 public sealed class BorderEntry

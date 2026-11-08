@@ -23,6 +23,7 @@ public sealed class GeographyView : Control
     private readonly GeoScene _scene;
     private readonly GeoData _coast;
     private readonly PlateData _plates;
+    private readonly ContinentData _continents;
     private readonly BorderData _borders;
     private readonly LabelData _labels;
 
@@ -35,6 +36,7 @@ public sealed class GeographyView : Control
     private bool _showZones = true;
     private bool _showCoast = true;
     private bool _showPlates;
+    private bool _showContinents = true;
     private bool _showBorders = true;
     private bool _showLabels = true;
     private GeoMode _mode = GeoMode.Sphere3D;
@@ -42,11 +44,12 @@ public sealed class GeographyView : Control
     public event Action? StateChanged;
 
     public GeographyView(IModelContext context, GeoScene scene, GeoData coast,
-        PlateData plates, BorderData borders, LabelData labels)
+        PlateData plates, ContinentData continents, BorderData borders, LabelData labels)
     {
         _scene = scene;
         _coast = coast;
         _plates = plates;
+        _continents = continents;
         _borders = borders;
         _labels = labels;
         ClipToBounds = true;
@@ -56,6 +59,7 @@ public sealed class GeographyView : Control
     public bool ShowZones { get => _showZones; set { _showZones = value; Redraw(); } }
     public bool ShowCoast { get => _showCoast; set { _showCoast = value; Redraw(); } }
     public bool ShowPlates { get => _showPlates; set { _showPlates = value; Redraw(); } }
+    public bool ShowContinents { get => _showContinents; set { _showContinents = value; Redraw(); } }
     public bool ShowBorders { get => _showBorders; set { _showBorders = value; Redraw(); } }
     public bool ShowLabels { get => _showLabels; set { _showLabels = value; Redraw(); } }
     public GeoMode Mode { get => _mode; set { _mode = value; InvalidateVisual(); StateChanged?.Invoke(); } }
@@ -164,6 +168,7 @@ public sealed class GeographyView : Control
         if (_showZones) DrawZones3D(ctx, m, cx, cy, r);
         if (_showCoast) DrawCoast3D(ctx, m, cx, cy, r);
         if (_showPlates) DrawPlates3D(ctx, m, cx, cy, r);
+        if (_showContinents) DrawContinents3D(ctx, m, cx, cy, r);
         if (_showBorders) DrawBorders3D(ctx, m, cx, cy, r);
         if (_showLabels) DrawLabels3D(ctx, m, cx, cy, r);
 
@@ -308,17 +313,41 @@ public sealed class GeographyView : Control
             var pen = PlatePenFor(p.Id);
             foreach (var line in p.Lines) DrawGeo3D(ctx, line, m, cx, cy, r, pen, true);
         }
-        if (!_showLabels) return;
+        if (_showLabels) DrawPlateLabels3D(ctx, m, cx, cy, r);
+    }
 
+    private void DrawPlateLabels3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
+    {
         foreach (var p in _plates.Plates)
         {
-            var center = Centroid(p.Lines);
-            if (center == null) continue;
-            var cam = Geometry.ToCamera(Geometry.LatLonToUnit(center[1], center[0]), Matrix4x4.Identity, m);
+            var at = p.Label is { Length: >= 2 } ? p.Label : Centroid(p.Lines);
+            if (at == null) continue;
+            var cam = Geometry.ToCamera(Geometry.LatLonToUnit(at[1], at[0]), Matrix4x4.Identity, m);
             if (cam.Z <= 0.2f) continue;
             var pos = Geometry.Project(cam, r, cx, cy);
             DrawText(ctx, Pick(p.NameI18n, p.Id), pos.X, pos.Y, 10.5 * TextScale,
                 PlateBrushFor(p.Id), TextAlignment.Center);
+        }
+    }
+
+    /// <summary>五块大陆：与板块独立的线稿图层，便于讲清「板块 ≠ 大陆」。</summary>
+    private void DrawContinents3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
+    {
+        var pen = ContinentPen;
+        foreach (var c in _continents.Continents)
+            foreach (var line in c.Lines)
+                DrawGeo3D(ctx, line, m, cx, cy, r, pen, true);
+
+        if (!_showLabels) return;
+        foreach (var c in _continents.Continents)
+        {
+            var at = c.Label is { Length: >= 2 } ? c.Label : Centroid(c.Lines);
+            if (at == null) continue;
+            var cam = Geometry.ToCamera(Geometry.LatLonToUnit(at[1], at[0]), Matrix4x4.Identity, m);
+            if (cam.Z <= 0.2f) continue;
+            var pos = Geometry.Project(cam, r, cx, cy);
+            DrawText(ctx, Pick(c.NameI18n, c.Id), pos.X, pos.Y, 12 * TextScale,
+                MainlandBrush, TextAlignment.Center, FontStyle.Normal);
         }
     }
 
@@ -482,11 +511,28 @@ public sealed class GeographyView : Control
                     DrawFlatPolyline(ctx, line, P, pen);
 
                 if (!_showLabels) continue;
-                var c = Centroid(pl.Lines);
+                var c = pl.Label is { Length: >= 2 } ? pl.Label : Centroid(pl.Lines);
                 if (c == null) continue;
                 var at = P(c[0], c[1]);
                 DrawText(ctx, Pick(pl.NameI18n, pl.Id), at.X, at.Y, 10.5 * TextScale,
                     PlateBrushFor(pl.Id), TextAlignment.Center);
+            }
+        }
+
+        // 五大陆
+        if (_showContinents)
+        {
+            foreach (var c in _continents.Continents)
+            {
+                foreach (var line in c.Lines)
+                    DrawFlatPolyline(ctx, line, P, ContinentPen);
+
+                if (!_showLabels) continue;
+                var a = c.Label is { Length: >= 2 } ? c.Label : Centroid(c.Lines);
+                if (a == null) continue;
+                var at = P(a[0], a[1]);
+                DrawText(ctx, Pick(c.NameI18n, c.Id), at.X, at.Y, 12 * TextScale,
+                    MainlandBrush, TextAlignment.Center);
             }
         }
 
@@ -584,20 +630,15 @@ public sealed class GeographyView : Control
 
     private static IPen PlatePenFor(string id)
     {
+        // 教材六大板块，每块一个颜色
         var c = id switch
         {
-            "pacific" => Color.FromRgb(255, 110, 110),
-            "north-american" => Color.FromRgb(255, 176, 84),
-            "south-american" => Color.FromRgb(255, 226, 96),
-            "african" => Color.FromRgb(150, 230, 110),
-            "eurasian" => Color.FromRgb(110, 214, 230),
-            "indo-australian" => Color.FromRgb(126, 160, 255),
-            "antarctic" => Color.FromRgb(208, 190, 255),
-            "nazca" => Color.FromRgb(255, 140, 200),
-            "cocos" => Color.FromRgb(255, 200, 130),
-            "caribbean" => Color.FromRgb(180, 240, 160),
-            "philippine" => Color.FromRgb(255, 160, 230),
-            "arabian" => Color.FromRgb(200, 220, 255),
+            "eurasian" => Color.FromRgb(110, 214, 230),      // 青
+            "african" => Color.FromRgb(150, 230, 110),       // 绿
+            "american" => Color.FromRgb(255, 176, 84),       // 橙
+            "pacific" => Color.FromRgb(255, 110, 110),       // 红
+            "indian-ocean" => Color.FromRgb(126, 160, 255),  // 蓝紫
+            "antarctic" => Color.FromRgb(208, 190, 255),     // 淡紫
             _ => Color.FromRgb(255, 150, 100)
         };
         return new Pen(new SolidColorBrush(Color.FromArgb(225, c.R, c.G, c.B)), 1.55,
@@ -613,6 +654,11 @@ public sealed class GeographyView : Control
     // ================================================================ 通用画笔
     private static readonly IPen CoastPen = new Pen(new SolidColorBrush(Color.FromArgb(250, 236, 246, 255)), 1.75)
     { LineJoin = PenLineJoin.Round, LineCap = PenLineCap.Round };
+
+    /// <summary>五大陆轮廓：金黄色实线，与板块虚线明显区分。</summary>
+    private static readonly IPen ContinentPen = new Pen(new SolidColorBrush(Color.FromArgb(240, 255, 210, 74)), 2.0)
+    { LineJoin = PenLineJoin.Round, LineCap = PenLineCap.Round };
+    private static readonly IBrush MainlandBrush = new SolidColorBrush(Color.FromRgb(255, 218, 110));
 
     private static readonly IPen TropicPen = new Pen(new SolidColorBrush(Color.FromArgb(220, 255, 190, 100)), 1.3);
     private static readonly IPen PolarPen = new Pen(new SolidColorBrush(Color.FromArgb(210, 150, 205, 255)), 1.3);

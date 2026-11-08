@@ -9,3 +9,5 @@
 /Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Release/net8.0/EarthModelStudio.ModelSdk.dll
 /Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Release/net8.0/refint/EarthModelStudio.ModelSdk.dll
 /Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Release/net8.0/ref/EarthModelStudio.ModelSdk.dll
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/bin/Release/net8.0/EarthModelStudio.ModelSdk.pdb
+/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/obj/Release/net8.0/EarthModelStudio.ModelSdk.pdb

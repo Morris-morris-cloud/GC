@@ -1,16 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "1rhPDKvFVIw=",
+  "dgSpecHash": "XCy7zfNs4zI=",
   "success": true,
   "projectFilePath": "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
   "expectedPackageFiles": [
     "/Users/morris/.nuget/packages/avalonia/11.3.9/avalonia.11.3.9.nupkg.sha512",
     "/Users/morris/.nuget/packages/avalonia.buildservices/11.3.2/avalonia.buildservices.11.3.2.nupkg.sha512",
     "/Users/morris/.nuget/packages/avalonia.remote.protocol/11.3.9/avalonia.remote.protocol.11.3.9.nupkg.sha512",
-    "/Users/morris/.nuget/packages/microcom.runtime/0.11.0/microcom.runtime.0.11.0.nupkg.sha512",
-    "/Users/morris/.nuget/packages/microsoft.net.illink.tasks/8.0.31/microsoft.net.illink.tasks.8.0.31.nupkg.sha512",
-    "/Users/morris/.nuget/packages/microsoft.netcore.app.runtime.win-arm64/8.0.31/microsoft.netcore.app.runtime.win-arm64.8.0.31.nupkg.sha512",
-    "/Users/morris/.nuget/packages/microsoft.aspnetcore.app.runtime.win-arm64/8.0.31/microsoft.aspnetcore.app.runtime.win-arm64.8.0.31.nupkg.sha512"
+    "/Users/morris/.nuget/packages/microcom.runtime/0.11.0/microcom.runtime.0.11.0.nupkg.sha512"
   ],
   "logs": []
 }

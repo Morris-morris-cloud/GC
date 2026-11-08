@@ -19,6 +19,7 @@ public sealed class GeographyRuntime : IModelRuntime
     private GeoScene? _scene;
     private GeoData? _coast;
     private PlateData? _plates;
+    private ContinentData? _continents;
     private BorderData? _borders;
     private LabelData? _labels;
     private GeographyView? _view;
@@ -30,13 +31,15 @@ public sealed class GeographyRuntime : IModelRuntime
         _scene = ModelJson.Read<GeoScene>(Path.Combine(dir, "scene.json")) ?? new GeoScene();
         _coast = ModelJson.Read<GeoData>(Path.Combine(dir, "coastline.json")) ?? new GeoData();
         _plates = ModelJson.Read<PlateData>(Path.Combine(dir, "plates.json")) ?? new PlateData();
+        _continents = ModelJson.Read<ContinentData>(Path.Combine(dir, "continents.json")) ?? new ContinentData();
         _borders = ModelJson.Read<BorderData>(Path.Combine(dir, "borders.json")) ?? new BorderData();
 
         context.ReportProgress(0.45, "加载名称标注");
         _labels = ModelJson.Read<LabelData>(Path.Combine(dir, "labels.json")) ?? new LabelData();
 
         context.ReportProgress(0.72, "构建轮廓");
-        context.Log($"[{context.ModelId}] 海岸线 {_coast.Lines.Count} 条，板块 {_plates.Plates.Count} 个，洲界 {_borders.Borders.Count} 条");
+        context.Log($"[{context.ModelId}] 海岸线 {_coast.Lines.Count} 条，六大板块 {_plates.Plates.Count} 个，" +
+                    $"大陆 {_continents.Continents.Count} 块，洲界 {_borders.Borders.Count} 条");
     }
 
     public Control CreateView(IModelContext context)
@@ -44,10 +47,11 @@ public sealed class GeographyRuntime : IModelRuntime
         _scene ??= new GeoScene();
         _coast ??= new GeoData();
         _plates ??= new PlateData();
+        _continents ??= new ContinentData();
         _borders ??= new BorderData();
         _labels ??= new LabelData();
 
-        _view = new GeographyView(context, _scene, _coast, _plates, _borders, _labels);
+        _view = new GeographyView(context, _scene, _coast, _plates, _continents, _borders, _labels);
         context.ReportProgress(1.0, "准备就绪");
         return BuildLayout(_scene, _view, context);
     }
@@ -90,7 +94,8 @@ public sealed class GeographyRuntime : IModelRuntime
         actions.Children.Add(MakeModeSwitch(view));
         actions.Children.Add(MakeToggle("五带", view.ShowZones, on => view.ShowZones = on));
         actions.Children.Add(MakeToggle("大洲轮廓", view.ShowCoast, on => view.ShowCoast = on));
-        actions.Children.Add(MakeToggle("板块", view.ShowPlates, on => view.ShowPlates = on));
+        actions.Children.Add(MakeToggle("六大板块", view.ShowPlates, on => view.ShowPlates = on));
+        actions.Children.Add(MakeToggle("五大陆", view.ShowContinents, on => view.ShowContinents = on));
         actions.Children.Add(MakeToggle("洲界", view.ShowBorders, on => view.ShowBorders = on));
         actions.Children.Add(MakeButton("复位", () => view.ResetView()));
         Grid.SetColumn(actions, 2);
@@ -122,7 +127,8 @@ public sealed class GeographyRuntime : IModelRuntime
     {
         var panel = new StackPanel { Spacing = 6 };
         panel.Children.Add(LegendRow(new SolidColorBrush(Color.Parse("#DEEEFF")), "大洲海岸线"));
-        panel.Children.Add(LegendRow(new SolidColorBrush(Color.Parse("#FF8A5C")), "板块边界"));
+        panel.Children.Add(LegendRow(new SolidColorBrush(Color.Parse("#FF8A5C")), "六大板块边界"));
+        panel.Children.Add(LegendRow(new SolidColorBrush(Color.Parse("#FFD24A")), "五大陆轮廓"));
         panel.Children.Add(LegendRow(new SolidColorBrush(Color.Parse("#FFDC70")), "洲界 / 分界线"));
         return new Border
         {
