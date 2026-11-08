@@ -84,8 +84,9 @@ public sealed class ReleaseAsset
         get
         {
             var n = Name.ToLowerInvariant();
-            // macOS 的 .app 发布包其实是 zip（内含 .app 目录），需要解压，不算单文件
-            if (n.EndsWith(".app", StringComparison.Ordinal)) return false;
+            // macOS 的 .app 以 zip 分发（.app 或 .app.zip），内含 .app 目录，需要解压
+            if (n.EndsWith(".app", StringComparison.Ordinal) ||
+                n.EndsWith(".app.zip", StringComparison.Ordinal)) return false;
             return !n.EndsWith(".zip", StringComparison.Ordinal) &&
                    !n.EndsWith(".tar.gz", StringComparison.Ordinal) &&
                    !n.EndsWith(".tgz", StringComparison.Ordinal);

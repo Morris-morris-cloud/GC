@@ -1,6 +1,5 @@
 {
   "id": "earth-geography",
-  "version": "1.0",
   "nameI18n": {
     "zh-CN": "地球地理",
     "en": "Earth Geography"
@@ -17,5 +16,7 @@
     "earth",
     "atlas"
   ],
-  "dataDir": "earth-geography.model"
+  "dataDir": "earth-geography.model",
+  "version": "1.0-dd67f83d0c",
+  "updatedAt": "2026-11-08T01:29:16Z"
 }

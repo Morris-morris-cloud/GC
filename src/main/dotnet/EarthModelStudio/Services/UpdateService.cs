@@ -334,6 +334,7 @@ public sealed class UpdateService
         var assetName = package!.AssetName;
         bool singleFile = !string.IsNullOrWhiteSpace(assetName) &&
                           !assetName!.EndsWith(".app", StringComparison.OrdinalIgnoreCase) &&
+                          !assetName.EndsWith(".app.zip", StringComparison.OrdinalIgnoreCase) &&
                           !assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
                           !assetName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
         string executableName;

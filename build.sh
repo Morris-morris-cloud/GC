@@ -113,10 +113,11 @@ JSON
   echo "    运行目录 -> $REL/.GC （settings.json + model/ + cache/ + update/）"
 }
 
+# $1=RID $2=输出目录 $3=singlefile(true/false)
 publish_rid() {
-  RID="$1"; OUT="$2"
+  RID="$1"; OUT="$2"; SINGLE="${3:-true}"
   echo ""
-  echo "==> 编译 ${RID} -> ${OUT}"
+  echo "==> 编译 ${RID} (single-file=${SINGLE}) -> ${OUT}"
   # 先删旧产物，避免上次 publish 的残留文件混进新包
   rm -rf "$ROOT_DIR/$OUT"
   dotnet publish "$APP_PROJ" \
@@ -125,8 +126,8 @@ publish_rid() {
     --self-contained true \
     -p:Version="$VERSION" \
     -p:DebugType=none \
-    -p:PublishSingleFile=true \
-    -p:IncludeNativeLibrariesForSelfExtract=true \
+    -p:PublishSingleFile="$SINGLE" \
+    -p:IncludeNativeLibrariesForSelfExtract="$SINGLE" \
     -p:PublishTrimmed=false \
     -o "$ROOT_DIR/$OUT"
   rm -rf "$ROOT_DIR/$OUT/model" "$ROOT_DIR/$OUT/examples"
@@ -144,26 +145,15 @@ pack_models() {
 }
 
 # 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
-# 产物命名：GC-<版本>-<系统>-<架构>.exe / GC-<版本>-<系统>-<架构>.app
-# Windows: 单文件 exe 直接改名（本身就是可执行产物，无需再压缩）
-# macOS:   .app 目录整体打成 zip，但文件名保留 .app 后缀，便于客户端识别
-sys_arch_label() {
-  case "$1" in
-    win-x64)   echo "win-amd64" ;;
-    win-arm64) echo "win-arm64" ;;
-    osx-arm64) echo "mac-arm64" ;;
-    *)         echo "$1" ;;
-  esac
-}
-
+# 产物命名：GC-<版本>-<系统>-<架构>.exe / GC-<版本>-<系统>-<架构>.app.zip
+# Windows: 单文件 exe 直接改名（本身就是可执行产物）
+# macOS:   .app 必须打成 zip 才能作为单文件分发；文件名用 .app.zip，
+#          这样 macOS 双击会用归档工具解压出可运行的 .app。
+#          若直接命名 .app，系统会把 zip 当成应用包解析 => 报「已损坏/打不开」。
 pack_launcher() {
-  echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>.exe/.app）"
-  WIN64="$ROOT_DIR/dist/win-x64"
-  WINARM="$ROOT_DIR/dist/win-arm64"
-  MACAPP="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app"
-  [ -d "$MACAPP" ] || MACAPP="$ROOT_DIR/dist/mac-arm64"
+  echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>）"
 
-  # Windows：把 exe 重命名为发布名
+  # --- Windows：exe 单文件 ---
   for pair in "win-x64:win-amd64" "win-arm64:win-arm64"; do
     RID="${pair%%:*}"; LABEL="${pair##*:}"
     SRC="$ROOT_DIR/dist/$RID"
@@ -172,19 +162,71 @@ pack_launcher() {
     [ -n "$EXE" ] || continue
     DEST="$ROOT_DIR/dist/GC-${VERSION}-${LABEL}.exe"
     cp "$EXE" "$DEST"
+    chmod +x "$DEST"
     echo "    -> $(basename "$DEST")"
   done
 
-  # macOS：.app 打成分发包，命名保留 .app
+  # --- macOS：打包成 zip -> 解压回来 -> 改名 -> 删除 zip ---
+  # 这样 dist 里得到的是一个可直接双击运行的真实 .app 目录，
+  # 而 zip 只是保证权限/符号链接不丢的中间载体，用完即删。
+  MACAPP="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app"
   if [ -d "$MACAPP" ]; then
-    DEST="$ROOT_DIR/dist/GC-${VERSION}-mac-arm64.app"
-    rm -f "$DEST"
-    ( cd "$(dirname "$MACAPP")" && zip -qry "$DEST" "$(basename "$MACAPP")" -x "*.DS_Store" )
-    echo "    -> $(basename "$DEST")"
+    FINAL="$ROOT_DIR/dist/GC-${VERSION}-mac-arm64.app"
+    TMPZIP="$ROOT_DIR/dist/.gc-mac-tmp.zip"
+    WORK="$ROOT_DIR/dist/.gc-mac-work"
+
+    rm -rf "$FINAL" "$WORK" "$TMPZIP"
+    mkdir -p "$WORK"
+
+    # 1) 打包（ditto 保留可执行权限与符号链接，比 zip -y 可靠）
+    if command -v ditto >/dev/null 2>&1; then
+      ditto -c -k --sequesterRsrc --keepParent "$MACAPP" "$TMPZIP"
+    else
+      ( cd "$(dirname "$MACAPP")" && zip -qry "$TMPZIP" "$(basename "$MACAPP")" -x "*.DS_Store" )
+    fi
+
+    # 2) 解压到工作目录
+    if command -v ditto >/dev/null 2>&1; then
+      ditto -x -k "$TMPZIP" "$WORK"
+    else
+      ( cd "$WORK" && unzip -q "$TMPZIP" )
+    fi
+
+    # 3) 改名为发布名（保持 .app 是目录）
+    SRCAPP="$WORK/EarthModelStudio.app"
+    if [ -d "$SRCAPP" ]; then
+      mv "$SRCAPP" "$FINAL"
+      chmod +x "$FINAL/Contents/MacOS/EarthModelStudio" 2>/dev/null || true
+      # 同步 Info.plist 的显示名，避免 Finder 里显示旧名
+      PLIST="$FINAL/Contents/Info.plist"
+      if [ -f "$PLIST" ]; then
+        /usr/libexec/PlistBuddy -c "Set :CFBundleName Morris GC" "$PLIST" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Morris GC" "$PLIST" 2>/dev/null || true
+      fi
+      # 去掉隔离属性，避免 Gatekeeper 误拦（本地构建产物）
+      xattr -cr "$FINAL" 2>/dev/null || true
+      echo "    -> $(basename "$FINAL")/  (目录)"
+    else
+      echo "    !! macOS 打包失败：解压后未找到 EarthModelStudio.app" >&2
+    fi
+
+    # 4) 删除 zip 与工作目录
+    rm -rf "$WORK" "$TMPZIP"
   fi
 
+  strip_intermediate_dirs
   stamp_versions
+  echo ""
+  echo "==> dist 只保留可发布的附件："
   ls -lh "$ROOT_DIR"/dist/GC-"$VERSION"-* 2>/dev/null || true
+}
+
+# 删除 publish 过程中的中间目录，dist 里只留最终附件
+strip_intermediate_dirs() {
+  for d in win-x64 win-arm64 mac-arm64; do
+    [ -d "$ROOT_DIR/dist/$d" ] && rm -rf "$ROOT_DIR/dist/$d"
+  done
+  find "$ROOT_DIR/dist" -name ".DS_Store" -delete 2>/dev/null || true
 }
 
 package_mac_app() {
@@ -213,8 +255,11 @@ PLIST
   for f in "$DIST"/*; do
     base=$(basename "$f")
     [ "$base" = "EarthModelStudio.app" ] && continue
+    [ "$base" = ".DS_Store" ] && continue
     mv "$f" "$APP/Contents/MacOS/"
   done
+  # 发布包不带 .GC 运行骨架（用户首次启动自行创建），避免覆盖用户数据
+  rm -rf "$APP/Contents/MacOS/.GC"
   chmod +x "$APP/Contents/MacOS/EarthModelStudio"
   echo "==> 已打包 $APP"
 }
@@ -237,9 +282,11 @@ case "$TASK" in
     rm -rf "$ROOT_DIR/dist"
     mkdir -p "$ROOT_DIR/dist"
     stamp_versions
-    publish_rid "osx-arm64" "dist/mac-arm64"
-    publish_rid "win-x64"   "dist/win-x64"
-    publish_rid "win-arm64" "dist/win-arm64"
+    # macOS 用目录形式（非单文件）：单文件包启动时需要解压缓存目录，
+    # 在受限/沙箱环境下创建失败会直接报「打不开」。目录形式无此依赖。
+    publish_rid "osx-arm64" "dist/mac-arm64" false
+    publish_rid "win-x64"   "dist/win-x64"   true
+    publish_rid "win-arm64" "dist/win-arm64" true
     package_mac_app
     prepare_runtime_layout "dist/win-x64"
     prepare_runtime_layout "dist/win-arm64"
