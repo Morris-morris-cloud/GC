@@ -9,6 +9,9 @@ using System.Text.Json.Nodes;
 // 输出：更新 model/<id>/<id>.json 的 version / updatedAt，并生成
 //       仓库根 version.json 与 model/version.json（内容相同，便于两种源地址读取）。
 
+// 仓库地址（编译产物的 Release 也发在这里）：与启动器默认 updateRepository 保持一致。
+const string Repository = "https://gitcode.com/2509_92447106/GC";
+
 var root = args.Length > 0 ? Path.GetFullPath(args[0]) : Directory.GetCurrentDirectory();
 var launcherVersion = args.Length > 1 && !string.IsNullOrWhiteSpace(args[1]) ? args[1] : "1.0.0";
 var modelRoot = Path.Combine(root, "model");
@@ -111,12 +114,16 @@ if (Directory.Exists(srcRoot))
 var launcherRevision = srcChunks.Count > 0 ? Fingerprint(srcChunks)[..10] : "";
 
 var packages = new Dictionary<string, Dictionary<string, object>>();
+// 启动器更新只访问「编译的产物」：gitcode Release 里发布的 dist/GC-<rid>.zip 附件。
+// 运行时若存在同名 Release，GitCodeReleaseRemote 会用附件真实直链覆盖下面的 url；
+// 下面的地址是兜底（编译产物尚未发 Release 时也能指向正确的编译产物位置）。
+var releaseBase = $"{Repository}/releases/download/v{launcherVersion}";
 foreach (var rid in new[] { "win-x64", "win-arm64", "osx-arm64", "osx-x64", "linux-x64" })
 {
     var entry = new Dictionary<string, object>
     {
         ["path"] = $"dist/GC-{rid}.zip",
-        ["url"] = ""          // 大文件建议填 Release 直链；留空则用仓库内 path
+        ["url"] = $"{releaseBase}/GC-{rid}.zip"
     };
     // 已生成的启动器更新包：把校验值和体积写进清单，供下载端校验
     var zipPath = Path.Combine(root, "dist", $"GC-{rid}.zip");
@@ -133,7 +140,7 @@ var versionDoc = new Dictionary<string, object>
 {
     ["schema"] = 1,
     ["generated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-    ["repository"] = "https://gitcode.com/2509_92447106/GC",
+    ["repository"] = Repository,
     ["branch"] = "main",
     ["modelDir"] = "model",
     ["launcher"] = new Dictionary<string, object>

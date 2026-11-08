@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "type": "geography",
+  "defaultView": "zones",
+  "views": [
+    "zones",
+    "coast",
+    "plates"
+  ],
+  "nameI18n": {
+    "zh-CN": "地球地理",
+    "en": "Earth Geography"
+  },
+  "descriptionI18n": {
+    "zh-CN": "五带划分 · 七大洲四大洋 · 六大板块与洲界",
+    "en": "Climate zones · continents & oceans · plates & borders"
+  },
+  "tropicDeg": 23.5,
+  "axialTiltDeg": 23.5,
+  "oceanColor": "#0E2A4A",
+  "zones": [
+    {
+      "id": "torrid",
+      "latMin": -23.5,
+      "latMax": 23.5,
+      "nameI18n": {
+        "zh-CN": "热带",
+        "en": "Torrid zone"
+      },
+      "descI18n": {
+        "zh-CN": "南北回归线之间，有太阳直射，终年高温。",
+        "en": "Between the tropics; the Sun is overhead at some time each year."
+      }
+    },
+    {
+      "id": "north-temperate",
+      "latMin": 23.5,
+      "latMax": 66.5,
+      "nameI18n": {
+        "zh-CN": "北温带",
+        "en": "North temperate"
+      },
+      "descI18n": {
+        "zh-CN": "北回归线与北极圈之间，四季分明，无直射也无极昼极夜。",
+        "en": "Between Tropic of Cancer and Arctic Circle; four distinct seasons."
+      }
+    },
+    {
+      "id": "south-temperate",
+      "latMin": -66.5,
+      "latMax": -23.5,
+      "nameI18n": {
+        "zh-CN": "南温带",
+        "en": "South temperate"
+      },
+      "descI18n": {
+        "zh-CN": "南回归线与南极圈之间，四季分明。",
+        "en": "Between Tropic of Capricorn and Antarctic Circle; four seasons."
+      }
+    },
+    {
+      "id": "north-frigid",
+      "latMin": 66.5,
+      "latMax": 90,
+      "nameI18n": {
+        "zh-CN": "北寒带",
+        "en": "North frigid zone"
+      },
+      "descI18n": {
+        "zh-CN": "北极圈以北，有极昼极夜，终年寒冷。",
+        "en": "North of the Arctic Circle; polar day/night, always cold."
+      }
+    },
+    {
+      "id": "south-frigid",
+      "latMin": -90,
+      "latMax": -66.5,
+      "nameI18n": {
+        "zh-CN": "南寒带",
+        "en": "South frigid zone"
+      },
+      "descI18n": {
+        "zh-CN": "南极圈以南，有极昼极夜，终年寒冷。",
+        "en": "South of the Antarctic Circle; polar day/night, always cold."
+      }
+    }
+  ]
+}

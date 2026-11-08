@@ -27,7 +27,8 @@ public sealed class PlayerWindow : Window
         Height = 820;
         MinWidth = 1000;
         MinHeight = 680;
-        Background = new SolidColorBrush(Color.Parse("#05070F"));
+        Background = Brushes.Transparent;
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         // 与启动器一致：去掉系统标题栏，自己做一个极简顶栏（否则 Esc 之外无法关闭）
         SystemDecorations = Avalonia.Controls.SystemDecorations.None;
@@ -73,10 +74,18 @@ public sealed class PlayerWindow : Window
             foreach (var child in g.Children)
                 if (child is Button b) b.Click += (_, _) => Close();
 
-        Content = new DockPanel { LastChildFill = true };
+        var dock = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(titleBar, Dock.Top);
-        ((DockPanel)Content).Children.Add(titleBar);
-        ((DockPanel)Content).Children.Add(model.View);
+        dock.Children.Add(titleBar);
+        dock.Children.Add(model.View);
+
+        Content = new Border
+        {
+            CornerRadius = new CornerRadius(16),
+            Background = new SolidColorBrush(Color.Parse("#05070F")),
+            ClipToBounds = true,
+            Child = dock
+        };
 
         KeyDown += OnKeyDown;
         Closed += OnClosed;
@@ -121,7 +130,8 @@ public sealed class ModelErrorWindow : Window
         Title = title;
         Width = 560;
         Height = 340;
-        Background = new SolidColorBrush(Color.Parse("#0B1226"));
+        Background = Brushes.Transparent;
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         var lines = new List<Control>
@@ -155,6 +165,11 @@ public sealed class ModelErrorWindow : Window
         };
         foreach (var line in lines) panel.Children.Add(line);
         if (lines[^1] is Button ok) ok.Click += (_, _) => Close();
-        Content = panel;
+        Content = new Border
+        {
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.Parse("#0B1226")),
+            Child = panel
+        };
     }
 }
