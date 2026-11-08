@@ -1,6 +1,5 @@
 bin/
 obj/
-dist/
 build/
 .GC/
 *.user
