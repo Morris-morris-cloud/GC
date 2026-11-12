@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-11-12T11:41:01Z",
+  "generated": "2026-11-12T12:37:07Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
@@ -34,25 +34,25 @@
     {
       "id": "earth-geography",
       "version": "1.8",
-      "build": "97aa19d911",
+      "build": "b9f4bd818d",
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
       "version": "1.6",
-      "build": "aad624c377",
+      "build": "6cc3ec1c15",
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
       "version": "1.6",
-      "build": "32a3f6d940",
+      "build": "870b95f487",
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
       "version": "1.5",
-      "build": "1594b6cde8",
+      "build": "e8e33dbbb7",
       "dir": "model/scale-calculator"
     }
   ]
