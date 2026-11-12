@@ -1,58 +1,58 @@
 {
   "schema": 1,
-  "generated": "2026-11-12T11:34:37Z",
+  "generated": "2026-11-12T11:41:01Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
-    "version": "1.0.4",
-    "revision": "2480674708",
+    "version": "1.0.5",
+    "revision": "6eb7d88d23",
     "packages": {
       "win-x64": {
         "path": "dist/GC-win-x64.zip",
-        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.4/GC-win-x64.zip"
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.5/GC-win-x64.zip"
       },
       "win-arm64": {
         "path": "dist/GC-win-arm64.zip",
-        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.4/GC-win-arm64.zip"
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.5/GC-win-arm64.zip"
       },
       "osx-arm64": {
         "path": "dist/GC-osx-arm64.zip",
-        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.4/GC-osx-arm64.zip"
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.5/GC-osx-arm64.zip"
       },
       "osx-x64": {
         "path": "dist/GC-osx-x64.zip",
-        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.4/GC-osx-x64.zip"
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.5/GC-osx-x64.zip"
       },
       "linux-x64": {
         "path": "dist/GC-linux-x64.zip",
-        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.4/GC-linux-x64.zip"
+        "url": "https://gitcode.com/2509_92447106/GC/releases/download/v1.0.5/GC-linux-x64.zip"
       }
     }
   },
   "models": [
     {
       "id": "earth-geography",
-      "version": "1.7",
-      "build": "4720687a18",
+      "version": "1.8",
+      "build": "97aa19d911",
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
-      "version": "1.5",
-      "build": "fdc1b059c5",
+      "version": "1.6",
+      "build": "aad624c377",
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
-      "version": "1.5",
-      "build": "f98f989f79",
+      "version": "1.6",
+      "build": "32a3f6d940",
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
-      "version": "1.4",
-      "build": "47ba2697da",
+      "version": "1.5",
+      "build": "1594b6cde8",
       "dir": "model/scale-calculator"
     }
   ]

@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Shapes = Avalonia.Controls.Shapes;
 using Avalonia.VisualTree;
 using EarthModelStudio.Models;
 using EarthModelStudio.Services;
@@ -27,9 +28,12 @@ public sealed class PlayerWindow : Window
     private TextBlock? _titleText;
     private Border? _titleBar;
     private readonly List<Button> _titleButtons = new();
-    private readonly List<Avalonia.Controls.Shapes.Path> _titleGlyphs = new();
-    private Avalonia.Controls.Shapes.Path? _maximizeGlyph;
-    private Avalonia.Controls.Shapes.Path? _restoreGlyph;
+    private readonly List<Shapes.Path> _titleGlyphs = new();
+    private Shapes.Path? _maximizeGlyph;
+    private Shapes.Path? _restoreGlyph;
+    private readonly List<Shapes.Ellipse> _titleBadges = new();
+    private string _maxMaxPath = "";
+    private string _maxRestorePath = "";
     private Button? _helpButton;
     /// <summary>基准尺寸（1240×820 时的标题栏高度与按钮尺寸）。</summary>
     private const double BaseWidth = 1240;
@@ -91,81 +95,95 @@ public sealed class PlayerWindow : Window
         };
         helpButton.Click += (_, _) => ShowHelp(package, barBg, barBorder, barText, btnText, frameBg);
 
-        // 标题栏三键：最小化 / 最大化 / 关闭。
-        // 图标用矢量 Path 画（不用字体符号），线宽与圆角严格对齐，视觉上才干净。
-        Button TitleButton(int column, bool isClose = false)
+        // 标题栏三键：最小化 / 最大化 / 关闭 —— 卡通画风。
+        // 每颗按钮 = 彩色实心圆底 + 粗圆头描边图标，像一颗小糖豆。
+        (Button Btn, Shapes.Ellipse Badge, Shapes.Path Icon) MakeBadge(
+            int column, string iconPath, Color fill, Color ink, Color hoverFill)
         {
+            var badge = new Shapes.Ellipse
+            {
+                Width = 18,
+                Height = 18,
+                Fill = new SolidColorBrush(fill),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var icon = new Shapes.Path
+            {
+                Data = Geometry.Parse(iconPath),
+                Stroke = new SolidColorBrush(ink),
+                StrokeThickness = 1.7,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
+                Fill = null,
+                Stretch = Stretch.None,
+                Width = 9,
+                Height = 9,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var layer = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            layer.Children.Add(badge);
+            layer.Children.Add(icon);
+
             var b = new Button
             {
                 Width = 38,
                 Height = 28,
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(btnText),
                 BorderThickness = new Thickness(0),
-                CornerRadius = new CornerRadius(7),
+                CornerRadius = new CornerRadius(9),
                 Padding = new Thickness(0),
                 Margin = new Thickness(2, 0, 0, 0),
+                Content = layer,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 [Grid.ColumnProperty] = column
             };
-            // 悬停：深色标题栏用亮一点的同调色，浅色标题栏用浅灰，避免出现突兀的深色块
-            var hover = isClose ? Color.Parse("#D64545")
-                : IsLight(barBg) ? Color.Parse("#EDF2FC") : Color.Parse("#223252");
+            var hoverBg = IsLight(barBg)
+                ? new SolidColorBrush(Color.Parse("#EEF1F7"))
+                : new SolidColorBrush(Color.Parse("#1E2C46"));
             b.PointerEntered += (_, _) =>
             {
-                b.Background = new SolidColorBrush(hover);
-                b.Foreground = new SolidColorBrush(isClose ? Colors.White
-                    : IsLight(barBg) ? Color.Parse("#111A2E") : Colors.White);
+                badge.Fill = new SolidColorBrush(hoverFill);
+                b.Background = hoverBg;
             };
             b.PointerExited += (_, _) =>
             {
+                badge.Fill = new SolidColorBrush(fill);
                 b.Background = Brushes.Transparent;
-                b.Foreground = new SolidColorBrush(btnText);
             };
             b.Classes.Add("model-titlebtn");
             _titleButtons.Add(b);
-            return b;
+            _titleBadges.Add(badge);
+            _titleGlyphs.Add(icon);
+            return (b, badge, icon);
         }
 
-        // 图标：全部按 10×10 视框绘制，描边 1.1，随按钮等比缩放
-        Avalonia.Controls.Shapes.Path Glyph(string path)
-        {
-            var p = new Avalonia.Controls.Shapes.Path
-            {
-                Data = Geometry.Parse(path),
-                Stroke = new SolidColorBrush(btnText),
-                StrokeThickness = 1.15,
-                StrokeLineCap = PenLineCap.Round,
-                StrokeJoin = PenLineJoin.Round,
-                Fill = null,
-                Stretch = Stretch.None,
-                Width = 10,
-                Height = 10
-            };
-            p.Classes.Add("model-titleglyph");
-            _titleGlyphs.Add(p);
-            return p;
-        }
+        // 卡通配色：暖黄 / 薄荷绿 / 珊瑚红
+        var minBadge = MakeBadge(2, "M1.5,5 L8.5,5",
+            Color.Parse("#FFD166"), Color.Parse("#7A4E00"), Color.Parse("#FFE08A"));
+        var maxBadge = MakeBadge(3, "M2.2,2.2 L7.8,2.2 L7.8,7.8 L2.2,7.8 Z",
+            Color.Parse("#6EE7A7"), Color.Parse("#0B5B33"), Color.Parse("#8DF0BC"));
+        var closeBadge = MakeBadge(4, "M2,2 L8,8 M8,2 L2,8",
+            Color.Parse("#FF7B7B"), Color.Parse("#7A1F1F"), Color.Parse("#FF9B9B"));
 
-        var minimizeButton = TitleButton(2);
-        minimizeButton.Content = Glyph("M1,5 L9,5");
-
-        var maximizeButton = TitleButton(3);
-        var restoreGlyph = Glyph("M2.5,3.5 L8.5,3.5 L8.5,9.5 L2.5,9.5 Z M2.5,3.5 L2.5,1.5 L8.5,1.5 L8.5,7.5 L8.5,3.5");
-        var maxGlyph = Glyph("M2,2 L8,2 L8,8 L2,8 Z");
-        maximizeButton.Content = maxGlyph;
-
-        var closeButton = TitleButton(4, isClose: true);
-        var closeGlyph = Glyph("M1.5,1.5 L8.5,8.5 M8.5,1.5 L1.5,8.5");
-        closeButton.Content = closeGlyph;
+        var minimizeButton = minBadge.Btn;
+        var maximizeButton = maxBadge.Btn;
+        var closeButton = closeBadge.Btn;
 
         minimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
         maximizeButton.Click += (_, _) => ToggleMaximize();
         closeButton.Click += (_, _) => Close();
-        _maximizeGlyph = maxGlyph;
-        _restoreGlyph = restoreGlyph;
+        _maximizeGlyph = maxBadge.Icon;
+        _restoreGlyph = maxBadge.Icon;
+        _maxRestorePath = "M2.6,3.6 L7.4,3.6 L7.4,8.4 L2.6,8.4 Z M2.6,3.6 L2.6,1.6 L7.4,1.6 L7.4,6.4";
+        _maxMaxPath = "M2.2,2.2 L7.8,2.2 L7.8,7.8 L2.2,7.8 Z";
 
         var titleBar = new Border
         {
@@ -176,6 +194,7 @@ public sealed class PlayerWindow : Window
             Child = new Grid
             {
                 ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto,Auto"),
+                Margin = new Thickness(0, 0, 10, 0),
                 Children = { titleText, helpButton, minimizeButton, maximizeButton, closeButton }
             }
         };
@@ -253,9 +272,14 @@ public sealed class PlayerWindow : Window
         }
         foreach (var g in _titleGlyphs)
         {
-            g.Width = Math.Round(10 * scale, 1);
-            g.Height = Math.Round(10 * scale, 1);
-            g.StrokeThickness = Math.Round(1.15 * scale, 2);
+            g.Width = Math.Round(9 * scale, 1);
+            g.Height = Math.Round(9 * scale, 1);
+            g.StrokeThickness = Math.Round(1.7 * scale, 2);
+        }
+        foreach (var badge in _titleBadges)
+        {
+            badge.Width = Math.Round(18 * scale, 1);
+            badge.Height = Math.Round(18 * scale, 1);
         }
         if (_titleText != null)
         {
@@ -282,10 +306,13 @@ public sealed class PlayerWindow : Window
     private void UpdateMaximizeVisual()
     {
         var max = WindowState == WindowState.Maximized || WindowState == WindowState.FullScreen;
-        if (_maximizeButton != null && _maximizeGlyph != null && _restoreGlyph != null)
+        if (_maximizeGlyph != null)
         {
-            // 矢量图标切换：还原态画「重叠方框」，最大化态画「单方框」
-            _maximizeButton.Content = max ? _restoreGlyph : _maximizeGlyph;
+            // 只换 Data，不换控件对象（换对象会触发 "already has a parent"）
+            _maximizeGlyph.Data = Geometry.Parse(max ? _maxRestorePath : _maxMaxPath);
+        }
+        if (_maximizeButton != null)
+        {
             Avalonia.Controls.ToolTip.SetTip(_maximizeButton, max
                 ? (IsEnglish() ? "Restore" : "还原")
                 : (IsEnglish() ? "Maximize" : "最大化"));
@@ -384,16 +411,43 @@ public sealed class PlayerWindow : Window
         }
 
         // ── 帮助窗口自建标题栏（带 ✕），与模型窗口同款配色 ──
+        // 关闭键也用品红卡通圆底 + 矢量 ✕：文字符号在中文字体下常被裁切或基线偏移
+        var helpBadgeShape = new Shapes.Ellipse
+        {
+            Width = 18, Height = 18,
+            Fill = new SolidColorBrush(Color.Parse("#FF7B7B")),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var helpCross = new Shapes.Path
+        {
+            Data = Geometry.Parse("M2,2 L8,8 M8,2 L2,8"),
+            Stroke = new SolidColorBrush(Color.Parse("#7A1F1F")),
+            StrokeThickness = 1.7,
+            StrokeLineCap = PenLineCap.Round,
+            Fill = null,
+            Stretch = Stretch.None,
+            Width = 9, Height = 9,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var helpCrossLayer = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        helpCrossLayer.Children.Add(helpBadgeShape);
+        helpCrossLayer.Children.Add(helpCross);
+
         var helpClose = new Button
         {
-            Content = "✕",
+            Content = helpCrossLayer,
             Width = 34,
             Height = 26,
             Background = Brushes.Transparent,
-            Foreground = new SolidColorBrush(btnText),
             BorderThickness = new Thickness(0),
-            FontSize = 12.5,
-            CornerRadius = new CornerRadius(7),
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(0),
             Margin = new Thickness(6, 0, 0, 0),
             HorizontalContentAlignment = HorizontalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center,
@@ -401,13 +455,14 @@ public sealed class PlayerWindow : Window
         };
         helpClose.PointerEntered += (_, _) =>
         {
-            helpClose.Background = new SolidColorBrush(Color.Parse("#D64545"));
-            helpClose.Foreground = new SolidColorBrush(Colors.White);
+            helpBadgeShape.Fill = new SolidColorBrush(Color.Parse("#FF9B9B"));
+            helpClose.Background = new SolidColorBrush(IsLight(frameBg)
+                ? Color.Parse("#EEF1F7") : Color.Parse("#1E2C46"));
         };
         helpClose.PointerExited += (_, _) =>
         {
+            helpBadgeShape.Fill = new SolidColorBrush(Color.Parse("#FF7B7B"));
             helpClose.Background = Brushes.Transparent;
-            helpClose.Foreground = new SolidColorBrush(btnText);
         };
 
         var helpTitle = new TextBlock
@@ -422,7 +477,7 @@ public sealed class PlayerWindow : Window
         var helpBarGrid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            Margin = new Thickness(22, 0, 12, 0)
+            Margin = new Thickness(22, 0, 14, 0)
         };
         helpBarGrid.Children.Add(helpTitle);
         Grid.SetColumn(helpClose, 1);

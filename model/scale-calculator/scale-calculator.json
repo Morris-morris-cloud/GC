@@ -24,8 +24,8 @@
   "type": "NeoRF.ScaleCalculator.ScaleCalculatorFactory",
   "preview": "preview.png",
   "apiVersion": 1,
-  "version": "1.4",
-  "updatedAt": "2026-11-12T11:34:37Z",
+  "version": "1.5",
+  "updatedAt": "2026-11-12T11:41:01Z",
   "chrome": {
     "titleBar": "#FFFFFF",
     "titleBorder": "#E3E8F3",
@@ -33,5 +33,5 @@
     "button": "#5B6A86",
     "frame": "#F4F6FB"
   },
-  "build": "47ba2697da"
+  "build": "1594b6cde8"
 }
