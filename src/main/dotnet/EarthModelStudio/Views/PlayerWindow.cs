@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using EarthModelStudio.Models;
 using EarthModelStudio.Services;
 
@@ -26,6 +27,9 @@ public sealed class PlayerWindow : Window
     private TextBlock? _titleText;
     private Border? _titleBar;
     private readonly List<Button> _titleButtons = new();
+    private readonly List<Avalonia.Controls.Shapes.Path> _titleGlyphs = new();
+    private Avalonia.Controls.Shapes.Path? _maximizeGlyph;
+    private Avalonia.Controls.Shapes.Path? _restoreGlyph;
     private Button? _helpButton;
     /// <summary>基准尺寸（1240×820 时的标题栏高度与按钮尺寸）。</summary>
     private const double BaseWidth = 1240;
@@ -87,19 +91,19 @@ public sealed class PlayerWindow : Window
         };
         helpButton.Click += (_, _) => ShowHelp(package, barBg, barBorder, barText, btnText, frameBg);
 
-        // 标题栏三键：最小化 / 最大化 / 关闭。配色与按钮尺寸都跟随模型 chrome。
-        Button TitleButton(string glyph, int column, bool isClose = false)
+        // 标题栏三键：最小化 / 最大化 / 关闭。
+        // 图标用矢量 Path 画（不用字体符号），线宽与圆角严格对齐，视觉上才干净。
+        Button TitleButton(int column, bool isClose = false)
         {
             var b = new Button
             {
-                Content = glyph,
                 Width = 38,
                 Height = 28,
                 Background = Brushes.Transparent,
                 Foreground = new SolidColorBrush(btnText),
                 BorderThickness = new Thickness(0),
-                FontSize = 13,
                 CornerRadius = new CornerRadius(7),
+                Padding = new Thickness(0),
                 Margin = new Thickness(2, 0, 0, 0),
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
@@ -109,12 +113,11 @@ public sealed class PlayerWindow : Window
             // 悬停：深色标题栏用亮一点的同调色，浅色标题栏用浅灰，避免出现突兀的深色块
             var hover = isClose ? Color.Parse("#D64545")
                 : IsLight(barBg) ? Color.Parse("#EDF2FC") : Color.Parse("#223252");
-            var hoverText = isClose ? Colors.White
-                : IsLight(barBg) ? (Color?)Color.Parse("#111A2E") : Colors.White;
             b.PointerEntered += (_, _) =>
             {
                 b.Background = new SolidColorBrush(hover);
-                if (hoverText.HasValue) b.Foreground = new SolidColorBrush(hoverText.Value);
+                b.Foreground = new SolidColorBrush(isClose ? Colors.White
+                    : IsLight(barBg) ? Color.Parse("#111A2E") : Colors.White);
             };
             b.PointerExited += (_, _) =>
             {
@@ -122,15 +125,47 @@ public sealed class PlayerWindow : Window
                 b.Foreground = new SolidColorBrush(btnText);
             };
             b.Classes.Add("model-titlebtn");
+            _titleButtons.Add(b);
             return b;
         }
 
-        var minimizeButton = TitleButton("—", 2);
-        var maximizeButton = TitleButton("□", 3);
-        var closeButton = TitleButton("✕", 4, isClose: true);
+        // 图标：全部按 10×10 视框绘制，描边 1.1，随按钮等比缩放
+        Avalonia.Controls.Shapes.Path Glyph(string path)
+        {
+            var p = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Geometry.Parse(path),
+                Stroke = new SolidColorBrush(btnText),
+                StrokeThickness = 1.15,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
+                Fill = null,
+                Stretch = Stretch.None,
+                Width = 10,
+                Height = 10
+            };
+            p.Classes.Add("model-titleglyph");
+            _titleGlyphs.Add(p);
+            return p;
+        }
+
+        var minimizeButton = TitleButton(2);
+        minimizeButton.Content = Glyph("M1,5 L9,5");
+
+        var maximizeButton = TitleButton(3);
+        var restoreGlyph = Glyph("M2.5,3.5 L8.5,3.5 L8.5,9.5 L2.5,9.5 Z M2.5,3.5 L2.5,1.5 L8.5,1.5 L8.5,7.5 L8.5,3.5");
+        var maxGlyph = Glyph("M2,2 L8,2 L8,8 L2,8 Z");
+        maximizeButton.Content = maxGlyph;
+
+        var closeButton = TitleButton(4, isClose: true);
+        var closeGlyph = Glyph("M1.5,1.5 L8.5,8.5 M8.5,1.5 L1.5,8.5");
+        closeButton.Content = closeGlyph;
+
         minimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
         maximizeButton.Click += (_, _) => ToggleMaximize();
         closeButton.Click += (_, _) => Close();
+        _maximizeGlyph = maxGlyph;
+        _restoreGlyph = restoreGlyph;
 
         var titleBar = new Border
         {
@@ -216,6 +251,12 @@ public sealed class PlayerWindow : Window
             _helpButton.Padding = new Thickness(Math.Round(12 * scale), 0);
             _helpButton.CornerRadius = new CornerRadius(Math.Round(7 * scale, 1));
         }
+        foreach (var g in _titleGlyphs)
+        {
+            g.Width = Math.Round(10 * scale, 1);
+            g.Height = Math.Round(10 * scale, 1);
+            g.StrokeThickness = Math.Round(1.15 * scale, 2);
+        }
         if (_titleText != null)
         {
             _titleText.FontSize = Math.Round(BaseTitleFont * scale, 1);
@@ -241,16 +282,16 @@ public sealed class PlayerWindow : Window
     private void UpdateMaximizeVisual()
     {
         var max = WindowState == WindowState.Maximized || WindowState == WindowState.FullScreen;
-        if (_maximizeButton != null)
+        if (_maximizeButton != null && _maximizeGlyph != null && _restoreGlyph != null)
         {
-            // ❐ 还原 / □ 最大化
-            _maximizeButton.Content = max ? "❐" : "□";
+            // 矢量图标切换：还原态画「重叠方框」，最大化态画「单方框」
+            _maximizeButton.Content = max ? _restoreGlyph : _maximizeGlyph;
             Avalonia.Controls.ToolTip.SetTip(_maximizeButton, max
                 ? (IsEnglish() ? "Restore" : "还原")
                 : (IsEnglish() ? "Maximize" : "最大化"));
         }
-        // 最大化时贴边，不需要圆角；还原后恢复 16
-        if (_frame != null) _frame.CornerRadius = new CornerRadius(max ? 0 : 16);
+        // 最大化后同样保留圆角（用户要求：任何状态都要圆角）
+        if (_frame != null) _frame.CornerRadius = new CornerRadius(16);
     }
 
     private static Color ParseColor(string? hex, string fallback)
@@ -342,48 +383,97 @@ public sealed class PlayerWindow : Window
                 });
         }
 
+        // ── 帮助窗口自建标题栏（带 ✕），与模型窗口同款配色 ──
+        var helpClose = new Button
+        {
+            Content = "✕",
+            Width = 34,
+            Height = 26,
+            Background = Brushes.Transparent,
+            Foreground = new SolidColorBrush(btnText),
+            BorderThickness = new Thickness(0),
+            FontSize = 12.5,
+            CornerRadius = new CornerRadius(7),
+            Margin = new Thickness(6, 0, 0, 0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        helpClose.PointerEntered += (_, _) =>
+        {
+            helpClose.Background = new SolidColorBrush(Color.Parse("#D64545"));
+            helpClose.Foreground = new SolidColorBrush(Colors.White);
+        };
+        helpClose.PointerExited += (_, _) =>
+        {
+            helpClose.Background = Brushes.Transparent;
+            helpClose.Foreground = new SolidColorBrush(btnText);
+        };
+
+        var helpTitle = new TextBlock
+        {
+            Text = title,
+            Foreground = new SolidColorBrush(barText),
+            FontSize = 16,
+            FontWeight = FontWeight.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var helpBarGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            Margin = new Thickness(22, 0, 12, 0)
+        };
+        helpBarGrid.Children.Add(helpTitle);
+        Grid.SetColumn(helpClose, 1);
+        helpBarGrid.Children.Add(helpClose);
+
+        var helpTitleBar = new Border
+        {
+            Height = 48,
+            Background = new SolidColorBrush(barBg),
+            BorderBrush = new SolidColorBrush(barBorder),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = helpBarGrid
+        };
+        helpTitleBar.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(helpTitleBar).Properties.IsLeftButtonPressed)
+                helpClose.FindAncestorOfType<Window>()?.BeginMoveDrag(e);
+        };
+
+        // ── 底部固定操作条：无论正文多长，「知道了」始终可见 ──
         var ok = new Button
         {
             Content = IsEnglish() ? "Got it" : "知道了",
             HorizontalAlignment = HorizontalAlignment.Right,
-            Padding = new Thickness(18, 7),
-            Margin = new Thickness(0, 14, 0, 0),
-            Background = new SolidColorBrush(barBorder),
-            Foreground = new SolidColorBrush(barText),
+            Padding = new Thickness(20, 8),
+            Background = new SolidColorBrush(Color.Parse("#2F6BFF")),
+            Foreground = new SolidColorBrush(Colors.White),
             BorderThickness = new Thickness(0),
             CornerRadius = new CornerRadius(8),
             Cursor = new Cursor(StandardCursorType.Hand)
         };
-
-        // 标题固定在顶部，正文滚动；内容再长也不会被裁掉
-        var rootPanel = new DockPanel { LastChildFill = true };
-        var header = new Border
+        var footer = new Border
         {
-            Padding = new Thickness(24, 18, 24, 10),
-            Child = new StackPanel
-            {
-                Spacing = 8,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = title,
-                        Foreground = new SolidColorBrush(barText),
-                        FontSize = 17,
-                        FontWeight = FontWeight.SemiBold
-                    },
-                    new Border { Height = 1, Background = new SolidColorBrush(barBorder) }
-                }
-            }
+            Padding = new Thickness(24, 10, 24, 14),
+            BorderBrush = new SolidColorBrush(barBorder),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = ok
         };
-        DockPanel.SetDock(header, Dock.Top);
-        rootPanel.Children.Add(header);
+
+        // 标题栏（顶） + 正文（中，滚动） + 操作条（底，固定）
+        var rootPanel = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(helpTitleBar, Dock.Top);
+        rootPanel.Children.Add(helpTitleBar);
+        DockPanel.SetDock(footer, Dock.Bottom);
+        rootPanel.Children.Add(footer);
         var scroll = new ScrollViewer
         {
-            Content = new StackPanel
+            Content = new Border
             {
-                Margin = new Thickness(24, 0, 24, 8),
-                Children = { body, ok }
+                Margin = new Thickness(24, 14, 24, 10),
+                Child = body
             },
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
@@ -394,9 +484,9 @@ public sealed class PlayerWindow : Window
         {
             Title = title,
             Width = 660,
-            Height = Math.Min(720, 240 + sections.Sum(s => s.Lines.Count * 24 + 40)),
+            Height = Math.Min(760, 230 + sections.Sum(s => s.Lines.Count * 24 + 40)),
             MinWidth = 480,
-            MinHeight = 300,
+            MinHeight = 320,
             Background = Brushes.Transparent,
             TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent },
             SystemDecorations = SystemDecorations.None,
@@ -412,6 +502,7 @@ public sealed class PlayerWindow : Window
             }
         };
         ok.Click += (_, _) => win.Close();
+        helpClose.Click += (_, _) => win.Close();
         win.Show(this);
     }
 
