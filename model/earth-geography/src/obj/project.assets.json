@@ -112,7 +112,7 @@
           "lib/net5.0/MicroCom.Runtime.dll": {}
         }
       },
-      "EarthModelStudio.ModelSdk/1.0.4": {
+      "EarthModelStudio.ModelSdk/1.0.5": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
@@ -347,7 +347,7 @@
         "microcom.runtime.nuspec"
       ]
     },
-    "EarthModelStudio.ModelSdk/1.0.4": {
+    "EarthModelStudio.ModelSdk/1.0.5": {
       "type": "project",
       "path": "../../_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
       "msbuildProject": "../../_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj"
@@ -356,14 +356,14 @@
   "projectFileDependencyGroups": {
     "net8.0": [
       "Avalonia >= 11.3.9",
-      "EarthModelStudio.ModelSdk >= 1.0.4"
+      "EarthModelStudio.ModelSdk >= 1.0.5"
     ]
   },
   "packageFolders": {
     "/Users/morris/.nuget/packages/": {}
   },
   "project": {
-    "version": "1.0.4",
+    "version": "1.0.5",
     "restore": {
       "projectUniqueName": "/Users/morris/Downloads/GC#/model/earth-geography/src/EarthGeographyModel.csproj",
       "projectName": "EarthGeographyModel",
@@ -432,13 +432,5 @@
         "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.401/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "获取包漏洞数据时出错: Access to the path '/Users/morris/.local/share/NuGet/http-cache/670c1461c29885f9aa22c281d8b7da90845b38e4$ps:_api.nuget.org_v3_index.json/vuln_index.dat-new' is denied."
-    }
-  ]
+  }
 }

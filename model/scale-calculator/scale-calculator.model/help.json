@@ -1,0 +1,146 @@
+{
+  "zh-CN": {
+    "title": "如何使用 · 比例尺计算器",
+    "sections": [
+      {
+        "h": "开始使用（跟着做）",
+        "lines": [
+          "第 1 步：顶部选「求实地距离」，此时蓝色卡是答案，另外两个是输入。",
+          "第 2 步：在「图上距离」里填 3，在「比例尺分母」里填 100000。",
+          "第 3 步：看蓝色卡算出 3 千米 —— 再点「解题步骤」核对每一步。",
+          "第 4 步：改成「求比例尺」，把实地距离填成 6 千米，看分母怎么翻倍。",
+          "第 5 步：拖动中间标尺的滑块，观察蓝色条（图上）与绿色条（实地）的长度关系。",
+          "第 6 步：滚到底部「练习闯关」，自己做一道，答错会自动展开步骤。",
+          "算不出来？先检查单位：填了 km 就不要再按 cm 算，模型会自动换算。"
+        ]
+      },
+      {
+        "h": "一、核心公式（先记住这一条）",
+        "lines": [
+          "比例尺 = 图上距离 ÷ 实地距离，写作 1 : N。",
+          "N 是分母，含义是「实地距离是图上距离的 N 倍」，两句都必须统一成同一单位。",
+          "三个变形：实地 = 图上 × N；图上 = 实地 ÷ N；N = 实地 ÷ 图上。",
+          "单位换算：1 m = 100 cm，1 km = 1000 m = 100000 cm（km 化 cm 加 5 个 0）。"
+        ]
+      },
+      {
+        "h": "二、三种求解模式",
+        "lines": [
+          "顶部三个按钮选「求实地距离 / 求图上距离 / 求比例尺」。",
+          "选中的那一项会变成蓝色结果卡（只读），另外两项留作输入。",
+          "拖动滑块或直接输入数字，三栏读数与中栏标尺实时联动。",
+          "「重置」回到 3 cm / 1:100000 / 3 km 的初始例子。"
+        ]
+      },
+      {
+        "h": "三、中栏可视化标尺",
+        "lines": [
+          "上条（蓝）是图上距离，按真实厘米画刻度。",
+          "下条（绿）是同一段实地距离按当前比例尺压缩后的长度，与上方同宽。",
+          "线段式比例尺会按 1/2/5×10ⁿ 自动换挡，任何比例尺都画得下。",
+          "比例尺光谱把 1:1千 到 1:10亿 排在对数轴上，当前值用指针标出。",
+          "若超出图幅，会提示「需要更小的比例尺」——这正是选图幅的教学点。"
+        ]
+      },
+      {
+        "h": "四、三种写法与解题步骤",
+        "lines": [
+          "数字式 1 : N；文字式「图上 1 厘米代表实地 …」；线段式（图形刻度）。",
+          "右栏三者实时联动，可直接抄到作业里。",
+          "「解题步骤」可展开：① 统一单位 → ② 列公式 → ③ 代入 → ④ 得数 → ⑤ 换算合适单位。",
+          "「大小判读」卡：大 / 中 / 小比例尺 +「分母越大 → 比例尺越小 → 范围越大 → 越简略」。"
+        ]
+      },
+      {
+        "h": "五、实地尺与练习",
+        "lines": [
+          "「实地尺」内置教室 10 m、操场 400 m、马拉松 42.195 km、京沪 1080 km、赤道 4 万 km。",
+          "改变比例尺，看这段真实距离画到图上是多长（或画不下 / 几乎看不见）。",
+          "「练习闯关」随机出三类题，填数字后回车或点「检查」，答错展开完整解题步骤。",
+          "连对计数会一直累计，答错清零。"
+        ]
+      },
+      {
+        "h": "六、易错点",
+        "lines": [
+          "忘记统一单位：km 必须 ×100000 变成 cm 才能代入。",
+          "「放大 2 倍」是分母 ÷ 2（比例尺变大），不是 × 2。",
+          "图上距离与实地距离别代反了；N 是「实地是图上的几倍」。",
+          "比例尺是比值，没有单位；说「比例尺越大」指的是比值越大、分母越小。"
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "How to use · Scale Calculator",
+    "sections": [
+      {
+        "h": "Getting started (follow along)",
+        "lines": [
+          "Step 1: choose Find real distance at the top — the blue card is the answer, the other two are inputs.",
+          "Step 2: enter 3 as the map distance and 100000 as the scale denominator.",
+          "Step 3: the blue card shows 3 km — open Worked steps and check each line.",
+          "Step 4: switch to Find scale, set the real distance to 6 km, and watch the denominator change.",
+          "Step 5: drag the ruler slider and compare the blue bar (map) with the green bar (real).",
+          "Step 6: scroll to Practice and try one; a wrong answer expands the full solution.",
+          "Stuck? Check your units first — the model converts automatically, so don't mix km and cm."
+        ]
+      },
+      {
+        "h": "1. The core formula",
+        "lines": [
+          "Scale = map distance ÷ real distance, written 1 : N.",
+          "N is the denominator: the real distance is N times the map distance — both must share one unit.",
+          "Three forms: real = map × N; map = real ÷ N; N = real ÷ map.",
+          "Unit conversions: 1 m = 100 cm, 1 km = 1000 m = 100000 cm (add five zeros)."
+        ]
+      },
+      {
+        "h": "2. Three solve modes",
+        "lines": [
+          "Pick Find real distance / Find map distance / Find scale at the top.",
+          "The chosen one becomes the blue read-only result card; the other two stay as inputs.",
+          "Drag a slider or type a number — all three columns and the ruler update live.",
+          "Reset returns to the default 3 cm / 1:100000 / 3 km example."
+        ]
+      },
+      {
+        "h": "3. The visual ruler",
+        "lines": [
+          "The blue bar is the map distance in real centimetres.",
+          "The green bar is the same real distance compressed by the current scale — same width.",
+          "The graphic scale auto-ranges over 1/2/5×10ⁿ so it always fits.",
+          "The spectrum places 1:1k … 1:1B on a log axis with a pointer at the current value.",
+          "Overflow warns “use a smaller scale” — that IS the lesson on choosing a sheet size."
+        ]
+      },
+      {
+        "h": "4. Three notations & worked steps",
+        "lines": [
+          "Numeric 1:N; verbal “1 cm on the map = … on the ground”; graphic bar scale.",
+          "All three stay in sync and can be copied straight into homework.",
+          "Expand Worked steps: unify units → formula → substitute → result → convert unit.",
+          "The grade card: large / medium / small scale and “bigger denominator → smaller scale → larger area → less detail”."
+        ]
+      },
+      {
+        "h": "5. Real-world ruler & practice",
+        "lines": [
+          "Built-in distances: classroom 10 m, track 400 m, marathon 42.195 km, Beijing–Shanghai 1080 km, equator 40,000 km.",
+          "Change the scale to see how long each becomes on paper (or that it won't fit / is invisible).",
+          "Practice generates three question types; type a number and press Enter or Check; wrong answers reveal full steps.",
+          "The streak counter accumulates and resets on a wrong answer."
+        ]
+      },
+      {
+        "h": "6. Common mistakes",
+        "lines": [
+          "Forgetting to unify units: km ×100000 → cm before substituting.",
+          "“Zoom 2×” means denominator ÷ 2 (a larger scale), not × 2.",
+          "Don't swap map and real distance; N means “how many times the map length the real length is”.",
+          "A scale is a ratio with no unit; “larger scale” means a larger ratio, i.e. a SMALLER denominator."
+        ]
+      }
+    ]
+  }
+}

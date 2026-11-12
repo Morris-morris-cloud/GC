@@ -5,7 +5,7 @@
   },
   "projects": {
     "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj": {
-      "version": "1.0.4",
+      "version": "1.0.5",
       "restore": {
         "projectUniqueName": "/Users/morris/Downloads/GC#/model/_sdk/EarthModelStudio.ModelSdk/EarthModelStudio.ModelSdk.csproj",
         "projectName": "EarthModelStudio.ModelSdk",

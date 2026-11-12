@@ -1,0 +1,124 @@
+{
+  "zh-CN": {
+    "title": "如何使用 · 地球公转",
+    "sections": [
+      {
+        "h": "开始使用（跟着做）",
+        "lines": [
+          "第 1 步：先按「1」定格到春分，看读数区「太阳直射」是多少度。",
+          "第 2 步：再按「2」，直射纬度变成 23.5°N —— 这就是北半球夏至。",
+          "第 3 步：依次按「3」「4」，对比四个节气的直射点位置。",
+          "第 4 步：按「空格」播放，看地球绕太阳走完一圈要多久（有速度调节）。",
+          "第 5 步：拖动鼠标换到「俯视」，能看到轨道是个椭圆，地轴始终指向同一方向。",
+          "看不到变化？确认顶部「节气定位」已打开，且没有停在暂停状态。"
+        ]
+      },
+      {
+        "h": "一、这个模型讲什么",
+        "lines": [
+          "地球绕太阳公转，周期约 365.25 天，轨道近似椭圆，地轴始终指向北极星附近。",
+          "地轴与公转轨道面成 66.5° 夹角（赤道面与轨道面夹角 23.5°，即黄赤交角）。",
+          "由于地轴倾斜方向不变，太阳直射点在南北回归线之间往返，形成四季更替。",
+          "二分二至：春分 3/21、夏至 6/22、秋分 9/23、冬至 12/22（教材值）。"
+        ]
+      },
+      {
+        "h": "二、基本操作",
+        "lines": [
+          "「播放 / 暂停」控制公转动画；「速度」调节一年走完的快慢。",
+          "「步进」让地球沿轨道前进一小格，便于逐段观察。",
+          "拖动或滚轮改变观察角度与缩放；「俯视 / 侧视」切换视角。",
+          "「重置」回到春分起点。"
+        ]
+      },
+      {
+        "h": "三、节气定位（重点）",
+        "lines": [
+          "按 1–4 直接定格到春分、夏至、秋分、冬至。",
+          "春分 / 秋分：太阳直射赤道（0°），全球昼夜平分。",
+          "夏至：直射北回归线 23.5°N，北半球昼最长、北极圈内极昼。",
+          "冬至：直射南回归线 23.5°S，北半球昼最短、北极圈内极夜。",
+          "定格后读数区显示：公转角度、太阳直射纬度、教材日期、节气名称。"
+        ]
+      },
+      {
+        "h": "四、读数与课堂卡",
+        "lines": [
+          "「太阳直射」读数来自模型数据里的 declinationDeg，不是近似公式。",
+          "「节气定位」面板列出四个节气的日期与现象说明（中英双语）。",
+          "「教学要点」解释：直射点移动 → 正午太阳高度与昼长变化 → 四季。"
+        ]
+      },
+      {
+        "h": "五、易错点",
+        "lines": [
+          "四季成因是「地轴倾斜且方向不变」，不是「地球离太阳忽远忽近」。",
+          "近日点在 1 月初（北半球冬天），远日点在 7 月初（北半球夏天）。",
+          "南北半球季节相反：北半球夏至时南半球是冬至。",
+          "Esc 关闭窗口，F11 全屏。"
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "How to use · Earth Revolution",
+    "sections": [
+      {
+        "h": "Getting started (follow along)",
+        "lines": [
+          "Step 1: press 1 to freeze at the spring equinox and read the subsolar latitude.",
+          "Step 2: press 2 — the subsolar point jumps to 23.5°N, the June solstice.",
+          "Step 3: press 3 and 4 to compare all four key positions.",
+          "Step 4: press Space to animate one full orbit; adjust Speed as needed.",
+          "Step 5: drag to Top view to see the elliptical orbit and the fixed axis direction.",
+          "Nothing changing? Make sure Seasons is on in the top bar and the model isn't paused."
+        ]
+      },
+      {
+        "h": "1. What this model shows",
+        "lines": [
+          "Earth orbits the Sun in ~365.25 days; the axis keeps pointing near Polaris.",
+          "The axis is tilted 66.5° to the orbital plane (obliquity 23.5°).",
+          "Because the tilt direction is fixed, the subsolar point migrates between the tropics, making seasons.",
+          "Key dates: spring equinox 3/21, summer solstice 6/22, autumn equinox 9/23, winter solstice 12/22."
+        ]
+      },
+      {
+        "h": "2. Basic controls",
+        "lines": [
+          "Play/Pause runs the orbit; Speed sets how fast a year passes.",
+          "Step advances one increment for close observation.",
+          "Drag or scroll to change view/zoom; Top view / Side view switch perspective.",
+          "Reset returns to the spring equinox."
+        ]
+      },
+      {
+        "h": "3. Solstices & equinoxes",
+        "lines": [
+          "Keys 1–4 freeze at spring equinox, summer solstice, autumn equinox, winter solstice.",
+          "Equinoxes: subsolar at the equator (0°), equal day and night worldwide.",
+          "June solstice: subsolar at 23.5°N; longest day in the north, polar day inside the Arctic Circle.",
+          "December solstice: subsolar at 23.5°S; shortest day in the north, polar night.",
+          "The readout shows orbit angle, subsolar latitude, textbook date and season name."
+        ]
+      },
+      {
+        "h": "4. Readouts & classroom cards",
+        "lines": [
+          "Subsolar latitude comes from declinationDeg in the model data, not an approximation.",
+          "The seasons panel lists dates and phenomena for all four (bilingual).",
+          "Teaching notes: migrating subsolar point → changing noon altitude and day length → seasons."
+        ]
+      },
+      {
+        "h": "5. Common mistakes",
+        "lines": [
+          "Seasons come from the fixed axial tilt, NOT from Earth being closer/farther to the Sun.",
+          "Perihelion is early January (northern winter); aphelion is early July (northern summer).",
+          "Seasons are opposite in the two hemispheres.",
+          "Esc closes, F11 toggles fullscreen."
+        ]
+      }
+    ]
+  }
+}

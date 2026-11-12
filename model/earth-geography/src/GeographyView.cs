@@ -41,6 +41,23 @@ public sealed class GeographyView : Control
     private bool _showLabels = true;
     private GeoMode _mode = GeoMode.Sphere3D;
 
+    // ── 平面视图几何缓存：五大陆有 1.3 万点，每帧重建 StreamGeometry 会明显掉帧。
+    //    尺寸/缩放不变时复用同一份几何，只重画笔刷。
+    private readonly Dictionary<string, Avalonia.Media.Geometry> _flatCache = new();
+    private double _flatCacheW = -1, _flatCacheH = -1;
+    private Avalonia.Media.Geometry? _coastGeo;
+    private double _coastCacheW = -1, _coastCacheH = -1;
+    // 单位球坐标缓存：三角运算只算一次，之后每帧只做矩阵乘 + 投影
+    private readonly Dictionary<string, (Vector3[] Pts, bool[] Valid)> _unitCache = new();
+
+    // ── 3D 视图成品几何缓存：旋转/缩放/尺寸都不变时直接复用上一帧的几何，
+    //    避免每帧重建 2.6 万点的 StreamGeometry 并重新提交给 Skia。
+    //    用户静止观察时这是绝大多数情况；拖动时按角度量化命中，转动依然跟手。
+    private Avalonia.Media.Geometry? _s3dCoast, _s3dCont;
+    private readonly Dictionary<string, Avalonia.Media.Geometry> _s3dBands = new();
+    private readonly Dictionary<string, Avalonia.Media.Geometry> _s3dPlates = new();
+    private string _s3dKey = "";
+
     public event Action? StateChanged;
 
     public GeographyView(IModelContext context, GeoScene scene, GeoData coast,
@@ -165,10 +182,52 @@ public sealed class GeographyView : Control
 
         DrawOceanDisc(ctx, cx, cy, r);
 
-        if (_showZones) DrawZones3D(ctx, m, cx, cy, r);
-        if (_showCoast) DrawCoast3D(ctx, m, cx, cy, r);
+        // 成品几何缓存 key：旋转 / 缩放 / 尺寸 / 图层只要有一个变了才重建几何。
+        // 静止观察时命中率 100%，拖动时按 0.5° 量化，仍然跟手。
+        var key = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"{Math.Round(_yawDeg * 2) / 2}|{Math.Round(_pitchDeg * 2) / 2}|{Math.Round(_zoom, 3)}|" +
+            $"{Math.Round(size.Width)}|{Math.Round(size.Height)}|" +
+            $"{(_showZones ? 1 : 0)}{(_showCoast ? 1 : 0)}{(_showPlates ? 1 : 0)}{(_showContinents ? 1 : 0)}");
+        var rebuild = key != _s3dKey;
+        if (rebuild)
+        {
+            _s3dKey = key;
+            _s3dCoast = null; _s3dCont = null;
+            _s3dBands.Clear();
+            _s3dPlates.Clear();
+        }
+
+        if (_showZones)
+        {
+            // 每个温度带一种颜色，所以按带分别缓存一份几何
+            foreach (var zone in _scene.Zones)
+            {
+                var zkey = "band:" + zone.Id;
+                if (rebuild || !_s3dBands.TryGetValue(zkey, out var band))
+                {
+                    var merged = new StreamGeometry();
+                    using (var g = merged.Open())
+                        AppendBand(g, m, cx, cy, r, zone.LatMin, zone.LatMax);
+                    band = merged;
+                    _s3dBands[zkey] = band;
+                }
+                ctx.DrawGeometry(ZoneFill(zone.Id), null, band);
+            }
+
+            // 边界线（赤道/回归线/极圈）随旋转变化，直接画
+            DrawZoneLines3D(ctx, m, cx, cy, r);
+        }
+        if (_showCoast)
+        {
+            if (rebuild || _s3dCoast == null) _s3dCoast = BuildCoast(m, cx, cy, r);
+            ctx.DrawGeometry(null, CoastPen, _s3dCoast);
+        }
         if (_showPlates) DrawPlates3D(ctx, m, cx, cy, r);
-        if (_showContinents) DrawContinents3D(ctx, m, cx, cy, r);
+        if (_showContinents)
+        {
+            if (rebuild || _s3dCont == null) _s3dCont = BuildContinents(m, cx, cy, r);
+            ctx.DrawGeometry(null, ContinentPen, _s3dCont);
+        }
         if (_showBorders) DrawBorders3D(ctx, m, cx, cy, r);
         if (_showLabels) DrawLabels3D(ctx, m, cx, cy, r);
 
@@ -234,15 +293,9 @@ public sealed class GeographyView : Control
         ctx.DrawEllipse(spec, null, new Point(cx, cy), r, r);
     }
 
-    // ---- 五带：按纬度带填色（用四边形条带逐格填充，避免整环多边形跨地平线破面）----
-    private void DrawZones3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
+    // ---- 五带边界线：赤道 / 回归线 / 极圈（随旋转变化，每帧直接画）----
+    private void DrawZoneLines3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
     {
-        foreach (var zone in _scene.Zones)
-        {
-            var fill = ZoneFill(zone.Id);
-            FillBand3D(ctx, m, cx, cy, r, zone.LatMin, zone.LatMax, fill);
-        }
-        // 边界线：赤道 / 回归线 / 极圈
         foreach (var zone in _scene.Zones)
         {
             DrawParallel3D(ctx, m, cx, cy, r, zone.LatMin, ZoneEdgePen);
@@ -254,44 +307,6 @@ public sealed class GeographyView : Control
         DrawParallel3D(ctx, m, cx, cy, r, 90 - _scene.TropicDeg, PolarPen);
         DrawParallel3D(ctx, m, cx, cy, r, -(90 - _scene.TropicDeg), PolarPen);
     }
-
-    /// <summary>
-    /// 纬度带填充：沿经度切成小四边形逐格画。
-    /// 每个格子独立判断可见性——这样跨地平线的格子会被跳过，
-    /// 而不是像整环多边形那样把背面点也连进去导致形状撕裂。
-    /// </summary>
-    private static void FillBand3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r,
-        double latMin, double latMax, IBrush fill)
-    {
-        const int steps = 180;
-        const double lonStep = 360.0 / steps;
-
-        for (var i = 0; i < steps; i++)
-        {
-            var lon0 = -180.0 + lonStep * i;
-            var lon1 = lon0 + lonStep;
-
-            var a = Geometry.ToCamera(Geometry.LatLonToUnit(latMin, lon0), Matrix4x4.Identity, m);
-            var b = Geometry.ToCamera(Geometry.LatLonToUnit(latMin, lon1), Matrix4x4.Identity, m);
-            var c = Geometry.ToCamera(Geometry.LatLonToUnit(latMax, lon1), Matrix4x4.Identity, m);
-            var d = Geometry.ToCamera(Geometry.LatLonToUnit(latMax, lon0), Matrix4x4.Identity, m);
-
-            // 四角都在正面才填这一格
-            if (a.Z <= 0 || b.Z <= 0 || c.Z <= 0 || d.Z <= 0) continue;
-
-            var geo = new StreamGeometry();
-            using (var g = geo.Open())
-            {
-                g.BeginFigure(Pt(Geometry.Project(a, r, cx, cy)), true);
-                g.LineTo(Pt(Geometry.Project(b, r, cx, cy)));
-                g.LineTo(Pt(Geometry.Project(c, r, cx, cy)));
-                g.LineTo(Pt(Geometry.Project(d, r, cx, cy)));
-                g.EndFigure(true);
-            }
-            ctx.DrawGeometry(fill, null, geo);
-        }
-    }
-
     private static void DrawParallel3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r,
         double lat, IPen pen)
     {
@@ -299,11 +314,86 @@ public sealed class GeographyView : Control
         for (var i = 0; i < 145; i++) pts.Add(new[] { -180.0 + 360.0 * i / 144.0, lat });
         DrawGeo3D(ctx, pts, m, cx, cy, r, pen, false);
     }
-
-    private void DrawCoast3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
+    /// <summary>海岸线合并几何（供成品缓存使用）。</summary>
+    private Avalonia.Media.Geometry BuildCoast(Matrix4x4 m, float cx, float cy, float r)
     {
-        foreach (var line in _coast.Lines)
-            DrawGeo3D(ctx, line, m, cx, cy, r, CoastPen, true);
+        var merged = new StreamGeometry();
+        using (var g = merged.Open())
+        {
+            for (var i = 0; i < _coast.Lines.Count; i++)
+                AppendCached(g, "coast:" + i, _coast.Lines[i], m, r, cx, cy, true);
+        }
+        return merged;
+    }
+
+    /// <summary>五大陆合并几何（供成品缓存使用）。</summary>
+    private Avalonia.Media.Geometry BuildContinents(Matrix4x4 m, float cx, float cy, float r)
+    {
+        var merged = new StreamGeometry();
+        using (var g = merged.Open())
+        {
+            foreach (var c in _continents.Continents)
+                for (var i = 0; i < c.Lines.Count; i++)
+                    AppendCached(g, "cont:" + c.Id + ":" + i, c.Lines[i], m, r, cx, cy, true);
+        }
+        return merged;
+    }
+
+    /// <summary>把一个纬度带的可见格子追加到几何里（每格独立判断可见性）。</summary>
+    private static void AppendBand(StreamGeometryContext g, Matrix4x4 m, float cx, float cy, float r,
+        double latMin, double latMax)
+    {
+        const int steps = 180;
+        const double lonStep = 360.0 / steps;
+        for (var i = 0; i < steps; i++)
+        {
+            var lon0 = -180.0 + lonStep * i;
+            var lon1 = lon0 + lonStep;
+            var a = Geometry.ToCamera(Geometry.LatLonToUnit(latMin, lon0), Matrix4x4.Identity, m);
+            var b = Geometry.ToCamera(Geometry.LatLonToUnit(latMin, lon1), Matrix4x4.Identity, m);
+            var c = Geometry.ToCamera(Geometry.LatLonToUnit(latMax, lon1), Matrix4x4.Identity, m);
+            var d = Geometry.ToCamera(Geometry.LatLonToUnit(latMax, lon0), Matrix4x4.Identity, m);
+            if (a.Z <= 0 || b.Z <= 0 || c.Z <= 0 || d.Z <= 0) continue;
+            g.BeginFigure(Pt(Geometry.Project(a, r, cx, cy)), true);
+            g.LineTo(Pt(Geometry.Project(b, r, cx, cy)));
+            g.LineTo(Pt(Geometry.Project(c, r, cx, cy)));
+            g.LineTo(Pt(Geometry.Project(d, r, cx, cy)));
+            g.EndFigure(true);
+        }
+    }
+
+    /// <summary>把一条缓存折线的所有可见弧段追加到同一个几何里。</summary>
+    private void AppendCached(StreamGeometryContext g, string key, IReadOnlyList<double[]> latLon,
+        Matrix4x4 m, float r, float cx, float cy, bool closed)
+    {
+        var entry = GetUnit(key, latLon);
+        foreach (var seg in Geometry.ProjectUnitPolyline(entry.Pts, entry.Valid,
+                     Matrix4x4.Identity, m, r, cx, cy, closed))
+        {
+            if (seg.Count < 2) continue;
+            g.BeginFigure(Pt(seg[0]), false);
+            for (var i = 1; i < seg.Count; i++) g.LineTo(Pt(seg[i]));
+            g.EndFigure(false);
+        }
+    }
+
+    private (Vector3[] Pts, bool[] Valid) GetUnit(string key, IReadOnlyList<double[]> latLon)
+    {
+        if (_unitCache.TryGetValue(key, out var entry)) return entry;
+        var pts = new Vector3[latLon.Count];
+        var valid = new bool[latLon.Count];
+        for (var i = 0; i < latLon.Count; i++)
+        {
+            var p = latLon[i];
+            if (p.Length >= 2)
+            {
+                pts[i] = Geometry.LatLonToUnit(p[1], p[0]);
+                valid[i] = true;
+            }
+        }
+        entry = (pts, valid);
+        _unitCache[key] = entry;
+        return entry;
     }
 
     private void DrawPlates3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
@@ -311,7 +401,13 @@ public sealed class GeographyView : Control
         foreach (var p in _plates.Plates)
         {
             var pen = PlatePenFor(p.Id);
-            foreach (var line in p.Lines) DrawGeo3D(ctx, line, m, cx, cy, r, pen, true);
+            var merged = new StreamGeometry();
+            using (var g = merged.Open())
+            {
+                for (var i = 0; i < p.Lines.Count; i++)
+                    AppendCached(g, "plate:" + p.Id + ":" + i, p.Lines[i], m, r, cx, cy, true);
+            }
+            ctx.DrawGeometry(null, pen, merged);
         }
         if (_showLabels) DrawPlateLabels3D(ctx, m, cx, cy, r);
     }
@@ -329,28 +425,6 @@ public sealed class GeographyView : Control
                 PlateBrushFor(p.Id), TextAlignment.Center);
         }
     }
-
-    /// <summary>五块大陆：与板块独立的线稿图层，便于讲清「板块 ≠ 大陆」。</summary>
-    private void DrawContinents3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
-    {
-        var pen = ContinentPen;
-        foreach (var c in _continents.Continents)
-            foreach (var line in c.Lines)
-                DrawGeo3D(ctx, line, m, cx, cy, r, pen, true);
-
-        if (!_showLabels) return;
-        foreach (var c in _continents.Continents)
-        {
-            var at = c.Label is { Length: >= 2 } ? c.Label : Centroid(c.Lines);
-            if (at == null) continue;
-            var cam = Geometry.ToCamera(Geometry.LatLonToUnit(at[1], at[0]), Matrix4x4.Identity, m);
-            if (cam.Z <= 0.2f) continue;
-            var pos = Geometry.Project(cam, r, cx, cy);
-            DrawText(ctx, Pick(c.NameI18n, c.Id), pos.X, pos.Y, 12 * TextScale,
-                MainlandBrush, TextAlignment.Center, FontStyle.Normal);
-        }
-    }
-
     private void DrawBorders3D(DrawingContext ctx, Matrix4x4 m, float cx, float cy, float r)
     {
         foreach (var b in _borders.Borders)
@@ -438,6 +512,29 @@ public sealed class GeographyView : Control
         }
     }
 
+    /// <summary>
+    /// 缓存版绘制：单位球坐标按 key 缓存一次，之后每帧只做矩阵乘与投影。
+    /// 海岸线/大陆共 2.6 万点，这是 3D 视图的主要开销来源。
+    /// </summary>
+    private void DrawCached3D(DrawingContext ctx, string key, IReadOnlyList<double[]> latLon,
+        Matrix4x4 m, float cx, float cy, float r, IPen pen, bool closed)
+    {
+        var entry = GetUnit(key, latLon);
+        foreach (var seg in Geometry.ProjectUnitPolyline(entry.Pts, entry.Valid,
+                     Matrix4x4.Identity, m, r, cx, cy, closed))
+        {
+            if (seg.Count < 2) continue;
+            var geo = new StreamGeometry();
+            using (var g = geo.Open())
+            {
+                g.BeginFigure(Pt(seg[0]), false);
+                for (var i = 1; i < seg.Count; i++) g.LineTo(Pt(seg[i]));
+                g.EndFigure(false);
+            }
+            ctx.DrawGeometry(null, pen, geo);
+        }
+    }
+
     // ================================================================ 平面等经纬
     private void RenderFlat(DrawingContext ctx, Size size)
     {
@@ -483,22 +580,29 @@ public sealed class GeographyView : Control
         // 海岸线
         if (_showCoast)
         {
-            foreach (var line in _coast.Lines)
+            var cw = Math.Round(size.Width);
+            var ch = Math.Round(size.Height);
+            if (Math.Abs(cw - _coastCacheW) > 0.5 || Math.Abs(ch - _coastCacheH) > 0.5 || _coastGeo == null)
             {
-                if (line.Count < 2) continue;
-                var geo = new StreamGeometry();
-                using (var g = geo.Open())
+                var merged = new StreamGeometry();
+                using (var g = merged.Open())
                 {
-                    g.BeginFigure(P(line[0][0], line[0][1]), false);
-                    for (var i = 1; i < line.Count; i++)
+                    foreach (var line in _coast.Lines)
                     {
-                        var p = line[i];
-                        if (p.Length >= 2) g.LineTo(P(p[0], p[1]));
+                        if (line.Count < 2) continue;
+                        g.BeginFigure(P(line[0][0], line[0][1]), false);
+                        for (var i = 1; i < line.Count; i++)
+                        {
+                            var p = line[i];
+                            if (p.Length >= 2) g.LineTo(P(p[0], p[1]));
+                        }
+                        g.EndFigure(false);
                     }
-                    g.EndFigure(false);
                 }
-                ctx.DrawGeometry(null, CoastPen, geo);
+                _coastGeo = merged;
+                _coastCacheW = cw; _coastCacheH = ch;
             }
+            ctx.DrawGeometry(null, CoastPen, _coastGeo);
         }
 
         // 板块
@@ -522,10 +626,39 @@ public sealed class GeographyView : Control
         // 五大陆
         if (_showContinents)
         {
+            // 用缓存几何：尺寸不变时只画一次构建开销
+            var fw = Math.Round(size.Width);
+            var fh = Math.Round(size.Height);
+            if (Math.Abs(fw - _flatCacheW) > 0.5 || Math.Abs(fh - _flatCacheH) > 0.5 || _flatCache.Count == 0)
+            {
+                _flatCache.Clear();
+                _flatCacheW = fw; _flatCacheH = fh;
+            }
+
             foreach (var c in _continents.Continents)
             {
-                foreach (var line in c.Lines)
-                    DrawFlatPolyline(ctx, line, P, ContinentPen);
+                var key = "cont:" + c.Id;
+                if (!_flatCache.TryGetValue(key, out var geo))
+                {
+                    var merged = new StreamGeometry();
+                    using (var g = merged.Open())
+                    {
+                        foreach (var line in c.Lines)
+                        {
+                            if (line.Count < 2) continue;
+                            g.BeginFigure(P(line[0][0], line[0][1]), false);
+                            for (var i = 1; i < line.Count; i++)
+                            {
+                                var p = line[i];
+                                if (p.Length >= 2) g.LineTo(P(p[0], p[1]));
+                            }
+                            g.EndFigure(false);
+                        }
+                    }
+                    geo = merged;
+                    _flatCache[key] = geo;
+                }
+                ctx.DrawGeometry(null, ContinentPen, geo);
 
                 if (!_showLabels) continue;
                 var a = c.Label is { Length: >= 2 } ? c.Label : Centroid(c.Lines);

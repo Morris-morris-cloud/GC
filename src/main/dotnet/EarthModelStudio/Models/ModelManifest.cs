@@ -28,6 +28,18 @@ public sealed class ModelManifest
     public string? License { get; set; }
     public string? UpdatedAt { get; set; }
     public string? MinAppVersion { get; set; }
+    /// <summary>模型窗口标题栏配色（模型自带，跟随模型界面风格）；缺省时用深色。</summary>
+    public WindowChrome? Chrome { get; set; }
+}
+
+/// <summary>模型窗口自建标题栏的颜色，由模型清单提供。</summary>
+public sealed class WindowChrome
+{
+    public string? TitleBar { get; set; }
+    public string? TitleBorder { get; set; }
+    public string? TitleText { get; set; }
+    public string? Button { get; set; }
+    public string? Frame { get; set; }
 }
 
 public sealed class ModelPackage

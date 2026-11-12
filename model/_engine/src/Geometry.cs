@@ -44,10 +44,33 @@ public static class Geometry
         float radius, float centerX, float centerY,
         bool closed = false)
     {
-        var result = new List<List<Vector2>>();
-        if (latLonPoints.Count < 2) return result;
+        // 兼容旧调用：按需转换（点位少的分支，如洲界）
+        var unit = new Vector3[latLonPoints.Count];
+        for (var i = 0; i < latLonPoints.Count; i++)
+        {
+            var p = latLonPoints[i];
+            unit[i] = p.Length >= 2 ? LatLonToUnit(p[1], p[0]) : Vector3.Zero;
+        }
+        var valid = new bool[unit.Length];
+        for (var i = 0; i < latLonPoints.Count; i++) valid[i] = latLonPoints[i].Length >= 2;
+        return ProjectUnitPolyline(unit, valid, planet, cam, radius, centerX, centerY, closed);
+    }
 
-        var count = latLonPoints.Count;
+    /// <summary>
+    /// 预计算单位球坐标后的快速投影：每帧只做矩阵乘 + 正交投影，
+    /// 不再重复计算 sin/cos（地理模型约 2.6 万个点，这是最大开销）。
+    /// </summary>
+    public static List<List<Vector2>> ProjectUnitPolyline(
+        IReadOnlyList<Vector3> unitPoints,
+        IReadOnlyList<bool> valid,
+        Matrix4x4 planet, Matrix4x4 cam,
+        float radius, float centerX, float centerY,
+        bool closed = false)
+    {
+        var result = new List<List<Vector2>>();
+        if (unitPoints.Count < 2) return result;
+
+        var count = unitPoints.Count;
         var total = closed ? count + 1 : count;
         List<Vector2>? current = null;
 
@@ -56,18 +79,17 @@ public static class Geometry
 
         for (var i = 0; i < total; i++)
         {
-            var p = latLonPoints[i % count];
-            if (p.Length < 2) { havePrev = false; continue; }
+            var k = i % count;
+            if (!valid[k]) { havePrev = false; continue; }
 
-            var camPos = ToCamera(LatLonToUnit(p[1], p[0]), planet, cam);
+            var camPos = Vector3.Transform(Vector3.Transform(unitPoints[k], planet), cam);
             var visible = camPos.Z > 0f;
 
             if (!havePrev)
             {
                 if (visible)
                 {
-                    current = new List<Vector2>();
-                    current.Add(Project(camPos, radius, centerX, centerY));
+                    current = new List<Vector2> { Project(camPos, radius, centerX, centerY) };
                 }
                 prevCam = camPos;
                 havePrev = true;

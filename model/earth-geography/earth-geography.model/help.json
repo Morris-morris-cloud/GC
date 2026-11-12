@@ -1,0 +1,124 @@
+{
+  "zh-CN": {
+    "title": "如何使用 · 地球地理",
+    "sections": [
+      {
+        "h": "开始使用（跟着做）",
+        "lines": [
+          "第 1 步：点右上「平面」，先看完整的世界地图，确认七大洲四大洋的位置。",
+          "第 2 步：点「五带」，看回归线与极圈怎么把地球分成五个温度带。",
+          "第 3 步：关掉「五带」，打开「六大板块」，记住六块板块的名字和范围。",
+          "第 4 步：再打开「五大陆」，对比金色实线（大陆）与彩色虚线（板块）的差别。",
+          "第 5 步：切回「3D 球面」，拖动转动地球，看背面会自动隐藏。",
+          "看不清？滚轮放大；想重来点「复位」。每个图层都能单独开关，互不干扰。"
+        ]
+      },
+      {
+        "h": "一、这个模型包含什么",
+        "lines": [
+          "五带：热带、南北温带、南北寒带（按回归线 23.5° 与极圈 66.5° 划分）。",
+          "七大洲四大洋轮廓，以及洲与洲之间的分界线（苏伊士运河、巴拿马运河、白令海峡等）。",
+          "六大板块：亚欧、非洲、美洲、太平洋、印度洋、南极洲板块。",
+          "五块大陆：亚欧大陆、非洲大陆、美洲大陆、澳大利亚大陆、南极大陆。"
+        ]
+      },
+      {
+        "h": "二、两种视图",
+        "lines": [
+          "「3D 球面」：正交投影球体，拖动旋转、滚轮缩放，背面自动裁掉。",
+          "「平面」：等经纬矩形地图，课本地图样式，一次看全整幅。",
+          "「复位」回到初始视角与缩放。"
+        ]
+      },
+      {
+        "h": "三、图层开关（各自独立）",
+        "lines": [
+          "「五带」：叠加五带分界线与回归线、极圈。",
+          "「大洲轮廓」：白色海岸线。",
+          "「六大板块」：彩色虚线，是板块边界（不是大陆边界）。",
+          "「五大陆」：金色实线，是大陆轮廓。",
+          "「洲界」：分界点与分界线标签（如德雷克海峡、乌拉尔山…）。"
+        ]
+      },
+      {
+        "h": "四、颜色与图例",
+        "lines": [
+          "右侧图例说明三种线型：海岸线 / 板块边界 / 分界线。",
+          "底部色块对应五个温度带。",
+          "六大板块各一种颜色，标签放在板块中心附近。"
+        ]
+      },
+      {
+        "h": "五、教学要点与易错点",
+        "lines": [
+          "「板块 ≠ 大陆」：美洲板块覆盖南北美大陆并向东到大西洋中脊；印度洋板块包含澳大利亚与印度次大陆。",
+          "六大板块是全球一级板块，纳斯卡、阿拉伯等属于次级小板块，教材不列入。",
+          "板块交界处多火山地震（环太平洋带、地中海—喜马拉雅带）。",
+          "洲界是人为约定：亚欧以乌拉尔山—乌拉尔河—里海—大高加索山—黑海—土耳其海峡为界；亚非以苏伊士运河为界；南北美以巴拿马运河为界；南美与南极以德雷克海峡为界。",
+          "Esc 关闭窗口，F11 全屏。"
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "How to use · Earth Geography",
+    "sections": [
+      {
+        "h": "Getting started (follow along)",
+        "lines": [
+          "Step 1: click Flat in the top right for the whole world map first.",
+          "Step 2: turn on Climate zones to see how the tropics and polar circles split five belts.",
+          "Step 3: switch zones off and turn on Six plates; learn the six names and extents.",
+          "Step 4: turn on Five mainlands and compare solid gold lines (mainlands) with dashed colored lines (plates).",
+          "Step 5: switch back to 3D globe, drag to rotate, and see back faces clip automatically.",
+          "Hard to read? Scroll to zoom; press Reset to start over. Each layer toggles independently."
+        ]
+      },
+      {
+        "h": "1. What this model contains",
+        "lines": [
+          "Five climate zones split by the tropics (23.5°) and polar circles (66.5°).",
+          "Seven continents, four oceans, and continental borders (Suez, Panama, Bering, etc.).",
+          "Six major plates: Eurasian, African, American, Pacific, Indian Ocean, Antarctic.",
+          "Five mainlands: Eurasia, Africa, America, Australia, Antarctica."
+        ]
+      },
+      {
+        "h": "2. Two views",
+        "lines": [
+          "3D globe: orthographic sphere; drag to rotate, scroll to zoom, back faces clipped.",
+          "Flat: equirectangular textbook map, whole world at once.",
+          "Reset restores the initial view and zoom."
+        ]
+      },
+      {
+        "h": "3. Independent layer toggles",
+        "lines": [
+          "Climate zones: tropics, polar circles and zone edges.",
+          "Coastlines: white continental outlines.",
+          "Six plates: dashed colored lines — plate BOUNDARIES, not continental edges.",
+          "Five mainlands: solid gold lines — continental outlines.",
+          "Borders: boundary dots and labels (Drake Passage, Ural Mts., ...)."
+        ]
+      },
+      {
+        "h": "4. Colors & legend",
+        "lines": [
+          "The right legend explains the three line styles.",
+          "The bottom strip maps the five climate zones.",
+          "Each of the six plates has its own color, labelled near its center."
+        ]
+      },
+      {
+        "h": "5. Teaching notes & pitfalls",
+        "lines": [
+          "Plates are NOT mainlands: the American Plate spans both Americas to the Mid-Atlantic Ridge; the Indian Ocean Plate includes Australia and the Indian subcontinent.",
+          "These six are the first-order plates; Nazca, Arabian, etc. are secondary and are not listed in textbooks.",
+          "Volcanoes and earthquakes concentrate along plate boundaries (Pacific Ring, Mediterranean–Himalayan belt).",
+          "Borders are conventions: Asia/Europe along the Urals–Ural River–Caspian–Caucasus–Black Sea–Turkish Straits; Asia/Africa at Suez; N/S America at Panama; S. America/Antarctica at Drake Passage.",
+          "Esc closes, F11 toggles fullscreen."
+        ]
+      }
+    ]
+  }
+}

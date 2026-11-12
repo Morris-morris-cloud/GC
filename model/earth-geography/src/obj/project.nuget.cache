@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "8duKn1xFDI4=",
+  "dgSpecHash": "KQi6iFsaWE4=",
   "success": true,
   "projectFilePath": "/Users/morris/Downloads/GC#/model/earth-geography/src/EarthGeographyModel.csproj",
   "expectedPackageFiles": [
@@ -9,15 +9,5 @@
     "/Users/morris/.nuget/packages/avalonia.remote.protocol/11.3.9/avalonia.remote.protocol.11.3.9.nupkg.sha512",
     "/Users/morris/.nuget/packages/microcom.runtime/0.11.0/microcom.runtime.0.11.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "message": "获取包漏洞数据时出错: Access to the path '/Users/morris/.local/share/NuGet/http-cache/670c1461c29885f9aa22c281d8b7da90845b38e4$ps:_api.nuget.org_v3_index.json/vuln_index.dat-new' is denied.",
-      "projectPath": "/Users/morris/Downloads/GC#/model/earth-geography/src/EarthGeographyModel.csproj",
-      "warningLevel": 1,
-      "filePath": "/Users/morris/Downloads/GC#/model/earth-geography/src/EarthGeographyModel.csproj",
-      "targetGraphs": []
-    }
-  ]
+  "logs": []
 }

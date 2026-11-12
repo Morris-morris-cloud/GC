@@ -1,0 +1,121 @@
+{
+  "zh-CN": {
+    "title": "如何使用 · 地球自转",
+    "sections": [
+      {
+        "h": "开始使用（跟着做）",
+        "lines": [
+          "第 1 步：窗口打开后先按「空格」暂停，动画停住才好观察。",
+          "第 2 步：按住鼠标左键拖动地球，把晨昏线转到正对你。",
+          "第 3 步：点顶部「经纬网」打开网格，能看清哪一段是夜半球。",
+          "第 4 步：再按「空格」播放，盯住一个点，看它从黑夜转进白天。",
+          "第 5 步：按住「←」「→」可以一格一格慢慢看昼夜交界线怎么移动。",
+          "找不到按钮？所有开关都在窗口顶部那一排；转不动地球就点「复位」重来。"
+        ]
+      },
+      {
+        "h": "一、这个模型讲什么",
+        "lines": [
+          "地球绕地轴自西向东自转，周期约 24 小时（一个太阳日）。",
+          "自转产生三个可观察现象：昼夜交替、地方时差、地转偏向力。",
+          "晨昏线（ terminator ）是把地球分成昼半球与夜半球的大圆，它随自转不断西移。",
+          "太阳直射点是地表太阳高度为 90° 的点，正午太阳高度由它向南北两侧递减。"
+        ]
+      },
+      {
+        "h": "二、基本操作",
+        "lines": [
+          "拖动地球：改变观察角度（经度/纬度），可从极地或赤道上空看。",
+          "滚轮或双指捏合：缩放；右上角「放大」可切到地球特写。",
+          "「播放 / 暂停」开始或停止自转动画；「速度」调节快慢。",
+          "「重置」把角度、速度、缩放恢复到初始状态。"
+        ]
+      },
+      {
+        "h": "三、图层开关",
+        "lines": [
+          "「经纬网」叠加经线与纬线，便于读出赤道、回归线、极圈。",
+          "「标注」显示北极、南极、太阳直射点、赤道等关键标签。",
+          "「轨道」显示自转轴与赤道面；「夸张倾角」把 23.5° 放大便于观察。",
+          "「教学要点」展开课堂讲解文字，适合投屏授课。"
+        ]
+      },
+      {
+        "h": "四、键盘快捷键",
+        "lines": [
+          "空格：播放 / 暂停。",
+          "← →：逐帧步进（暂停时最有用）。",
+          "Esc：关闭窗口；F11：全屏 / 退出全屏。"
+        ]
+      },
+      {
+        "h": "五、课堂上怎么用",
+        "lines": [
+          "先暂停，把晨昏线转到与经线重合，说明「昼夜平分」只在二分日出现。",
+          "再播放，让学生观察同一地点如何由夜入昼（晨线）与由昼入夜（昏线）。",
+          "对比不同经度：东边地点先见到日出，引出「东早西晚」的地方时差。",
+          "易错提醒：昼夜现象本身由「地球不发光、不透明」造成，自转只造成「交替」。"
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "How to use · Earth Rotation",
+    "sections": [
+      {
+        "h": "Getting started (follow along)",
+        "lines": [
+          "Step 1: press Space to pause first — a still globe is easier to read.",
+          "Step 2: hold the left mouse button and drag until the terminator faces you.",
+          "Step 3: switch on Graticule in the top bar to see which side is night.",
+          "Step 4: press Space to play and watch one point rotate from night into day.",
+          "Step 5: use ← / → to step frame by frame and follow the day/night boundary.",
+          "Can't find a control? Every toggle is in the top bar; if the globe gets twisted, press Reset."
+        ]
+      },
+      {
+        "h": "1. What this model shows",
+        "lines": [
+          "Earth spins west-to-east on its axis in about 24 hours (a solar day).",
+          "Rotation causes the day/night cycle, local time differences and the Coriolis effect.",
+          "The terminator is the great circle splitting day and night; it moves west as Earth turns.",
+          "The subsolar point is where the Sun is overhead; noon altitude decreases away from it."
+        ]
+      },
+      {
+        "h": "2. Basic controls",
+        "lines": [
+          "Drag the globe to change the viewing angle (from pole or equator).",
+          "Scroll or pinch to zoom; the close-up button gives an Earth detail view.",
+          "Play/Pause starts or stops the spin; Speed changes the rate.",
+          "Reset restores the initial angle, speed and zoom."
+        ]
+      },
+      {
+        "h": "3. Layer toggles",
+        "lines": [
+          "Graticule overlays meridians and parallels (equator, tropics, polar circles).",
+          "Labels shows poles, subsolar point and the equator.",
+          "Orbit shows the axis and equatorial plane; Exaggerate tilt magnifies the 23.5° tilt.",
+          "Teaching notes expands classroom text, useful on a projector."
+        ]
+      },
+      {
+        "h": "4. Keyboard shortcuts",
+        "lines": [
+          "Space: play / pause.   ← →: step one frame (best while paused).",
+          "Esc: close window.     F11: toggle fullscreen."
+        ]
+      },
+      {
+        "h": "5. In the classroom",
+        "lines": [
+          "Pause with the terminator along a meridian to show equal day/night at equinoxes.",
+          "Play again and watch a site cross the dawn line and the dusk line.",
+          "Compare longitudes: eastern places see sunrise earlier — local time runs ahead.",
+          "Common mistake: day/night exists because Earth is opaque; rotation only makes it alternate."
+        ]
+      }
+    ]
+  }
+}
