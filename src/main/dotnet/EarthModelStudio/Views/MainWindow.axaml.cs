@@ -42,6 +42,18 @@ public partial class MainWindow : Window
         }
         DataContextChanged += OnDataContextChanged;
         Closed += OnClosed;
+
+        // 最大化 / 还原：切换图标（单框 ⇄ 双框），圆角始终保持
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property != WindowStateProperty) return;
+            var max = WindowState == WindowState.Maximized;
+            if (this.FindControl<Avalonia.Controls.Shapes.Path>("MaximizeGlyph") is { } glyph)
+                glyph.Data = Avalonia.Media.Geometry.Parse(max
+                    ? "M2.6,3.4 L7.4,3.4 L7.4,8.4 L2.6,8.4 Z M2.6,3.4 L2.6,1.6 L7.4,1.6 L7.4,6.6"
+                    : "M2.2,2.2 L7.8,2.2 L7.8,7.8 L2.2,7.8 Z");
+            if (Content is Border frame) frame.CornerRadius = new Avalonia.CornerRadius(16);
+        };
     }
 
     /// <summary>当前打开的模型窗口（每个模型一个独立窗口）。</summary>
@@ -148,12 +160,25 @@ public partial class MainWindow : Window
     // ---- 自建标题栏 ------------------------------------------------------
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        // 双击标题栏 = 最大化 / 还原
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            return;
+        }
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             BeginMoveDrag(e);
     }
 
     private void OnMinimizeClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
+
+    private void OnMaximizeClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
+        => WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
 
     // 关闭动画：先淡出再真正 Close（第 4 项）
     private async void OnCloseClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)

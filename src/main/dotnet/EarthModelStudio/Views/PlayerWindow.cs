@@ -31,7 +31,6 @@ public sealed class PlayerWindow : Window
     private readonly List<Shapes.Path> _titleGlyphs = new();
     private Shapes.Path? _maximizeGlyph;
     private Shapes.Path? _restoreGlyph;
-    private readonly List<Shapes.Ellipse> _titleBadges = new();
     private string _maxMaxPath = "";
     private string _maxRestorePath = "";
     private Button? _helpButton;
@@ -97,28 +96,20 @@ public sealed class PlayerWindow : Window
 
         // 标题栏三键：最小化 / 最大化 / 关闭 —— 卡通画风。
         // 每颗按钮 = 彩色实心圆底 + 粗圆头描边图标，像一颗小糖豆。
-        (Button Btn, Shapes.Ellipse Badge, Shapes.Path Icon) MakeBadge(
-            int column, string iconPath, Color fill, Color ink, Color hoverFill)
+        (Button Btn, Shapes.Path Icon) MakeBadge(int column, string iconPath)
         {
-            var badge = new Shapes.Ellipse
-            {
-                Width = 18,
-                Height = 18,
-                Fill = new SolidColorBrush(fill),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            // 纯矢量图标，没有彩色圆圈
             var icon = new Shapes.Path
             {
                 Data = Geometry.Parse(iconPath),
-                Stroke = new SolidColorBrush(ink),
-                StrokeThickness = 1.7,
+                Stroke = new SolidColorBrush(btnText),
+                StrokeThickness = 1.5,
                 StrokeLineCap = PenLineCap.Round,
                 StrokeJoin = PenLineJoin.Round,
                 Fill = null,
                 Stretch = Stretch.None,
-                Width = 9,
-                Height = 9,
+                Width = 10,
+                Height = 10,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -127,7 +118,6 @@ public sealed class PlayerWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            layer.Children.Add(badge);
             layer.Children.Add(icon);
 
             var b = new Button
@@ -148,30 +138,28 @@ public sealed class PlayerWindow : Window
             var hoverBg = IsLight(barBg)
                 ? new SolidColorBrush(Color.Parse("#EEF1F7"))
                 : new SolidColorBrush(Color.Parse("#1E2C46"));
+            var isCloseBtn = column == 4;
             b.PointerEntered += (_, _) =>
             {
-                badge.Fill = new SolidColorBrush(hoverFill);
                 b.Background = hoverBg;
+                icon.Stroke = new SolidColorBrush(isCloseBtn ? Colors.White
+                    : IsLight(barBg) ? Color.Parse("#111A2E") : Colors.White);
             };
             b.PointerExited += (_, _) =>
             {
-                badge.Fill = new SolidColorBrush(fill);
                 b.Background = Brushes.Transparent;
+                icon.Stroke = new SolidColorBrush(btnText);
             };
             b.Classes.Add("model-titlebtn");
             _titleButtons.Add(b);
-            _titleBadges.Add(badge);
             _titleGlyphs.Add(icon);
-            return (b, badge, icon);
+            return (b, icon);
         }
 
         // 卡通配色：暖黄 / 薄荷绿 / 珊瑚红
-        var minBadge = MakeBadge(2, "M1.5,5 L8.5,5",
-            Color.Parse("#FFD166"), Color.Parse("#7A4E00"), Color.Parse("#FFE08A"));
-        var maxBadge = MakeBadge(3, "M2.2,2.2 L7.8,2.2 L7.8,7.8 L2.2,7.8 Z",
-            Color.Parse("#6EE7A7"), Color.Parse("#0B5B33"), Color.Parse("#8DF0BC"));
-        var closeBadge = MakeBadge(4, "M2,2 L8,8 M8,2 L2,8",
-            Color.Parse("#FF7B7B"), Color.Parse("#7A1F1F"), Color.Parse("#FF9B9B"));
+        var minBadge = MakeBadge(2, "M1.5,5 L8.5,5");
+        var maxBadge = MakeBadge(3, "M2.2,2.2 L7.8,2.2 L7.8,7.8 L2.2,7.8 Z");
+        var closeBadge = MakeBadge(4, "M2,2 L8,8 M8,2 L2,8");
 
         var minimizeButton = minBadge.Btn;
         var maximizeButton = maxBadge.Btn;
@@ -272,14 +260,9 @@ public sealed class PlayerWindow : Window
         }
         foreach (var g in _titleGlyphs)
         {
-            g.Width = Math.Round(9 * scale, 1);
-            g.Height = Math.Round(9 * scale, 1);
-            g.StrokeThickness = Math.Round(1.7 * scale, 2);
-        }
-        foreach (var badge in _titleBadges)
-        {
-            badge.Width = Math.Round(18 * scale, 1);
-            badge.Height = Math.Round(18 * scale, 1);
+            g.Width = Math.Round(10 * scale, 1);
+            g.Height = Math.Round(10 * scale, 1);
+            g.StrokeThickness = Math.Round(1.5 * scale, 2);
         }
         if (_titleText != null)
         {
