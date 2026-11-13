@@ -30,6 +30,8 @@ public sealed class GeographyView : Control
     private double _yawDeg = 10;
     private double _pitchDeg = 15;
     private double _zoom = 1.0;
+    private double _zoomTarget = 1.0;
+    private Avalonia.Threading.DispatcherTimer? _zoomTimer;
     private Point _lastPointer;
     private bool _dragging;
 
@@ -82,17 +84,58 @@ public sealed class GeographyView : Control
     public GeoMode Mode { get => _mode; set { _mode = value; InvalidateVisual(); StateChanged?.Invoke(); } }
 
     /// <summary>缩放倍数（0.55–4.0）。文字大小跟随缩放变化。</summary>
+    /// <summary>
+    /// 缩放。写入的是**目标值**，由动画计时器平滑逼近，
+    /// 直接跳变会让滚轮缩放显得生硬。
+    /// </summary>
     public double Zoom
     {
-        get => _zoom;
+        get => _zoomTarget;
         set
         {
-            _zoom = Math.Clamp(value, 0.55, 4.0);
-            Redraw();
+            _zoomTarget = Math.Clamp(value, 0.55, 4.0);
+            EnsureAnimating();
         }
     }
 
+    /// <summary>立即生效（贴图生成、复位等场景不该有过渡）。</summary>
+    public void SetZoomImmediate(double value)
+    {
+        _zoomTarget = Math.Clamp(value, 0.55, 4.0);
+        _zoom = _zoomTarget;
+        Redraw();
+    }
+
     private void Redraw() { InvalidateVisual(); StateChanged?.Invoke(); }
+
+    /// <summary>
+    /// 缩放动画：60Hz 逼近目标值，差值小于阈值即停，
+    /// 避免空转白耗 CPU（一体机上尤其明显）。
+    /// </summary>
+    private void EnsureAnimating()
+    {
+        _zoomTimer ??= new Avalonia.Threading.DispatcherTimer(
+            TimeSpan.FromMilliseconds(16), Avalonia.Threading.DispatcherPriority.Render, (_, _) => StepZoom());
+        if (!_zoomTimer.IsEnabled) _zoomTimer.Start();
+    }
+
+    private void StepZoom()
+    {
+        var diff = _zoomTarget - _zoom;
+        if (Math.Abs(diff) < 0.0015)
+        {
+            _zoom = _zoomTarget;
+            _zoomTimer?.Stop();
+            Redraw();
+            return;
+        }
+        // 指数逼近：手感接近系统级平滑缩放
+        _zoom += diff * 0.28;
+        Redraw();
+    }
+
+    /// <summary>释放动画计时器，避免窗口关闭后还在跑。</summary>
+    public void StopAnimation() => _zoomTimer?.Stop();
 
     /// <summary>文字缩放系数：跟随缩放一起放大/缩小，放大地球时标签也变大。</summary>
     private double TextScale => Math.Clamp(_zoom, 0.85, 2.4);
@@ -141,8 +184,8 @@ public sealed class GeographyView : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        _zoom = Math.Clamp(_zoom * (1 + e.Delta.Y * 0.12), 0.55, 4.0);
-        Redraw();
+        // 走 Zoom 属性（带平滑动画），不要在事件里直接改 _zoom
+        Zoom = _zoomTarget * (1 + e.Delta.Y * 0.12);
         e.Handled = true;
     }
 

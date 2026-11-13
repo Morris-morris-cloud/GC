@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "generated": "2026-11-13T13:56:47Z",
+  "generated": "2026-11-13T15:19:06Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
     "version": "1.0.6",
-    "revision": "e00b9065c8",
+    "revision": "6db90790d3",
     "packages": {
       "win-x64": {
         "path": "dist/GC-win-x64.zip",
@@ -34,25 +34,25 @@
     {
       "id": "earth-geography",
       "version": "1.8",
-      "build": "103f3400b7",
+      "build": "912c6d5619",
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
       "version": "1.6",
-      "build": "c83fbb7799",
+      "build": "d34ade3c3f",
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
       "version": "1.6",
-      "build": "49f5a18dab",
+      "build": "033c8f1696",
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
       "version": "1.5",
-      "build": "f769728477",
+      "build": "85a274733d",
       "dir": "model/scale-calculator"
     }
   ]

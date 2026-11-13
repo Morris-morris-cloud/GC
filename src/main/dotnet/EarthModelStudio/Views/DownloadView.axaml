@@ -11,9 +11,9 @@
 
         <TextBlock Classes="h2" Text="{loc:Loc dl.sources}" />
 
+        <!-- 只允许 Xhmcl / GitCode 两个内置源；这里是对比测速并自动切换 -->
         <StackPanel Grid.Row="1" Margin="0,12,0,0" Spacing="8">
-          <TextBox Text="{Binding ImportUrl}" Watermark="{loc:Loc dl.importPlaceholder}" />
-          <Button Classes="primary" Content="{loc:Loc dl.import}"
+          <Button Classes="primary" Content="测速并切换到最快源"
                   Command="{Binding ImportCommand}" HorizontalAlignment="Stretch" />
         </StackPanel>
 
@@ -31,8 +31,7 @@
                                TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding HostText}" Classes="faint" TextTrimming="CharacterEllipsis" />
                   </StackPanel>
-                  <Button Grid.Column="1" Classes="ghost small" Content="✕"
-                          IsVisible="{Binding CanRemove}" Command="{Binding RemoveCommand}" VerticalAlignment="Center" />
+
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>

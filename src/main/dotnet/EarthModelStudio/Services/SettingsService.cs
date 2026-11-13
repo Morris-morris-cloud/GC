@@ -23,35 +23,35 @@ public sealed class SettingsService
     }
 
     /// <summary>
-    /// 默认下载源（gitcode 官方仓库）始终内置在列表里，且不允许删除：
-    /// 它是启动器自动更新的同源仓库，用户清掉会导致模型无法回退。
-    /// 老配置里没有这条时自动补上；已有的用户自定义源保持不变。
+    /// 只允许两个内置源：Xhmcl 与 GitCode（同一份仓库的两个镜像）。
+    /// 不再支持用户自定义源 —— 每次加载都把 Sources 规整成这两条，
+    /// 老配置里的自定义源会被清理掉。
     /// </summary>
-    public const string DefaultSourceId = "gitcode-official";
+    public const string DefaultSourceId = "gitcode";
     public const string DefaultSourceUrl = "https://gitcode.com/2509_92447106/GC";
 
     private void SeedDefaultSource()
     {
-        var existing = Current.Sources.FirstOrDefault(s =>
-            string.Equals(s.Id, DefaultSourceId, StringComparison.OrdinalIgnoreCase));
-        if (existing == null)
+        var rebuilt = new List<ModelSource>();
+        foreach (var preset in SourcePreset.All)
         {
-            Current.Sources.Insert(0, new ModelSource
+            // 保留用户对「启用/停用」的选择，其余字段以内置定义为准
+            var old = Current.Sources.FirstOrDefault(s =>
+                SourcePreset.Detect(s.Url).Id == preset.Id);
+            rebuilt.Add(new ModelSource
             {
-                Id = DefaultSourceId,
-                Name = "Morris GC (GitCode)",
-                Url = DefaultSourceUrl,
-                Enabled = true,
+                Id = preset.Id,
+                Name = preset.Name,
+                Url = preset.HomeUrl,
+                Enabled = old?.Enabled ?? true,
                 BuiltIn = true
             });
-            Save();
         }
-        else
-        {
-            // 强制保证内置标记与地址，避免旧配置被用户改坏后失去保护
-            existing.BuiltIn = true;
-            if (string.IsNullOrWhiteSpace(existing.Url)) existing.Url = DefaultSourceUrl;
-        }
+
+        var changed = Current.Sources.Count != rebuilt.Count ||
+                      Current.Sources.Any(s => !s.BuiltIn);
+        Current.Sources = rebuilt;
+        if (changed) Save();
     }
 
     public void Save()

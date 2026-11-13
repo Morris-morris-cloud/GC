@@ -109,30 +109,30 @@ public partial class DownloadViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 只允许两个内置源（Xhmcl / GitCode），不再接受任意地址。
+    /// 旧的「自定义源」入口统一改为：按测速结果切换到更快的那个源。
+    /// </summary>
     [RelayCommand]
     private async Task ImportAsync()
     {
-        var url = ImportUrl.Trim();
-        if (string.IsNullOrWhiteSpace(url))
+        var fastest = await _services.Selector.PickFastestAsync(force: true);
+        var target = Sources.FirstOrDefault(x =>
+            SourcePreset.Find(fastest.Id) != null &&
+            SourcePreset.Detect(x.Model.Url).Id == fastest.Id);
+
+        if (target == null)
         {
-            StatusMessage = L.I["dl.error.emptyUrl"];
+            StatusMessage = "没有可用的下载源";
             return;
         }
 
-        var source = new ModelSource
-        {
-            Name = DeriveName(url),
-            Url = url,
-            Enabled = true
-        };
-        _services.Settings.Current.Sources.Add(source);
-        _services.Settings.Save();
-
-        var item = new SourceItemViewModel(source, this, _services);
-        Sources.Add(item);
-        ImportUrl = "";
-        SelectedSource = item;
-        await LoadAsync(item, force: true);
+        SelectedSource = target;
+        var lat = _services.Selector.LastLatency;
+        StatusMessage = $"已切换到 {fastest.Name}" +
+            (lat.Count > 0 ? "（" + string.Join("，", lat.Select(kv =>
+                $"{SourcePreset.Find(kv.Key)?.Name ?? kv.Key} {kv.Value}ms")) + "）" : "");
+        await LoadAsync(target, force: true);
     }
 
     private static string DeriveName(string url)
@@ -173,6 +173,24 @@ public partial class DownloadViewModel : ObservableObject
         StatusMessage = L.I["dl.syncing"];
         try
         {
+            // 第 6 项：下载页与启动更新用同一个源、同一种下载方式。
+            // 每次加载前先让选择器给出最快源（有缓存，不会真的每次都测）。
+            try
+            {
+                var fastest = await _services.Selector.PickFastestAsync(false, ct);
+                if (fastest.Id != SourcePreset.Detect(source.Model.Url).Id)
+                {
+                    var prefer = Sources.FirstOrDefault(x =>
+                        SourcePreset.Detect(x.Model.Url).Id == fastest.Id && x.Model.Enabled);
+                    if (prefer != null && prefer != source)
+                    {
+                        SelectedSource = prefer;
+                        source = prefer;
+                    }
+                }
+            }
+            catch { /* 测速失败就沿用当前源 */ }
+
             var index = await _services.Sources.FetchAsync(source.Model, force, null, ct);
             // 只有「仍是当前选中源 + 仍是最新一次加载」才可以写 UI 集合
             if (ct.IsCancellationRequested || generation != _loadGeneration || SelectedSource != source)

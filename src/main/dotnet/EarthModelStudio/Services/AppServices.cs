@@ -17,6 +17,8 @@ public sealed class AppServices
     public ModelHost ModelHost { get; }
     /// <summary>启动时检查模型 / 启动器更新。</summary>
     public UpdateService Updates { get; }
+    /// <summary>双源测速选择器（Xhmcl / GitCode 取最快）。</summary>
+    public SourceSelector Selector { get; }
 
     private AppServices(AppPaths paths)
     {
@@ -28,6 +30,7 @@ public sealed class AppServices
         Downloads = new DownloadCenter(paths, Models);
         Memory = new MemoryBudget();
         ModelHost = new ModelHost(paths, Settings, Memory);
+        Selector = new SourceSelector();
         Updates = new UpdateService(paths, Settings, UpdateService.CreateRemote(Settings.Current));
     }
 

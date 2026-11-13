@@ -256,6 +256,7 @@ public sealed class GeographyRuntime : IModelRuntime
     {
         foreach (var d in _disposables) d.Dispose();
         _disposables.Clear();
+        _view?.StopAnimation();
         _view = null;
         GC.SuppressFinalize(this);
     }

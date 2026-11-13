@@ -64,6 +64,9 @@ public sealed class RepoEntry
 public interface IModelRemote
 {
     string DisplayName { get; }
+
+    /// <summary>源标识（xhmcl / gitcode / local），用于判断当前是哪个源。</summary>
+    string SourceId => SourcePreset.Detect(DisplayName).Id;
     Task<RepoVersion?> GetVersionAsync(CancellationToken ct);
     Task<IReadOnlyList<RepoEntry>> ListTreeAsync(string rootPath, CancellationToken ct);
     Task<byte[]> DownloadAsync(RepoEntry entry, CancellationToken ct);

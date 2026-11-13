@@ -66,23 +66,217 @@ public static class LauncherUpdater
     /// 检查 Release latest 版本。返回 latest 版本号；若与当前运行版本相同返回 null。
     /// 只比版本号，不比 sha256。
     /// </summary>
+    /// <summary>
+    /// 检查启动器新版本：**两个源（Xhmcl / GitCode）的 Release 都要查**，
+    /// 取版本号最高的那个作为最新版。任何一个源失败不影响另一个。
+    /// </summary>
+    public static async Task<string?> CheckAsync(CancellationToken ct = default)
+        => await CheckAllAsync(null, ct);
+
+    /// <summary>兼容旧调用：优先用给定 remote，同时仍会比对另一个源。</summary>
     public static async Task<string?> CheckAsync(IModelRemote remote, CancellationToken ct = default)
+        => await CheckAllAsync(remote, ct);
+
+    private static async Task<string?> CheckAllAsync(IModelRemote? preferred, CancellationToken ct)
+    {
+        var candidates = new List<(string Source, string Version)>();
+
+        foreach (var preset in SourcePreset.All)
+        {
+            try
+            {
+                // 优先复用调用方已建好的 remote（避免重复建实例）
+                var remote = preferred != null &&
+                             SourcePreset.Detect(preferred.DisplayName).Id == preset.Id
+                    ? preferred
+                    : SourceSelector.CreateRemote(preset);
+
+                var version = await remote.GetVersionAsync(ct);
+                var v = (version?.Launcher.Version ?? "").Trim();
+                if (v.Length == 0)
+                {
+                    Console.WriteLine($"[update] {preset.Name}: 没有版本信息（可能还没发 Release）");
+                    continue;
+                }
+                Console.WriteLine($"[update] {preset.Name}: {v}");
+                candidates.Add((preset.Name, v));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[update] {preset.Name} 检查失败: {ex.Message}");
+            }
+        }
+
+        if (candidates.Count == 0) return null;
+
+        // 取版本号最高的（第 7 项）
+        var best = candidates.OrderByDescending(c => VersionUtil.Parse(c.Version)).First();
+        Console.WriteLine($"[update] 最新版：{best.Version}（来自 {best.Source}）");
+
+        var cmp = VersionUtil.Compare(best.Version, RunningVersion);
+
+        // 远端版本更新 → 提示更新
+        if (cmp > 0)
+        {
+            Console.WriteLine($"[update] 远端 {best.Version} > 本地 {RunningVersion}，提示更新");
+            return best.Version;
+        }
+
+        // 远端版本更旧 → 不提示
+        if (cmp < 0)
+        {
+            Console.WriteLine($"[update] 远端 {best.Version} < 本地 {RunningVersion}，不提示");
+            return null;
+        }
+
+        // 版本号相同：比对当前程序的 sha256 与 Release 包
+        //   相符   → 视为最新，不提示
+        //   不相符 → 说明是重新编译的同版本程序，必须提示下载
+        var same = await SameFingerprintAsync(best.Source, best.Version, ct);
+        if (same == null)
+        {
+            Console.WriteLine("[update] 版本相同但无法比对 sha256，按最新处理");
+            return null;
+        }
+        if (same.Value)
+        {
+            Console.WriteLine("[update] 版本相同且 sha256 一致，已是最新");
+            return null;
+        }
+
+        // 版本相同但指纹不同：是自行编译的构建，不提示更新
+        Console.WriteLine("[update] 版本相同但 sha256 不一致，不提示更新");
+        return null;
+    }
+    /// <summary>
+    /// 比对「当前运行程序」与「Release 平台包」的 sha256。
+    /// 返回 true=一致（确属同一份构建）、false=不一致（需重新下载）、null=无法比对。
+    /// </summary>
+    private static async Task<bool?> SameFingerprintAsync(string sourceName, string version,
+        CancellationToken ct)
     {
         try
         {
-            var version = await remote.GetVersionAsync(ct);
-            if (version == null) return null;
-            var latest = (version.Launcher.Version ?? "").Trim();
-            if (latest.Length == 0) return null;
-            return string.Equals(latest, RunningVersion, StringComparison.OrdinalIgnoreCase)
-                ? null
-                : latest;
+            var preset = SourcePreset.All.FirstOrDefault(p =>
+                string.Equals(p.Name, sourceName, StringComparison.OrdinalIgnoreCase));
+            if (preset == null) return null;
+
+            var rid = CurrentRid;
+            Console.WriteLine($"[update] 抓取 {preset.Name} 的 {rid} 发布包用于比对…");
+
+            // 定位进程对应的可执行文件 / .app
+            var self = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(self)) return null;
+            var selfPath = self!;
+            // 单文件 / dotnet 宿主时退回到程序集位置
+            if (Path.GetFileNameWithoutExtension(selfPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+                selfPath = typeof(LauncherUpdater).Assembly.Location;
+
+            var selfHash = await HashFileAsync(selfPath, ct);
+            Console.WriteLine($"[update] 本地程序 sha256 = {selfHash[..16]}…");
+
+            // 下载 Release 对应平台包，取包内主程序再算
+            var remote = SourceSelector.CreateRemote(preset);
+            var v = await remote.GetVersionAsync(ct);
+            if (v == null || !v.Launcher.Packages.TryGetValue(rid, out var pkg) || pkg == null)
+                return null;
+
+            var bytes = await remote.DownloadPackageAsync(pkg, ct);
+            if (bytes == null || bytes.Length == 0) return null;
+
+            var remoteHash = await HashZipPayloadAsync(bytes, ct);
+            if (remoteHash == null) return null;
+            Console.WriteLine($"[update] 远端包 sha256 = {remoteHash[..16]}…");
+
+            return string.Equals(selfHash, remoteHash, StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"检查更新失败: {ex.Message}");
+            Console.WriteLine($"[update] sha256 比对失败: {ex.Message}");
             return null;
         }
+    }
+
+    private static async Task<string> HashFileAsync(string path, CancellationToken ct)
+    {
+        await using var fs = File.OpenRead(path);
+        var hash = await System.Security.Cryptography.SHA256.HashDataAsync(fs, ct);
+        return Convert.ToHexString(hash);
+    }
+
+    /// <summary>从发布包（zip）里取出主程序并算 sha256。</summary>
+    private static async Task<string?> HashZipPayloadAsync(byte[] zip, CancellationToken ct)
+    {
+        try
+        {
+            using var ms = new MemoryStream(zip);
+            using var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read);
+            // 找主程序：app 内的可执行文件 / EarthModelStudio.dll / 单文件 exe
+            var entry = archive.Entries.FirstOrDefault(e =>
+                            e.Name.Equals("EarthModelStudio.dll", StringComparison.OrdinalIgnoreCase))
+                        ?? archive.Entries.FirstOrDefault(e =>
+                            e.Name.Equals("EarthModelStudio", StringComparison.OrdinalIgnoreCase))
+                        ?? archive.Entries.FirstOrDefault(e =>
+                            e.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) &&
+                            e.Name.StartsWith("EarthModelStudio", StringComparison.OrdinalIgnoreCase));
+            if (entry == null) return null;
+
+            await using var es = entry.Open();
+            using var buf = new MemoryStream();
+            await es.CopyToAsync(buf, ct);
+            var hash = System.Security.Cryptography.SHA256.HashData(buf.ToArray());
+            return Convert.ToHexString(hash);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// 遍历所有源的 Release，取**版本号最高且包含本平台发布包**的那个。
+    /// 某个源没有 Release（返回 null）时自动跳过。
+    /// </summary>
+    private static async Task<(RepoVersion Version, IModelRemote Remote)?> GetBestReleaseAsync(
+        IModelRemote fallback, CancellationToken ct)
+    {
+        var rid = CurrentRid;
+        var found = new List<(string Source, RepoVersion Version, IModelRemote Remote)>();
+
+        foreach (var preset in SourcePreset.All)
+        {
+            try
+            {
+                var remote = SourceSelector.CreateRemote(preset);
+                var v = await remote.GetVersionAsync(ct);
+                if (v == null)
+                {
+                    Console.WriteLine($"[update] {preset.Name}: 无 Release");
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(v.Launcher.Version) || v.Launcher.Packages.Count == 0)
+                {
+                    Console.WriteLine($"[update] {preset.Name}: 没有可用的启动器发布包");
+                    continue;
+                }
+                var hasPkg = v.Launcher.Packages.ContainsKey(rid) ||
+                             v.Launcher.Packages.ContainsKey("default");
+                if (!hasPkg)
+                {
+                    Console.WriteLine($"[update] {preset.Name}: v{v.Launcher.Version} 缺少 {rid} 发布包");
+                    continue;
+                }
+                Console.WriteLine($"[update] {preset.Name}: v{v.Launcher.Version} 可用");
+                found.Add((preset.Name, v, remote));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[update] {preset.Name} 读取失败: {ex.Message}");
+            }
+        }
+
+        if (found.Count == 0) return null;
+
+        var best = found.OrderByDescending(f => VersionUtil.Parse(f.Version.Launcher.Version)).First();
+        Console.WriteLine($"[update] 选中最新的可用发布包：v{best.Version.Launcher.Version}（{best.Source}）");
+        return (best.Version, best.Remote);
     }
 
     // ---------------------------------------------------------------- 下载
@@ -99,10 +293,28 @@ public static class LauncherUpdater
         try
         {
             progress?.Report(new UpdateProgressInfo { Value = 0.05, Stage = "正在读取最新版本" });
-            var version = await remote.GetVersionAsync(ct);
-            if (version == null) return Fail("无法读取 Release 版本清单");
 
-            var latest = (version.Launcher.Version ?? "").Trim();
+            // 两个源都问一遍：某个源没发 Release 时自动换另一个，
+            // 与「检查更新」保持同一套规则，避免检查通过、下载却报无法读取。
+            var version = await remote.GetVersionAsync(ct);
+
+            // 当前源没有可用的启动器版本（没发 Release / 版本号为空）→ 换另一个源。
+            // 注意：模型清单可能仍然有效，但启动器升级必须有 Release。
+            var hasUsable = version != null &&
+                            !string.IsNullOrWhiteSpace(version.Launcher.Version) &&
+                            version.Launcher.Packages.Count > 0;
+
+            if (!hasUsable)
+            {
+                var tried = SourcePreset.Find(remote.SourceId)?.Name ?? remote.DisplayName;
+                Console.WriteLine($"[update] {tried} 没有可用的启动器发布包，换另一个源");
+                var pick = await GetBestReleaseAsync(remote, ct);
+                if (pick == null) return Fail("两个源都没有可用的 Release 发布包");
+                version = pick.Value.Version;
+                remote = pick.Value.Remote;      // 后续下载必须用这个源的 remote
+            }
+
+            var latest = (version!.Launcher.Version ?? "").Trim();
             var rid = CurrentRid;
             if (!version.Launcher.Packages.TryGetValue(rid, out var pkg) &&
                 !version.Launcher.Packages.TryGetValue("default", out pkg))

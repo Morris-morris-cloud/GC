@@ -59,34 +59,54 @@ public sealed class GitCodeReleaseRemote : IModelRemote
     }
 
     public string DisplayName { get; }
+    public string SourceId => SourcePreset.Detect(_content.DisplayName).Id;
 
     /// <summary>
     /// 模型部分照旧读仓库 version.json；成功拿到 Release 时，用 tag/附件覆盖启动器字段。
     /// </summary>
+    /// <summary>
+    /// 只认 Release：拿不到任何 Release 就返回 null，由上层去问另一个源。
+    /// 仓库里的 version.json 只用来补全「模型清单」与平台包兜底地址，
+    /// 不再用它充当版本号来源。
+    /// </summary>
     public async Task<RepoVersion?> GetVersionAsync(CancellationToken ct)
     {
         var version = await _content.GetVersionAsync(ct);
+
+        bool gotRelease;
         try
         {
-            await ApplyReleaseAsync(version, ct);
+            gotRelease = await ApplyReleaseAsync(version, ct);
         }
         catch (Exception ex)
         {
-            // 没有 Release / 断网 / 格式不符：回退到 version.json，不影响模型更新
-            Console.Error.WriteLine($"读取 Release 失败，回退仓库清单: {ex.Message}");
+            Console.Error.WriteLine($"[gitcode] 读取 Release 失败: {ex.Message}");
+            gotRelease = false;
+        }
+
+        if (!gotRelease)
+        {
+            // 没有 Release：启动器版本留空（表示这个源没有可升级的启动器），
+            // 但模型清单仍然有效，保证模型能正常同步。
+            Console.WriteLine($"[gitcode] {DisplayName}: Release 为空（模型清单仍可用）");
+            if (version != null)
+            {
+                version.Launcher.Version = "";
+                version.Launcher.Packages.Clear();
+            }
         }
         return version;
     }
 
-    private async Task ApplyReleaseAsync(RepoVersion? version, CancellationToken ct)
+    private async Task<bool> ApplyReleaseAsync(RepoVersion? version, CancellationToken ct)
     {
-        if (version == null) return;
+        if (version == null) return false;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
         var text = await Http.GetStringAsync(_releasesUrl, timeout.Token);
         var trimmed = text.TrimStart();
-        if (trimmed.Length == 0 || trimmed[0] != '[') return;   // 可能是错误页/对象
+        if (trimmed.Length == 0 || trimmed[0] != '[') return false;   // 可能是错误页/对象
 
         using var doc = JsonDocument.Parse(text);
         ReleaseInfo? latest = null;
@@ -97,7 +117,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             // 取版本号最大的一条（API 通常已按时间倒序，这里再兜一层）
             if (latest == null || CompareVersion(info.Version, latest.Version) > 0) latest = info;
         }
-        if (latest == null || string.IsNullOrWhiteSpace(latest.Version)) return;
+        if (latest == null || string.IsNullOrWhiteSpace(latest.Version)) return false;
 
         version.Launcher.Version = latest.Version;
 
@@ -125,6 +145,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             if (!string.IsNullOrWhiteSpace(info.Sha256)) pkg.Sha256 = info.Sha256;
             if (info.Size > 0) pkg.Size = info.Size;
         }
+        return true;
     }
 
     private static int CompareVersion(string a, string b)

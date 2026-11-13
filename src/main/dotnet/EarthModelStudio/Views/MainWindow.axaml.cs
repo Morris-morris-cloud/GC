@@ -40,6 +40,7 @@ public partial class MainWindow : Window
                 }
             };
         }
+
         DataContextChanged += OnDataContextChanged;
         Closed += OnClosed;
 

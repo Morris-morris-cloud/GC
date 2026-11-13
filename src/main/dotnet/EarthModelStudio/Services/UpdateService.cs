@@ -21,7 +21,7 @@ public sealed class UpdateService
 {
     private readonly AppPaths _paths;
     private readonly SettingsService _settings;
-    private readonly IModelRemote _remote;
+    private IModelRemote _remote;
 
     public UpdateService(AppPaths paths, SettingsService settings, IModelRemote remote)
     {
@@ -32,15 +32,40 @@ public sealed class UpdateService
 
     public IModelRemote Remote => _remote;
 
+    /// <summary>换源：测速选出最快的一个后，用它的 remote 覆盖当前实例。</summary>
+    public void UseRemote(IModelRemote remote) => _remote = remote;
+
+    private static string? _versionOverride;
+
     public static string CurrentLauncherVersion
     {
         get
         {
-            var v = Assembly.GetEntryAssembly()?.GetName().Version;
+            if (!string.IsNullOrWhiteSpace(_versionOverride)) return _versionOverride!;
+
+            // 用**本程序集**的版本，而不是 GetEntryAssembly()。
+            // EntryAssembly 在宿主（dotnet run / 测试宿主 / 单文件解包）下可能指向别的程序，
+            // 读出来会变成 1.0.0，导致「明明是最新版却一直提示有更新」。
+            var asm = typeof(UpdateService).Assembly;
+            var v = asm.GetName().Version;
+            if (v == null || (v.Major == 0 && v.Minor == 0 && v.Build == 0))
+            {
+                // 兜底：读 InformationalVersion（Directory.Build.props 里的 <Version>）
+                var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+                if (!string.IsNullOrWhiteSpace(info))
+                {
+                    var core = info!.Split('+')[0].Trim();
+                    if (Version.TryParse(core, out var iv))
+                        v = iv;
+                }
+            }
             if (v == null) return "0.0.0";
             return $"{Math.Max(0, v.Major)}.{Math.Max(0, v.Minor)}.{Math.Max(0, v.Build)}";
         }
     }
+
+    /// <summary>测试 / 自检时临时指定版本号。</summary>
+    public static void OverrideLauncherVersion(string? version) => _versionOverride = version;
 
     public static string CurrentRid
     {
@@ -59,14 +84,31 @@ public sealed class UpdateService
         }
     }
 
+    /// <summary>
+    /// 同步版本（无法测速时用）：按设置里的仓库地址映射到内置源。
+    /// 真正带测速的入口是 <see cref="CreateRemoteAsync"/>。
+    /// </summary>
     public static IModelRemote CreateRemote(AppSettings settings)
     {
         if (!string.IsNullOrWhiteSpace(settings.UpdateLocalRoot) &&
             Directory.Exists(settings.UpdateLocalRoot!))
-            return new DirectoryRemote(settings.UpdateLocalRoot!);   // 离线 U 盘源：仍读本地 version.json
-        // 在线源：启动器版本与发布包走 GitCode Release（tag + 附件），
-        // 模型清单/文件仍走仓库 contents API；无 Release 时自动回退仓库 version.json。
-        return new GitCodeReleaseRemote(settings.UpdateManifestUrl, settings.UpdateRepository);
+            return new DirectoryRemote(settings.UpdateLocalRoot!);
+        return SourceSelector.CreateRemote(SourcePreset.Detect(settings.UpdateRepository));
+    }
+
+    /// <summary>
+    /// 异步版本：先探测 Xhmcl / GitCode 两个源，取最快的那个。
+    /// 启动更新、下载页、检查更新统一走这里，保证「用同一个源、同一种下载方式」。
+    /// </summary>
+    public static async Task<IModelRemote> CreateRemoteAsync(AppSettings settings,
+        SourceSelector selector, bool forceProbe = false, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(settings.UpdateLocalRoot) &&
+            Directory.Exists(settings.UpdateLocalRoot!))
+            return new DirectoryRemote(settings.UpdateLocalRoot!);
+
+        var preset = await selector.PickFastestAsync(forceProbe, ct);
+        return SourceSelector.CreateRemote(preset);
     }
 
     public async Task<UpdateResult> RunAsync(bool force,

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -134,6 +135,24 @@ public partial class MainViewModel : ObservableObject
                 UpdateStatus = p.Message;
                 UpdateDetail = p.Detail ?? "";
             });
+
+            // 双源测速：Xhmcl / GitCode 取快的那个（第 5 项）。
+            // 启动更新与下载页共用同一个选择器，保证两处用同一个源、同一种下载方式。
+            UpdateStatus = "正在选择最快的下载源…";
+            try
+            {
+                var fastest = await _services.Selector.PickFastestAsync(
+                    force, default);
+                _services.Updates.UseRemote(SourceSelector.CreateRemote(fastest));
+                var lat = _services.Selector.LastLatency;
+                UpdateDetail = "源：" + fastest.Name +
+                    (lat.Count > 0 ? "（" + string.Join("，", lat.Select(kv =>
+                        $"{SourcePreset.Find(kv.Key)?.Name ?? kv.Key} {kv.Value}ms")) + "）" : "");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[update] 测速失败，沿用当前源: {ex.Message}");
+            }
 
             // 启动器：读 Release latest 版本号，与当前运行版本不同就弹窗询问
             var latest = await LauncherUpdater.CheckAsync(_services.Updates.Remote);
