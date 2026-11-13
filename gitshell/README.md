@@ -18,47 +18,112 @@
 ./git.sh autogit      # 提交并推送
 ```
 
-## autogit —— 一键多仓提交
-
-提交当前改动，并推送到 **所有** 已配置的远程仓库。
+## autogit —— 交互式提交（支持多仓库）
 
 ```bash
-./git.sh autogit                     # 自动生成提交信息
-./git.sh autogit -m "修复渲染卡顿"     # 指定提交信息
-./git.sh autogit -n                  # 只提交，不推送
-./git.sh autogit --dry-run           # 只看会提交什么，不动仓库
+./git.sh autogit
 ```
 
-### 多仓库
+交互顺序：
 
-脚本遍历 `git remote` 里的每个远程依次 push：
+**① 选择仓库（可多选）**
+
+```
+已配置的仓库：
+  1) origin     git@gitcode.com:2509_92447106/GC.git
+  2) gitee      git@github.com:user/GC.git
+
+  a) 全部
+  n) 添加新仓库地址
+
+请选择（可多选，用空格或逗号分隔，如 1 3  或  a  或  n；默认 1）：
+```
+
+支持的输入：
+
+| 输入 | 含义 |
+| --- | --- |
+| `1` | 第 1 个仓库 |
+| `1 3` / `1,3` / `1、3` | 同时选第 1 和第 3 个 |
+| `a` | 全部仓库 |
+| `n` | 添加新地址（**可连续输入多个，空行结束**） |
+
+选 `n` 时可以一次加好几个：
+
+```
+可以连续输入多个地址，每行一个，输入空行结束：
+  地址： git@gitcode.com:user/GC.git
+  给这个仓库起个名字（回车自动命名）： origin
+    已添加 origin -> git@gitcode.com:user/GC.git
+  地址： git@github.com:user/GC-mirror.git
+  给这个仓库起个名字（回车自动命名）： mirror
+    已添加 mirror -> git@github.com:user/GC-mirror.git
+  地址：                              ← 空行结束
+```
+
+**② 确认仓库地址**
+
+```
+ 目标仓库（共 2 个）：
+   origin     git@gitcode.com:2509_92447106/GC.git
+   mirror     git@github.com:user/GC-mirror.git
+----------------------------------------------
+以上地址都正确吗？(Y/n)
+```
+
+答 `n` 会逐个询问新地址，直接回车表示不改。
+
+**③ 确认分支**
+
+```
+提交分支（当前 main，直接回车沿用，或输入其它分支名）：
+----------------------------------------------
+ 提交分支：main
+----------------------------------------------
+分支正确吗？(Y/n)
+```
+
+输入其它名字时，不存在会自动创建并切换。
+
+**④ 输入提交信息**
+
+```
+请输入提交信息：修复渲染卡顿
+```
+
+留空则自动生成 `更新（日期 时间）`。
+
+**⑤ 最终确认**
+
+```
+==============================================
+ 分支：    main
+ 信息：    修复渲染卡顿
+ 推送到：
+   - origin     git@gitcode.com:2509_92447106/GC.git
+   - mirror     git@github.com:user/GC-mirror.git
+==============================================
+确认提交并推送？(y/N)
+```
+
+确认后逐个推送，最后汇总：
+
+```
+==> [1] 推送到 origin
+    OK
+==> [2] 推送到 mirror
+    OK
+
+==> 完成：2 个仓库已同步
+```
+
+参数：
 
 ```bash
-# 查看现有远程
-git remote -v
-
-# 追加一个仓库（之后 autogit 会同时推它）
-git remote add gitee git@github.com:user/GC.git
-git remote add backup git@gitcode.com:user/GC-backup.git
+./git.sh autogit -m "修复渲染卡顿"   # 跳过信息输入
+./git.sh autogit --dry-run          # 只看不动
+./git.sh autogit -y -m "信息"        # 全自动
 ```
-
-推送失败时（通常是远程有本地没有的提交），脚本会提示：
-
-```
-git push --force-with-lease <remote> main
-```
-
-### 自动跳过
-
-这些目录**永远不会被提交**（新增的由 `.gitignore` 挡住，历史上被跟踪的会先从索引移除，
-本地文件保留）：
-
-```
-dist/   build/   bin/   obj/   .GC/   node_modules/
-```
-
-脚本按 `*bin/*`、`*obj/*` 这样的通配匹配**任意层级**，
-所以 `model/earth-geography/src/bin/` 这类嵌套构建产物同样会被排除。
 
 ## status —— 状态速览
 
