@@ -50,6 +50,15 @@ public sealed class ContourView : Control
     // ── 交互状态
     private double _hoverU = 0.5, _hoverV = 0.5;
     private bool _hasHover;
+    private Point _pointerPosition;
+    private HoverRegion _hoverRegion;
+
+    private enum HoverRegion
+    {
+        None,
+        Terrain,
+        ContourMap
+    }
 
     private bool _showContours = true;
     private bool _showLabels = true;
@@ -106,7 +115,7 @@ public sealed class ContourView : Control
             var p = e.GetPosition(this);
             UpdateHover(p);
         };
-        PointerExited += (_, _) => { _hasHover = false; InvalidateVisual(); };
+        PointerExited += (_, _) => ClearHover();
     }
 
     private void UpdateHover(Point p)
@@ -115,25 +124,43 @@ public sealed class ContourView : Control
         if (size.Width < 40 || size.Height < 40) return;
 
         var (left, right) = SplitRects(size);
+        var map = ContourMapRect(right);
         double u = -1, v = -1;
+        var region = HoverRegion.None;
 
-        if (right.Contains(p))
+        if (map.Contains(p))
         {
-            u = (p.X - right.X) / right.Width;
-            v = (p.Y - right.Y) / right.Height;
+            u = (p.X - map.X) / map.Width;
+            v = (p.Y - map.Y) / map.Height;
+            region = HoverRegion.ContourMap;
         }
         else if (left.Contains(p))
         {
             // 左图是斜视图，做逆变换近似：把点击位置反投到 u/v
             (u, v) = UnprojectIso(left, p);
+            region = HoverRegion.Terrain;
         }
 
-        if (u < 0 || u > 1 || v < 0 || v > 1) return;
+        if (region == HoverRegion.None || u < 0 || u > 1 || v < 0 || v > 1)
+        {
+            ClearHover();
+            return;
+        }
         _hoverU = u; _hoverV = v; _hasHover = true;
+        _pointerPosition = p;
+        _hoverRegion = region;
 
         var h = Field.SampleSmooth(u, v);
         var f = TerrainAnalyzer.Classify(Field, u, v);
         HoverChanged?.Invoke(u, v, h, f);
+        InvalidateVisual();
+    }
+
+    private void ClearHover()
+    {
+        if (!_hasHover) return;
+        _hasHover = false;
+        _hoverRegion = HoverRegion.None;
         InvalidateVisual();
     }
 
@@ -144,6 +171,14 @@ public sealed class ContourView : Control
         var h = size.Height - pad * 2;
         return (new Rect(pad, pad, half, h),
                 new Rect(pad * 2 + half, pad, half, h));
+    }
+
+    private static Rect ContourMapRect(Rect panel)
+    {
+        var profileHeight = Math.Min(132, panel.Height * 0.30);
+        return profileHeight > 50
+            ? new Rect(panel.X, panel.Y, panel.Width, panel.Height - profileHeight)
+            : panel;
     }
 
     // ---------------------------------------------------------------- 渲染
@@ -221,7 +256,9 @@ public sealed class ContourView : Control
         if (_hasHover)
         {
             var h = Field.SampleSmooth(_hoverU, _hoverV);
-            var p = Project(_hoverU, _hoverV, h);
+            var p = _hoverRegion == HoverRegion.Terrain
+                ? _pointerPosition
+                : Project(_hoverU, _hoverV, h);
             dc.DrawEllipse(new SolidColorBrush(Colors.White), new Pen(new SolidColorBrush(CAccent), 2),
                 p, 5, 5);
             var stem = new Point(p.X, p.Y + 30);
@@ -245,9 +282,10 @@ public sealed class ContourView : Control
     // ---- 右侧：等高线俯视图 ----
     private void DrawContourMap(DrawingContext dc, Rect r)
     {
-        // 底部预留剖面图的空间
-        var profileH = Math.Min(132, r.Height * 0.30);
-        if (profileH > 50) r = new Rect(r.X, r.Y, r.Width, r.Height - profileH);
+        var panel = r;
+        var mapRect = ContourMapRect(panel);
+        var profileRect = new Rect(panel.X, mapRect.Bottom, panel.Width, panel.Bottom - mapRect.Bottom);
+        r = mapRect;
         // 分层设色底图
         const int N = 96;
         for (var j = 0; j < N; j++)
@@ -379,7 +417,7 @@ public sealed class ContourView : Control
         DrawNorthArrow(dc, r);
         DrawScaleBar(dc, r);
         DrawLegend(dc, r);
-        DrawProfile(dc, r);
+        if (profileRect.Height > 50) DrawProfile(dc, profileRect, mapRect);
 
         // 边框
         dc.DrawRectangle(null, new Pen(new SolidColorBrush(CLine), 1.2), r);
@@ -389,10 +427,8 @@ public sealed class ContourView : Control
     /// 地形剖面图（教科书等高线图必配）：沿图幅中部的一条南北剖面线，
     /// 画出地面起伏并标注各点海拔。这是最能体现「等高线图 ↔ 立体地形」关系的图。
     /// </summary>
-    private void DrawProfile(DrawingContext dc, Rect mapRect)
+    private void DrawProfile(DrawingContext dc, Rect r, Rect mapRect)
     {
-        var h = Math.Min(132, mapRect.Height * 0.30);
-        var r = new Rect(mapRect.X, mapRect.Bottom - h, mapRect.Width, h);
         if (r.Height < 50) return;
 
         // 背景
