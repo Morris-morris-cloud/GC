@@ -10,6 +10,14 @@ internal static class DefaultTexts
         ["app.title"] = "等高线地形图",
         ["app.subtitle"] = "七年级上册 · 地形图的判读：从立体地形到平面等高线",
 
+        ["kind.mountain"] = "山地",
+        ["kind.basin"] = "盆地",
+        ["kind.hill"] = "丘陵",
+        ["kind.plateau"] = "高原",
+        ["kind.plain"] = "平原",
+        ["btn.color"] = "上色",
+        ["btn.colorOn"] = "取消上色",
+
         ["side.features"] = "五种地形部位",
         ["feature.peak"] = "山峰",
         ["feature.peakDesc"] = "等高线闭合，数值由中心向四周递减。",
@@ -37,6 +45,14 @@ internal static class DefaultTexts
     {
         ["app.title"] = "Contour Map",
         ["app.subtitle"] = "Grade 7 · Reading terrain maps: from 3D relief to contour lines",
+
+        ["kind.mountain"] = "Mountains",
+        ["kind.basin"] = "Basin",
+        ["kind.hill"] = "Hills",
+        ["kind.plateau"] = "Plateau",
+        ["kind.plain"] = "Plain",
+        ["btn.color"] = "Colour",
+        ["btn.colorOn"] = "No colour",
 
         ["side.features"] = "Five terrain features",
         ["feature.peak"] = "Peak",

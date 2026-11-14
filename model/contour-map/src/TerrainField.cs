@@ -3,6 +3,16 @@ using System.Collections.Generic;
 
 namespace NeoRF.ContourMap;
 
+/// <summary>五种基本地形类型（教科书分类）。</summary>
+public enum TerrainKind
+{
+    Mountain,   // 山地：海拔高、起伏大
+    Basin,      // 盆地：四周高、中间低
+    Hill,       // 丘陵：海拔较低、坡度和缓
+    Plateau,    // 高原：海拔高、地面平坦、边缘陡
+    Plain       // 平原：海拔低、地面平坦
+}
+
 /// <summary>
 /// 地形高度场（等高线模型的数据核心）。
 ///
@@ -29,12 +39,24 @@ public sealed class TerrainField
     /// <summary>等高距（米）：教学图常用 100 m。</summary>
     public float Interval { get; init; } = 100f;
 
-    public TerrainField(int size = 192)
+    /// <summary>这块地形属于哪种类型（决定界面标题与说明）。</summary>
+    public TerrainKind Kind { get; }
+
+    public TerrainField(TerrainKind kind = TerrainKind.Mountain, int size = 192)
     {
         Size = size;
+        Kind = kind;
         Heights = new float[size, size];
-        Build();
+        Build(kind);
     }
+
+    /// <summary>该类型对应的等高距：平原/丘陵用 20m，山地/高原/盆地用 100m。</summary>
+    public float EffectiveInterval => Kind switch
+    {
+        TerrainKind.Plain => 5f,      // 平原起伏小，等高距要小才画得出线
+        TerrainKind.Hill => 10f,      // 丘陵相对高差约 150 m
+        _ => 100f
+    };
 
     /// <summary>归一化坐标 (u,v) ∈ [0,1]，u 向东、v 向南。</summary>
     public float HeightAt(double u, double v)
@@ -61,7 +83,19 @@ public sealed class TerrainField
         return (float)(a * (1 - ty) + b * ty);
     }
 
-    private void Build()
+    private void Build(TerrainKind kind)
+    {
+        switch (kind)
+        {
+            case TerrainKind.Mountain: BuildMountain(); break;
+            case TerrainKind.Basin:    BuildBasin(); break;
+            case TerrainKind.Hill:     BuildHill(); break;
+            case TerrainKind.Plateau:  BuildPlateau(); break;
+            case TerrainKind.Plain:    BuildPlain(); break;
+        }
+    }
+
+    private void BuildMountain()
     {
         // 各山体参数：中心(u,v)、高度、东西半径、南北半径
         var peaks = new (double U, double V, double H, double RU, double RV)[]
@@ -116,6 +150,121 @@ public sealed class TerrainField
         MaxHeight = max;
     }
 
+    /// <summary>盆地：四周高、中间低，等高线由外向内递减。</summary>
+    private void BuildBasin()
+    {
+        var min = float.MaxValue; var max = float.MinValue;
+        for (var y = 0; y < Size; y++)
+        {
+            for (var x = 0; x < Size; x++)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+                var du = u - 0.5; var dv = v - 0.5;
+                var r = Math.Sqrt(du * du + dv * dv) * 2.0;   // 0=中心 1=边缘
+
+                // 边缘抬升、中心下沉，形成碗状
+                double h = 160 + 900 * Math.Pow(Math.Clamp(r, 0, 1.15), 2.2);
+                // 一侧开个缺口（山口），让盆地向外开口
+                var gap = Math.Abs(Math.Atan2(dv, du) - 0.5);
+                if (gap < 0.35) h -= 320 * (1 - gap / 0.35) * (1 - Math.Clamp(r, 0, 1));
+
+                h += 14 * Math.Sin(u * 7.3) * Math.Cos(v * 6.1);
+                var hf = (float)Math.Max(0, h);
+                Heights[y, x] = hf;
+                if (hf < min) min = hf;
+                if (hf > max) max = hf;
+            }
+        }
+        MinHeight = min; MaxHeight = max;
+    }
+
+    /// <summary>丘陵：起伏和缓、海拔不高，等高线稀疏而弯曲。</summary>
+    private void BuildHill()
+    {
+        var bumps = new (double U, double V, double H, double R)[]
+        {
+            (0.30, 0.32, 120, 0.20), (0.66, 0.28, 95, 0.17),
+            (0.52, 0.62, 140, 0.22), (0.22, 0.72, 88, 0.16),
+            (0.78, 0.70, 110, 0.18),
+        };
+        var min = float.MaxValue; var max = float.MinValue;
+        for (var y = 0; y < Size; y++)
+        {
+            for (var x = 0; x < Size; x++)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+                double h = 60;
+                foreach (var b in bumps)
+                {
+                    var du = (u - b.U) / b.R; var dv = (v - b.V) / b.R;
+                    h += b.H * Math.Exp(-(du * du + dv * dv) * 1.3);
+                }
+                h += 10 * Math.Sin(u * 11.0) * Math.Cos(v * 9.0);
+                var hf = (float)Math.Max(0, h);
+                Heights[y, x] = hf;
+                if (hf < min) min = hf;
+                if (hf > max) max = hf;
+            }
+        }
+        MinHeight = min; MaxHeight = max;
+    }
+
+    /// <summary>高原：顶部平坦、边缘陡峭（等高线在中部稀疏、边缘密集）。</summary>
+    private void BuildPlateau()
+    {
+        var min = float.MaxValue; var max = float.MinValue;
+        for (var y = 0; y < Size; y++)
+        {
+            for (var x = 0; x < Size; x++)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+
+                // 到中心的距离，做平台 + 陡降
+                var du = (u - 0.5); var dv = (v - 0.5);
+                var r = Math.Sqrt(du * du + dv * dv) * 2.0;
+
+                double h;
+                if (r < 0.55) h = 1250;                       // 平坦顶面
+                else h = 1250 - 1000 * SmoothStep(0.55, 0.78, r);  // 边缘陡降
+
+                // 顶面轻微起伏，避免完全平板
+                if (r < 0.55) h += 25 * Math.Sin(u * 6.0) * Math.Cos(v * 5.0);
+                h += 30 * (1 - Math.Clamp(r, 0, 1));
+
+                var hf = (float)Math.Max(0, h);
+                Heights[y, x] = hf;
+                if (hf < min) min = hf;
+                if (hf > max) max = hf;
+            }
+        }
+        MinHeight = min; MaxHeight = max;
+    }
+
+    /// <summary>平原：地面低平、起伏极小，等高线很少。</summary>
+    private void BuildPlain()
+    {
+        var min = float.MaxValue; var max = float.MinValue;
+        for (var y = 0; y < Size; y++)
+        {
+            for (var x = 0; x < Size; x++)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+
+                // 整体微倾 + 极缓的起伏
+                double h = 40 + 22 * u + 8 * Math.Sin(u * 4.2) * Math.Cos(v * 3.6);
+                var hf = (float)Math.Max(0, h);
+                Heights[y, x] = hf;
+                if (hf < min) min = hf;
+                if (hf > max) max = hf;
+            }
+        }
+        MinHeight = min; MaxHeight = max;
+    }
+
     private static double SmoothStep(double a, double b, double x)
     {
         var t = Math.Clamp((x - a) / (b - a), 0, 1);
@@ -151,9 +300,10 @@ public sealed class TerrainField
     public List<float> ContourLevels()
     {
         var levels = new List<float>();
-        var top = (float)(Math.Floor(MaxHeight / Interval) * Interval);
-        var bottom = (float)(Math.Ceiling(MinHeight / Interval) * Interval);
-        for (var h = bottom; h <= top + 0.01f; h += Interval)
+        var iv = EffectiveInterval;
+        var top = (float)(Math.Floor(MaxHeight / iv) * iv);
+        var bottom = (float)(Math.Ceiling(MinHeight / iv) * iv);
+        for (var h = bottom; h <= top + 0.01f; h += iv)
             levels.Add(h);
         levels.Sort();
         return levels;

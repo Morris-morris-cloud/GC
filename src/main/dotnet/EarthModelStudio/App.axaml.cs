@@ -29,9 +29,47 @@ public partial class App : Application
                 return;
             }
 
-            var vm = new MainViewModel(services);
-            var window = new MainWindow { DataContext = vm };
+            // 启动加速：先建空窗口并显示，再在首帧之后构造 ViewModel。
+            // MainViewModel 会扫描模型、加载封面、读设置，同步做会让
+            // 「双击到看见窗口」明显变慢；先出窗口，内容随后填充。
+            var window = new MainWindow();
+            window.Show();
 
+            MainViewModel vm = null!;
+            window.Opened += (_, _) =>
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    vm = new MainViewModel(services);
+                    window.DataContext = vm;
+                    WireMainViewModel(vm, window, services, desktop);
+                }, Avalonia.Threading.DispatcherPriority.Background);
+            };
+
+            // 应用图标不依赖 ViewModel，先设好让窗口一出现就有图标
+            try
+            {
+                using var iconStream = Avalonia.Platform.AssetLoader.Open(
+                    new Uri("avares://EarthModelStudio/Assets/icon.png"));
+                window.Icon = new Avalonia.Controls.WindowIcon(iconStream);
+            }
+            catch { /* 图标缺失不影响启动 */ }
+
+            desktop.MainWindow = window;
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// 主窗口显示后再接上 ViewModel：绑定对话框、启动后台更新检查。
+    /// 拆出来是为了让窗口先出现，模型扫描不影响「双击到出窗口」。
+    /// </summary>
+    private static void WireMainViewModel(MainViewModel vm, MainWindow window,
+        AppServices services, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        _ = desktop;
             vm.ConfirmHandler = async message =>
             {
                 var dialog = new ConfirmWindow(message);
@@ -51,28 +89,13 @@ public partial class App : Application
                 return await dialog.ShowDialog<bool>(window);
             };
 
-            // 应用图标：窗口标题栏与任务栏也使用同一图标
-            try
-            {
-                using var iconStream = Avalonia.Platform.AssetLoader.Open(
-                    new Uri("avares://EarthModelStudio/Assets/icon.png"));
-                window.Icon = new Avalonia.Controls.WindowIcon(iconStream);
-            }
-            catch { /* 图标缺失不影响启动 */ }
-
-            desktop.MainWindow = window;
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-
-            // 主窗口已建好，后台检查模型 / 启动器更新，不阻塞界面
-            if (Environment.GetEnvironmentVariable("EMS_NO_UPDATE") != "1")
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(
-                    () => _ = vm.RunStartupUpdateAsync(),
-                    Avalonia.Threading.DispatcherPriority.Background);
-            }
+        // 主窗口已显示，后台检查模型 / 启动器更新，不阻塞界面
+        if (Environment.GetEnvironmentVariable("EMS_NO_UPDATE") != "1")
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => _ = vm.RunStartupUpdateAsync(),
+                Avalonia.Threading.DispatcherPriority.Background);
         }
-
-        base.OnFrameworkInitializationCompleted();
     }
 
     /// <summary>逐个加载模型，打印结果；返回退出码（0 = 全部成功）。</summary>

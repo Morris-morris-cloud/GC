@@ -1,0 +1,110 @@
+{
+  "zh-CN": {
+    "title": "如何使用 · 等高线地形图",
+    "sections": [
+      {
+        "h": "开始使用（跟着做）",
+        "lines": [
+          "第 1 步：顶部选一种地形（山地 / 盆地 / 丘陵 / 高原 / 平原），画面会换成对应的等高线图。",
+          "第 2 步：把鼠标移到图上任意位置，底部会显示该点的海拔、相对高度和地形部位。",
+          "第 3 步：观察左边的立体地形与右边的等高线图，找出同一个山峰，看它在两张图上分别长什么样。",
+          "第 4 步：点右下角「取消上色」，只留等高线；再点一次恢复分层设色，对比哪种更便于判读。",
+          "第 5 步：对着右侧的判读要点，依次在图上找出一个山峰、一条山脊、一条山谷、一处鞍部和一处陡崖。"
+        ]
+      },
+      {
+        "h": "等高线是什么",
+        "lines": [
+          "在地图上，把海拔相同的点用线连起来，这条线就叫等高线。",
+          "相邻两条等高线之间的高差叫等高距：本图山地、高原、盆地用 100 米，丘陵用 10 米，平原用 5 米。",
+          "等高线的闭合圈，数值由中心向四周递减的是山峰；四周高中间低的是盆地。",
+          "等高线向海拔低处凸出的是山脊（分水线）；向海拔高处凸出的是山谷（集水线）。",
+          "两个山峰之间低下去的地方叫鞍部；等高线重叠或挤成一团的地方是陡崖。",
+          "等高线越密，坡度越陡；越疏，坡度越缓。",
+          "每 5 条等高线加粗一条叫计曲线，上面标着海拔，方便读数。"
+        ]
+      },
+      {
+        "h": "海拔与相对高度",
+        "lines": [
+          "海拔：地面某一点高出海平面的垂直距离。",
+          "相对高度：两个地点海拔的差值，也就是图上两点的落差。",
+          "底部读数里的「相对高度」是本图最低点到该点的高差。"
+        ]
+      },
+      {
+        "h": "五种地体的等高线特征",
+        "lines": [
+          "山地：海拔高、起伏大，等高线密集且数值跨度大。",
+          "盆地：四周高、中间低，等高线由外向内数值递减，常有河流发育。",
+          "丘陵：海拔不高、坡度和缓，等高线稀疏弯曲。",
+          "高原：海拔高而顶面平坦，等高线中部稀疏、边缘密集。",
+          "平原：海拔低、地面平坦，等高线很少甚至没有。"
+        ]
+      },
+      {
+        "h": "容易出错的地方",
+        "lines": [
+          "把「等高线密集 = 陡」记反：密集是陡，稀疏是缓。",
+          "把山脊和山谷看反：看凸出的方向 —— 凸向低处是山脊，凸向高处是山谷。",
+          "忽视等高距：等高距变了，同样的等高线密度代表的坡度就不同。",
+          "把计曲线当成普通等高线：计曲线加粗并标了数值，读高程要看它。"
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "How to use · Contour Map",
+    "sections": [
+      {
+        "h": "Getting started (follow along)",
+        "lines": [
+          "Step 1: pick a terrain type at the top (mountains / basin / hills / plateau / plain) — the map switches to its contour map.",
+          "Step 2: move the pointer anywhere on the map; the footer shows elevation, relative height and the terrain feature.",
+          "Step 3: compare the 3D block on the left with the contour map on the right — find the same peak in both.",
+          "Step 4: click “No colour” at the bottom right to keep only the contour lines; click again to restore the colour fill.",
+          "Step 5: using the panel on the right, find one peak, one ridge, one valley, one saddle and one cliff."
+        ]
+      },
+      {
+        "h": "What contour lines are",
+        "lines": [
+          "Connect points of equal elevation on a map and you get a contour line.",
+          "The height gap between neighbouring contours is the contour interval: 100 m for mountains, plateau and basin; 10 m for hills; 5 m for plain.",
+          "A closed loop whose values decrease outward is a peak; high ground around a low centre is a basin.",
+          "Contours bulging toward lower ground form a ridge (watershed); bulging toward higher ground form a valley (drainage).",
+          "The low ground between two peaks is a saddle; overlapping or tightly crowded contours mark a cliff.",
+          "The closer the contours, the steeper the slope; the wider apart, the gentler.",
+          "Every 5th contour is bolded as an index contour and labelled with its elevation."
+        ]
+      },
+      {
+        "h": "Elevation and relative height",
+        "lines": [
+          "Elevation is the vertical height of a point above sea level.",
+          "Relative height is the difference between two elevations — the drop between two points on the map.",
+          "The relative height in the footer is measured from the lowest point of this map."
+        ]
+      },
+      {
+        "h": "Contour patterns of the five terrains",
+        "lines": [
+          "Mountains: high elevation, large relief, dense contours over a wide value range.",
+          "Basin: high rim, low centre; values decrease inward, often with a river.",
+          "Hills: low elevation, gentle slopes, sparse winding contours.",
+          "Plateau: high but flat on top — contours sparse in the middle and crowded at the edges.",
+          "Plain: low and flat — few or no contour lines at all."
+        ]
+      },
+      {
+        "h": "Common mistakes",
+        "lines": [
+          "Reversing dense and sparse: dense means steep, sparse means gentle.",
+          "Mixing up ridge and valley — look which way the bulge points: toward lower ground is a ridge, toward higher ground is a valley.",
+          "Ignoring the contour interval: change it and the same spacing means a different slope.",
+          "Treating index contours as ordinary ones — they are bold and labelled, so read elevations off them."
+        ]
+      }
+    ]
+  }
+}

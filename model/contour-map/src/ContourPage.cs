@@ -20,16 +20,31 @@ public sealed class ContourPage
     private static readonly Color CWarn = Color.Parse("#FFB454");
     private static readonly Color CGood = Color.Parse("#5FD69B");
 
-    private readonly TerrainField _field;
+    private TerrainField _field;
     private readonly Dictionary<string, string> _texts;
+    private readonly Dictionary<TerrainKind, TerrainField> _cache = new();
+    private Border? _colorBtn;
+    private TextBlock? _colorBtnText;
+    private TerrainKind _kind = TerrainKind.Mountain;
     private ContourView? _view;
     private TextBlock? _readout;
     private TextBlock? _featureText;
 
-    public ContourPage(TerrainField field, Dictionary<string, string> texts)
+    public ContourPage(Dictionary<string, string> texts)
     {
-        _field = field;
         _texts = texts;
+        _field = GetField(TerrainKind.Mountain);
+    }
+
+    /// <summary>取（并缓存）某类地体的高度场，切换时不重复计算。</summary>
+    private TerrainField GetField(TerrainKind kind)
+    {
+        if (!_cache.TryGetValue(kind, out var f))
+        {
+            f = new TerrainField(kind, 192);
+            _cache[kind] = f;
+        }
+        return f;
     }
 
     private string T(string key) => _texts.TryGetValue(key, out var v) ? v : key;
@@ -95,14 +110,82 @@ public sealed class ContourPage
         stack.Children.Add(title);
         stack.Children.Add(sub);
 
+        // 地体类型选择：教科书里的五种基本地形
+        var kinds = new (TerrainKind Kind, string Key)[]
+        {
+            (TerrainKind.Mountain, "kind.mountain"),
+            (TerrainKind.Basin,    "kind.basin"),
+            (TerrainKind.Hill,     "kind.hill"),
+            (TerrainKind.Plateau,  "kind.plateau"),
+            (TerrainKind.Plain,    "kind.plain"),
+        };
+
+        var tabs = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Margin = new Thickness(0, 9, 0, 0)
+        };
+        foreach (var (kind, key) in kinds)
+        {
+            var btn = MakeKindTab(kind, T(key));
+            tabs.Children.Add(btn);
+        }
+
+        var header = new StackPanel();
+        header.Children.Add(stack);
+        header.Children.Add(tabs);
+
         return new Border
         {
             Background = B(CPanel),
             BorderBrush = B(CLine),
             BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(18, 11),
-            Child = stack
+            Padding = new Thickness(18, 11, 18, 12),
+            Child = header
         };
+    }
+
+    /// <summary>地体类型按钮：选中高亮。</summary>
+    private Button MakeKindTab(TerrainKind kind, string label)
+    {
+        var b = new Button
+        {
+            Content = label,
+            FontSize = 11.5,
+            Padding = new Thickness(13, 5),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1),
+            Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+            Tag = kind
+        };
+
+        void Style()
+        {
+            var on = _kind == kind;
+            b.Background = B(on ? CAccent : Color.Parse("#16263C"));
+            b.BorderBrush = B(on ? CAccent : Color.Parse("#263A56"));
+            b.Foreground = B(on ? Colors.White : CInkDim);
+        }
+        Style();
+
+        b.Click += (_, _) =>
+        {
+            _kind = kind;
+            _field = GetField(kind);
+            _view?.SetField(_field);
+            // 重新刷新所有 tab 的选中态
+            if (b.Parent is StackPanel sp)
+                foreach (var c in sp.Children)
+                    if (c is Button sib && sib.Tag is TerrainKind)
+                    {
+                        var on = (TerrainKind)sib.Tag == _kind;
+                        sib.Background = B(on ? CAccent : Color.Parse("#16263C"));
+                        sib.BorderBrush = B(on ? CAccent : Color.Parse("#263A56"));
+                        sib.Foreground = B(on ? Colors.White : CInkDim);
+                    }
+        };
+        return b;
     }
 
     private Control BuildSidePanel()
@@ -203,8 +286,31 @@ public sealed class ContourPage
             HorizontalAlignment = HorizontalAlignment.Right
         };
 
+        // 右下角「上色」开关：点击一次去掉分层设色，只显示线稿，再点恢复
+        _colorBtnText = new TextBlock
+        {
+            Text = T("btn.color"),
+            FontSize = 11.5,
+            Foreground = B(Colors.White)
+        };
+        _colorBtn = new Border
+        {
+            Background = B(CAccent),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(13, 6),
+            Margin = new Thickness(0, 0, 12, 0),
+            Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+            Child = _colorBtnText
+        };
+        _colorBtn.PointerPressed += (_, _) => ToggleColor();
+
+        var left = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        left.Children.Add(_readout);
+        Grid.SetColumn(_colorBtn, 1);
+        left.Children.Add(_colorBtn);
+
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        row.Children.Add(_readout);
+        row.Children.Add(left);
         Grid.SetColumn(_featureText, 1);
         row.Children.Add(_featureText);
 
@@ -216,6 +322,17 @@ public sealed class ContourPage
             Padding = new Thickness(18, 9),
             Child = row
         };
+    }
+
+    /// <summary>切换分层设色。</summary>
+    private void ToggleColor()
+    {
+        if (_view == null) return;
+        _view.Colored = !_view.Colored;
+        if (_colorBtn != null)
+            _colorBtn.Background = B(_view.Colored ? CAccent : Color.Parse("#2A3B55"));
+        if (_colorBtnText != null)
+            _colorBtnText.Text = _view.Colored ? T("btn.colorOn") : T("btn.color");
     }
 
     private void OnHover(double u, double v, float height, TerrainFeature feature)

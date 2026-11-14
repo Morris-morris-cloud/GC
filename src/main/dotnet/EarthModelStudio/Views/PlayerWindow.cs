@@ -1,9 +1,12 @@
 using System;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -23,6 +26,7 @@ namespace EarthModelStudio.Views;
 public sealed class PlayerWindow : Window
 {
     private LoadedModel? _model;
+    private bool _closing;
     private Button? _maximizeButton;
     private Border? _frame;
     private TextBlock? _titleText;
@@ -167,7 +171,7 @@ public sealed class PlayerWindow : Window
 
         minimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
         maximizeButton.Click += (_, _) => ToggleMaximize();
-        closeButton.Click += (_, _) => Close();
+        closeButton.Click += (_, _) => _ = CloseWithAnimationAsync();
         _maximizeGlyph = maxBadge.Icon;
         _restoreGlyph = maxBadge.Icon;
         _maxRestorePath = "M2.6,3.6 L7.4,3.6 L7.4,8.4 L2.6,8.4 Z M2.6,3.6 L2.6,1.6 L7.4,1.6 L7.4,6.4";
@@ -394,37 +398,23 @@ public sealed class PlayerWindow : Window
         }
 
         // ── 帮助窗口自建标题栏（带 ✕），与模型窗口同款配色 ──
-        // 关闭键也用品红卡通圆底 + 矢量 ✕：文字符号在中文字体下常被裁切或基线偏移
-        var helpBadgeShape = new Shapes.Ellipse
-        {
-            Width = 18, Height = 18,
-            Fill = new SolidColorBrush(Color.Parse("#FF7B7B")),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
+        // 纯矢量图标，无彩色圆底（与三个窗口按钮保持一致）
         var helpCross = new Shapes.Path
         {
             Data = Geometry.Parse("M2,2 L8,8 M8,2 L2,8"),
-            Stroke = new SolidColorBrush(Color.Parse("#7A1F1F")),
-            StrokeThickness = 1.7,
+            Stroke = new SolidColorBrush(btnText),
+            StrokeThickness = 1.5,
             StrokeLineCap = PenLineCap.Round,
             Fill = null,
             Stretch = Stretch.None,
-            Width = 9, Height = 9,
+            Width = 10, Height = 10,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var helpCrossLayer = new Grid
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        helpCrossLayer.Children.Add(helpBadgeShape);
-        helpCrossLayer.Children.Add(helpCross);
 
         var helpClose = new Button
         {
-            Content = helpCrossLayer,
+            Content = helpCross,
             Width = 34,
             Height = 26,
             Background = Brushes.Transparent,
@@ -438,14 +428,14 @@ public sealed class PlayerWindow : Window
         };
         helpClose.PointerEntered += (_, _) =>
         {
-            helpBadgeShape.Fill = new SolidColorBrush(Color.Parse("#FF9B9B"));
             helpClose.Background = new SolidColorBrush(IsLight(frameBg)
                 ? Color.Parse("#EEF1F7") : Color.Parse("#1E2C46"));
+            helpCross.Stroke = new SolidColorBrush(Colors.White);
         };
         helpClose.PointerExited += (_, _) =>
         {
-            helpBadgeShape.Fill = new SolidColorBrush(Color.Parse("#FF7B7B"));
             helpClose.Background = Brushes.Transparent;
+            helpCross.Stroke = new SolidColorBrush(btnText);
         };
 
         var helpTitle = new TextBlock
@@ -555,7 +545,7 @@ public sealed class PlayerWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                Close();
+                _ = CloseWithAnimationAsync();
                 e.Handled = true;
                 break;
             case Key.F11:
@@ -565,6 +555,30 @@ public sealed class PlayerWindow : Window
                 e.Handled = true;
                 break;
         }
+    }
+
+    /// <summary>
+    /// 关闭动画：淡出 + 轻微缩小，动画结束后再真正关闭窗口。
+    /// 与主窗口的关闭动画保持同一节奏（180ms）。
+    /// </summary>
+    private async Task CloseWithAnimationAsync()
+    {
+        if (_closing) return;
+        _closing = true;
+
+        Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = OpacityProperty,
+                Duration = TimeSpan.FromMilliseconds(180),
+                Easing = new CubicEaseIn()
+            }
+        };
+        Opacity = 0;
+
+        await Task.Delay(190);
+        Close();
     }
 
     private void OnClosed(object? sender, EventArgs e)

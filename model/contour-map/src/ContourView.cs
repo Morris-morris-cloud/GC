@@ -27,7 +27,18 @@ public sealed class ContourView : Control
 
     private static readonly Typeface Font = new("Noto Sans CJK SC, Microsoft YaHei, Arial");
 
-    public TerrainField Field { get; }
+    public TerrainField Field { get; private set; }
+
+    /// <summary>切换到另一块地形（重新提取等高线）。</summary>
+    public void SetField(TerrainField field)
+    {
+        Field = field;
+        _levels = Field.ContourLevels();
+        _contours.Clear();
+        foreach (var lv in _levels)
+            _contours.Add((lv, Field.ExtractContour(lv)));
+        InvalidateVisual();
+    }
 
     /// <summary>等高线缓存：level -> 折线集合。</summary>
     private readonly List<(float Level, List<List<(double U, double V)>> Lines)> _contours = new();
@@ -42,6 +53,7 @@ public sealed class ContourView : Control
     private bool _showContours = true;
     private bool _showLabels = true;
     private bool _showSlope = true;
+    private bool _colored = true;
 
     public bool ShowContours
     {
@@ -59,6 +71,13 @@ public sealed class ContourView : Control
     {
         get => _showSlope;
         set => SetFlag(ref _showSlope, value);
+    }
+
+    /// <summary>是否分层设色（关闭后只看线稿，便于观察等高线本身）。</summary>
+    public bool Colored
+    {
+        get => _colored;
+        set => SetFlag(ref _colored, value);
     }
 
     private void SetFlag(ref bool slot, bool value)
@@ -234,7 +253,9 @@ public sealed class ContourView : Control
                 var u = (i + 0.5) / N; var v = (j + 0.5) / N;
                 var h = Field.SampleSmooth(u, v);
                 var (cr, cg, cb) = TerrainAnalyzer.ColorForHeight(h, Field.MinHeight, Field.MaxHeight);
-                var brush = new SolidColorBrush(Color.FromRgb(cr, cg, cb));
+                var brush = _colored
+                    ? new SolidColorBrush(Color.FromRgb(cr, cg, cb))
+                    : new SolidColorBrush(Color.Parse("#F3F0E6"));
                 dc.FillRectangle(brush, new Rect(
                     r.X + r.Width * i / N,
                     r.Y + r.Height * j / N,

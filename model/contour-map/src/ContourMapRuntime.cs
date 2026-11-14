@@ -28,21 +28,21 @@ public sealed class ContourMapRuntime : IModelRuntime
     public void Prepare(IModelContext context)
     {
         context.ReportProgress(0.15, "生成地形高度场");
-        _field = new TerrainField(192);
+        _field = new TerrainField(TerrainKind.Mountain, 192);
 
         context.ReportProgress(0.70, "提取等高线");
         _texts = LoadTexts(context.DataDirectory, context.Language);
 
         context.ReportProgress(0.92, "准备界面");
         context.Log($"[contour-map] 地形 {_field.Size}×{_field.Size}，" +
-                    $"海拔 {_field.MinHeight:0}~{_field.MaxHeight:0} m，等高距 {_field.Interval:0} m");
+                    $"海拔 {_field.MinHeight:0}~{_field.MaxHeight:0} m，等高距 {_field.EffectiveInterval:0} m");
     }
 
     public Control CreateView(IModelContext context)
     {
-        _field ??= new TerrainField(192);
         _texts ??= LoadTexts(context.DataDirectory, context.Language);
-        return new ContourPage(_field, _texts).Build();
+        // 五种地体都在界面里现场生成（切换很快，不必预先生成全部）
+        return new ContourPage(_texts).Build();
     }
 
     public void Dispose()

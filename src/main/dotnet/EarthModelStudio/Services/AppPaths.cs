@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.IO;
 
 namespace EarthModelStudio.Services;
@@ -244,16 +245,21 @@ public sealed class AppPaths
         Directory.CreateDirectory(ModelRoot);
         Directory.CreateDirectory(UpdateRoot);
 
-        // 开发态：让 .GC/model 与仓库里的模型保持一致（只同步清单 + 数据，不含 src 源码）
+        // 开发态：让 .GC/model 与仓库里的模型保持一致（只同步清单 + 数据，不含 src 源码）。
+        // 放到后台线程：这一步要复制 coastline.json 等大文件，同步做会拖慢启动。
         if (IsDevelopment && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("EMS_MODELS")))
-            SyncDevelopmentModels();
+        {
+            var root = HomeRoot;
+            var source = Path.Combine(AppRoot, "model");
+            if (Directory.Exists(source))
+                Task.Run(() => SyncDevelopmentModels(root, source));
+        }
     }
 
-    private void SyncDevelopmentModels()
+    private static void SyncDevelopmentModels(string modelRoot, string source)
     {
         try
         {
-            var source = Path.Combine(AppRoot, "model");
             if (!Directory.Exists(source)) return;
             foreach (var dir in Directory.GetDirectories(source))
             {
@@ -262,7 +268,7 @@ public sealed class AppPaths
                 var manifest = Path.Combine(dir, id + ".json");
                 var data = Path.Combine(dir, id + ".model");
                 if (!File.Exists(manifest) || !Directory.Exists(data)) continue;
-                var dest = Path.Combine(ModelRoot, id);
+                var dest = Path.Combine(modelRoot, id);
                 Directory.CreateDirectory(dest);
                 File.Copy(manifest, Path.Combine(dest, id + ".json"), true);
                 CopyTree(data, Path.Combine(dest, id + ".model"));
