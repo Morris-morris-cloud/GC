@@ -220,7 +220,7 @@ PLIST
     mv "$f" "$APP/Contents/MacOS/"
   done
   # 应用图标：由 Assets/icon-1024.png 生成 .icns
-  ICONSRC="$ROOT_DIR/GC-BOOT/Assets/icon-1024.png"
+  ICONSRC="$ROOT_DIR/GC/src/Assets/icon-1024.png"
   if [ -f "$ICONSRC" ] && command -v iconutil >/dev/null 2>&1; then
     ICONSET="$DIST/AppIcon.iconset"
     rm -rf "$ICONSET"; mkdir -p "$ICONSET"

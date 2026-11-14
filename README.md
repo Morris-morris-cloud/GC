@@ -56,12 +56,17 @@ Repository/
 ├── Directory.Build.props            # 公共构建属性
 ├── version.json                     # ★ 自动生成的版本清单（推送到仓库后才生效）
 ├── build.sh / build.ps1             # 构建脚本
-├── GC/                              # 原 src 内容
-│   └── src/test/dotnet/GC.Tests/    # 离屏校验 + --update-test 离线更新链路验证
-├── GC-BOOT/                         # 启动器（不实现模型绘制）
-│   ├── Models/  Services/           # 清单/设置/目录探测/i18n/模型库/下载/自动更新
-│   ├── ViewModels/  Views/          # 主页、下载、设置和启动更新状态
-│   └── Assets/i18n/                 # 启动器界面语言包
+├── GC/                              # 启动器主要代码
+│   └── src/
+│       ├── GC.Core.csproj
+│       ├── Models/  Services/       # 清单/设置/目录探测/i18n/模型库/下载/自动更新
+│       ├── ViewModels/  Views/      # 主页、下载、设置和启动更新状态
+│       ├── Assets/i18n/             # 启动器界面语言包
+│       └── test/dotnet/GC.Tests/    # 离屏校验 + --update-test 离线更新链路验证
+├── GC-BOOT/                         # 轻量启动入口
+│   ├── GC-BOOT.csproj
+│   ├── Program.cs
+│   └── app.manifest
 ├── GC-DRAW/PlayerWindow.cs          # 通用模型窗口宿主；实际绘制由模型提供
 ├── model/                           # ★ 模型的一切
 │   ├── version.json                 #   与根 version.json 相同（便于按 model/ 地址读取）

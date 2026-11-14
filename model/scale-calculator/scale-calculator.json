@@ -25,7 +25,7 @@
   "preview": "preview.png",
   "apiVersion": 1,
   "version": "1.5",
-  "updatedAt": "2026-11-14T04:52:33Z",
+  "updatedAt": "2026-11-14T05:09:30Z",
   "chrome": {
     "titleBar": "#FFFFFF",
     "titleBorder": "#E3E8F3",
@@ -33,5 +33,5 @@
     "button": "#5B6A86",
     "frame": "#F4F6FB"
   },
-  "build": "139afd4199"
+  "build": "c41765488d"
 }

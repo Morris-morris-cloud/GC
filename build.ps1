@@ -15,7 +15,7 @@ $Root = $PSScriptRoot
 Set-Location $Root
 $env:AVALONIA_TELEMETRY_OPTOUT = '1'
 
-$AppProj  = 'GC-BOOT/GC.csproj'
+$AppProj  = 'GC-BOOT/GC-BOOT.csproj'
 $TestProj = 'GC/src/test/dotnet/GC.Tests/GC.Tests.csproj'
 $StampProj= 'model/_engine/VersionStamp/VersionStamp.csproj'
 $Sln      = 'GC.sln'

@@ -1,22 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>GC</RootNamespace>
-    <AssemblyName>GC</AssemblyName>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- 应用图标（Windows exe / 任务栏） -->
-    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <AssemblyName>GC.Core</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
-    <Compile Include="..\GC-DRAW\PlayerWindow.cs" />
+    <Compile Include="..\..\GC-DRAW\PlayerWindow.cs" />
+    <Compile Remove="test\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,9 +22,8 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="$(MvvmVersion)" />
   </ItemGroup>
 
-  <!-- 模型契约：启动器与模型唯一的共享代码（不含任何渲染/业务） -->
   <ItemGroup>
-    <ProjectReference Include="..\model\_sdk\GC.ModelSdk\GC.ModelSdk.csproj" />
+    <ProjectReference Include="..\..\model\_sdk\GC.ModelSdk\GC.ModelSdk.csproj" />
   </ItemGroup>
 
 </Project>

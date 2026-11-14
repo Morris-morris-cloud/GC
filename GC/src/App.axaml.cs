@@ -56,7 +56,7 @@ public partial class App : Application
             try
             {
                 using var iconStream = Avalonia.Platform.AssetLoader.Open(
-                    new Uri("avares://GC/Assets/icon.png"));
+                    new Uri("avares://GC.Core/Assets/icon.png"));
                 window.Icon = new Avalonia.Controls.WindowIcon(iconStream);
             }
             catch { /* 图标缺失不影响启动 */ }

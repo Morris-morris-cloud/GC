@@ -75,7 +75,7 @@ public sealed class L : INotifyPropertyChanged
     {
         try
         {
-            var uri = new Uri($"avares://GC/Assets/i18n/{code}.json");
+            var uri = new Uri($"avares://GC.Core/Assets/i18n/{code}.json");
             using var stream = AssetLoader.Open(uri);
             using var reader = new StreamReader(stream);
             return JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd(),

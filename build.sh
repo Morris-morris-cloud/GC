@@ -21,7 +21,7 @@ export AVALONIA_TELEMETRY_OPTOUT=1
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$ROOT_DIR"
 
-APP_PROJ="GC-BOOT/GC.csproj"
+APP_PROJ="GC-BOOT/GC-BOOT.csproj"
 PREVIEW_PROJ="model/_engine/PreviewGen/PreviewGen.csproj"
 STAMP_PROJ="model/_engine/VersionStamp/VersionStamp.csproj"
 TEST_PROJ="GC/src/test/dotnet/GC.Tests/GC.Tests.csproj"

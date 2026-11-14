@@ -1,7 +1,8 @@
 <Project>
   <!--
     多目录结构公共属性：
-      GC-BOOT                    启动器生产代码
+      GC-BOOT                    启动入口
+      GC/src/                    启动器核心代码
       GC/src/test/dotnet/<module> 测试 / 离屏渲染校验
     TargetFramework 可由命令行覆盖：dotnet build -p:TargetFramework=net10.0
   -->

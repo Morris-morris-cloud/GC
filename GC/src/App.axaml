@@ -43,6 +43,6 @@
 
   <Application.Styles>
     <FluentTheme />
-    <StyleInclude Source="avares://GC/Styles/AppTheme.axaml" />
+    <StyleInclude Source="avares://GC.Core/Styles/AppTheme.axaml" />
   </Application.Styles>
 </Application>

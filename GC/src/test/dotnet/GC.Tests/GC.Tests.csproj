@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../../../GC-BOOT/GC.csproj" />
+    <ProjectReference Include="../../../GC.Core.csproj" />
   </ItemGroup>
 
 </Project>
