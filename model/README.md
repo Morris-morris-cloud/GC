@@ -17,7 +17,7 @@
 ```
 model/
   version.json                     # 版本清单（与仓库根 version.json 相同，自动生成）
-  _sdk/EarthModelStudio.ModelSdk/  # 模型契约（启动器与模型唯一的共享代码）
+  _sdk/GC.ModelSdk/  # 模型契约（启动器与模型唯一的共享代码）
   _engine/                        # 共享引擎源码
     src/                          #   CelestialView / PlanetTexture / EarthModelView / SphereRaster…
     PreviewGen/                   #   用模型渲染器生成封面的小工具
@@ -81,7 +81,7 @@ model/
 
 ## 模型契约（model/_sdk）
 
-模型只依赖一个极小的契约程序集 `EarthModelStudio.ModelSdk`（源码在 `model/_sdk/`）：
+模型只依赖一个极小的契约程序集 `GC.ModelSdk`（源码在 `model/_sdk/`）：
 
 ```csharp
 public interface IModelFactory

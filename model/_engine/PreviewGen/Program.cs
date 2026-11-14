@@ -9,7 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 using NeoRF.EarthModels;
 
 namespace NeoRF.EarthModels.Preview;
@@ -210,7 +210,7 @@ internal static class Program
                 // 契约与 Avalonia 一律回到默认上下文，与启动器 ModelLoadContext 一致
                 if (name.Name is null) return null;
                 if (name.Name.StartsWith("System", StringComparison.OrdinalIgnoreCase)) return null;
-                var shared = new[] { "EarthModelStudio.ModelSdk", "Avalonia", "Avalonia.Base",
+                var shared = new[] { "GC.ModelSdk", "Avalonia", "Avalonia.Base",
                     "Avalonia.Controls", "Avalonia.Skia", "Avalonia.Themes.Fluent", "SkiaSharp", "HarfBuzzSharp" };
                 if (shared.Contains(name.Name, StringComparer.OrdinalIgnoreCase)) return null;
                 var candidate = Path.Combine(dataDir, name.Name + ".dll");

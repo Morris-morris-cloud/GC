@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:GC.Services"
+             xmlns:vm="using:GC.ViewModels"
+             x:Class="GC.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+
+  <ScrollViewer>
+    <StackPanel Margin="28,24" Spacing="16" MaxWidth="880" HorizontalAlignment="Left">
+
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="关于" />
+        <TextBlock Classes="muted" Text="版本信息与开发者" />
+      </StackPanel>
+
+      <!-- 应用信息 -->
+      <Border Classes="card" Padding="22,20">
+        <Grid ColumnDefinitions="Auto,*">
+          <Border Width="62" Height="62" CornerRadius="16" Background="#1C2C4C"
+                  VerticalAlignment="Top">
+            <TextBlock Text="◎" FontSize="32" Foreground="#8FB6FF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+
+          <StackPanel Grid.Column="1" Margin="18,0,0,0" Spacing="10">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding AppName}" FontSize="19" FontWeight="SemiBold" />
+              <TextBlock Classes="faint" Text="{Binding PlatformText}" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto">
+              <TextBlock Classes="h3" Text="版本" />
+              <TextBlock Grid.Column="1" Classes="muted" Text="{Binding VersionText}"
+                         FontWeight="SemiBold" />
+
+              <TextBlock Grid.Row="1" Classes="h3" Text="仓库" Margin="0,8,0,0" />
+              <Button Grid.Row="1" Grid.Column="1" Classes="ghost small" Margin="0,6,0,0"
+                      HorizontalAlignment="Left" Padding="0"
+                      Command="{Binding OpenRepositoryCommand}"
+                      Content="{Binding RepositoryText}" />
+            </Grid>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 维护 -->
+      <Border Classes="card" Padding="22,20">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="启动器维护" />
+          <TextBlock Classes="muted" TextWrapping="Wrap"
+                     Text="重新下载会关闭所有窗口，显示下载进度，完成后自动启动新版本并删除旧版本。" />
+          <Button Classes="primary" Content="重新下载启动器"
+                  HorizontalAlignment="Left" Padding="18,8"
+                  Command="{Binding ReinstallLauncherCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- 感谢（样式抄「开发者」卡片，内容写死，不读取数据） -->
+      <Border Classes="card" Padding="22,20">
+        <StackPanel Spacing="14">
+          <TextBlock Classes="h2" Text="感谢" />
+
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Border Background="{DynamicResource SurfaceAlt}"
+                    BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                    CornerRadius="12" Padding="12,10" MinWidth="190">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Width="34" Height="34" CornerRadius="17"
+                        Background="{DynamicResource AccentSoft}">
+                  <TextBlock Text="◉" FontSize="15" Foreground="{DynamicResource Accent}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Text="地理洪老师" FontSize="12.5" FontWeight="SemiBold" />
+                  <TextBlock Classes="faint" Text="地理学科内容指导" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- 开发者 -->
+      <Border Classes="card" Padding="22,20">
+        <StackPanel Spacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h2" Text="{Binding ContributorsTitle}" />
+            <Button Grid.Column="1" Classes="ghost small" Content="刷新"
+                    Command="{Binding LoadCommand}" IsEnabled="{Binding !IsLoading}" />
+          </Grid>
+
+          <TextBlock Classes="faint" Text="{Binding StatusText}" />
+
+          <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsLoading}" />
+
+          <ItemsControl ItemsSource="{Binding Contributors}" IsVisible="{Binding HasContributors}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{DynamicResource SurfaceAlt}"
+                        BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                        CornerRadius="12" Padding="12,10" Margin="0,0,10,10" MinWidth="190">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="34" Height="34" CornerRadius="17"
+                            Background="{DynamicResource AccentSoft}">
+                      <TextBlock Text="◉" FontSize="15" Foreground="{DynamicResource Accent}"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" />
+                      <TextBlock Classes="faint" Text="{Binding ContributionsText}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

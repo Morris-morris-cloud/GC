@@ -1,8 +1,8 @@
 <Project>
   <!--
     多目录结构公共属性：
-      src/main/dotnet/<module>   生产代码
-      src/test/dotnet/<module>   测试 / 离屏渲染校验
+      GC-BOOT                    启动器生产代码
+      GC/src/test/dotnet/<module> 测试 / 离屏渲染校验
     TargetFramework 可由命令行覆盖：dotnet build -p:TargetFramework=net10.0
   -->
   <PropertyGroup Condition="'$(TargetFramework)' == ''">
@@ -23,7 +23,7 @@
     <MvvmVersion>8.2.2</MvvmVersion>
     <Version>1.0.7</Version>
     <Company>NeoRF</Company>
-    <Product>Earth Model Studio</Product>
+    <Product>GC</Product>
     <NeutralLanguage>zh-Hans</NeutralLanguage>
   </PropertyGroup>
 </Project>

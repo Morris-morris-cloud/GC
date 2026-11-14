@@ -1,4 +1,4 @@
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.EarthModels;
 

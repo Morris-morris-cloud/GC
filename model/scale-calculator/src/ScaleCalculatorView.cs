@@ -17,7 +17,7 @@ namespace NeoRF.ScaleCalculator;
 /// </summary>
 public sealed partial class ScaleCalculatorView : UserControl
 {
-    // 调色（与 src/main/dotnet/EarthModelStudio/Styles/AppTheme.axaml 一致）
+    // 调色（与 GC-BOOT/Styles/AppTheme.axaml 一致）
     internal static readonly Color CAppBg = Color.Parse("#F4F6FB");
     internal static readonly Color CSurface = Color.Parse("#FFFFFF");
     internal static readonly Color CSurfaceAlt = Color.Parse("#F7F9FE");

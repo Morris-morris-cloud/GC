@@ -6,7 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.EarthModels;
 

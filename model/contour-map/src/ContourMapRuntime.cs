@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.ContourMap;
 
@@ -49,7 +49,7 @@ public sealed class ContourMapRuntime : IModelRuntime
     {
         _field = null;
         _texts = null;
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 
     private static Dictionary<string, string> LoadTexts(string dataDir, string language)

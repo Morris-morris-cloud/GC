@@ -403,7 +403,7 @@ public class CelestialView : Control, IDisposable
         _sphere?.Dispose();
         _sphere = null;
         _sphereSize = 0;
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 
     private void OnTick(object? sender, EventArgs e)

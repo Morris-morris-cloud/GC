@@ -1,4 +1,4 @@
-# Earth Model Studio
+# GC
 
 天文教学模型**启动器**：管理/启动模型、启动时自动检查并下载最新版模型与启动器、设置语言与内存。
 
@@ -17,7 +17,7 @@
 
 ```
 <安装目录>/
-  EarthModelStudio.exe | EarthModelStudio.app/
+  GC.exe | GC.app/
   .GC/
     settings.json        设置 + 已安装版本记录
     model/               启动时下载的模型
@@ -51,23 +51,23 @@
 ## 目录结构
 
 ```
-EarthModelStudio/
-├── EarthModelStudio.sln
+Repository/
+├── GC.sln
 ├── Directory.Build.props            # 公共构建属性
 ├── version.json                     # ★ 自动生成的版本清单（推送到仓库后才生效）
 ├── build.sh / build.ps1             # 构建脚本
-├── src/                             # ★ 启动器（没有渲染逻辑）
-│   └── main/dotnet/EarthModelStudio/
-│       ├── Models/  Services/       #   清单/设置/目录探测/i18n/模型库/下载/自动更新
-│       │                            #   UpdateService · GitCodeRemote · DirectoryRemote · LauncherUpdate
-│       ├── ViewModels/  Views/      #   主页、下载、设置、模型窗口壳、启动更新状态条
-│       └── Assets/i18n/             #   启动器界面语言包
-├── src/test/dotnet/…Tests/          # 离屏校验 + --update-test 离线更新链路验证
+├── GC/                              # 原 src 内容
+│   └── src/test/dotnet/GC.Tests/    # 离屏校验 + --update-test 离线更新链路验证
+├── GC-BOOT/                         # 启动器（不实现模型绘制）
+│   ├── Models/  Services/           # 清单/设置/目录探测/i18n/模型库/下载/自动更新
+│   ├── ViewModels/  Views/          # 主页、下载、设置和启动更新状态
+│   └── Assets/i18n/                 # 启动器界面语言包
+├── GC-DRAW/PlayerWindow.cs          # 通用模型窗口宿主；实际绘制由模型提供
 ├── model/                           # ★ 模型的一切
 │   ├── version.json                 #   与根 version.json 相同（便于按 model/ 地址读取）
-│   ├── _sdk/EarthModelStudio.ModelSdk/
+│   ├── _sdk/GC.ModelSdk/
 │   ├── _engine/
-│   │   ├── src/                     #     CelestialView / PlanetTexture / EarthModelView …
+│   │   ├── src/                     #     模型专用引擎与渲染，留在 model 内
 │   │   ├── PreviewGen/              #     用模型渲染器生成封面
 │   │   └── VersionStamp/            #     按内容指纹自动打版本、生成 version.json
 │   ├── earth-rotation/
@@ -99,9 +99,9 @@ Windows 用 `.\build.ps1`（参数相同）。
 
 | 产物 | 平台 |
 | --- | --- |
-| `dist/mac-arm64/EarthModelStudio.app` | macOS Apple Silicon |
-| `dist/win-x64/EarthModelStudio.exe` | Windows x64 |
-| `dist/win-arm64/EarthModelStudio.exe` | Windows on ARM |
+| `dist/mac-arm64/GC.app` | macOS Apple Silicon |
+| `dist/win-x64/GC.exe` | Windows x64 |
+| `dist/win-arm64/GC.exe` | Windows on ARM |
 
 均为自包含单文件启动器，**发布包内不含模型**。改完模型：
 `./build.sh models` → 把 `version.json` 和 `model/` 推送到 gitcode → 客户端下次启动自动更新。

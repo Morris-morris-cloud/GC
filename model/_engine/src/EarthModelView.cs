@@ -9,7 +9,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.EarthModels;
 
@@ -187,7 +187,7 @@ public sealed class EarthModelView : UserControl, IDisposable
         }
         _canvas.Dispose();
         _closeup.Dispose();
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 
     private string CurrentView { get; set; } = "rotation";

@@ -45,7 +45,7 @@ bs_build() {
   package_mac_app
   prepare_runtime_layout "dist/win-x64"
   prepare_runtime_layout "dist/win-arm64"
-  prepare_runtime_layout "dist/mac-arm64/EarthModelStudio.app/Contents/MacOS"
+  prepare_runtime_layout "dist/mac-arm64/GC.app/Contents/MacOS"
 
   progress_step "打包 zip"; progress_tick 100
   pack_launcher

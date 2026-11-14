@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Avalonia.Controls;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.ScaleCalculator;
 
@@ -43,7 +43,7 @@ public sealed class ScaleCalculatorRuntime : IModelRuntime
     {
         _data = null;
         _texts = null;
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 
     private static Dictionary<string, string> LoadTexts(string dataDir, string language)

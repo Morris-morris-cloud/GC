@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\_sdk\EarthModelStudio.ModelSdk\EarthModelStudio.ModelSdk.csproj">
+    <ProjectReference Include="..\..\_sdk\GC.ModelSdk\GC.ModelSdk.csproj">
       <Private>false</Private>
     </ProjectReference>
   </ItemGroup>

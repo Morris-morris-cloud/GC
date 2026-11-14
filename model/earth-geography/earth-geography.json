@@ -18,7 +18,7 @@
   ],
   "dataDir": "earth-geography.model",
   "version": "1.8",
-  "updatedAt": "2026-11-14T02:48:20Z",
+  "updatedAt": "2026-11-14T04:41:38Z",
   "chrome": {
     "titleBar": "#0C1828",
     "titleBorder": "#1B2740",
@@ -26,5 +26,5 @@
     "button": "#9FB4D4",
     "frame": "#0A1524"
   },
-  "build": "ede9f2fdd0"
+  "build": "64b985e484"
 }

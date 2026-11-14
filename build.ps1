@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Earth Model Studio 构建入口（Windows PowerShell，薄封装）
+# GC 构建入口（Windows PowerShell，薄封装）
 # 实际代码在 buildsh/ 里。Windows 上若无 sh，则走内置的最小实现。
 #   .\build.ps1 build | check | models | stamp | run | test | clean | doctor
 # ---------------------------------------------------------------------------
@@ -15,10 +15,10 @@ $Root = $PSScriptRoot
 Set-Location $Root
 $env:AVALONIA_TELEMETRY_OPTOUT = '1'
 
-$AppProj  = 'src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj'
-$TestProj = 'src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj'
+$AppProj  = 'GC-BOOT/GC.csproj'
+$TestProj = 'GC/src/test/dotnet/GC.Tests/GC.Tests.csproj'
 $StampProj= 'model/_engine/VersionStamp/VersionStamp.csproj'
-$Sln      = 'EarthModelStudio.sln'
+$Sln      = 'GC.sln'
 $Version  = ([regex]::Match((Get-Content Directory.Build.props -Raw), '<Version>(.*?)</Version>')).Groups[1].Value
 if (-not $Version) { $Version = '1.0.0' }
 New-Item -ItemType Directory -Force -Path "$Root/build/logs" | Out-Null

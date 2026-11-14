@@ -24,7 +24,7 @@ build_models() {
       for DLL in "$DIR"src/bin/Release/net8.0/*.dll; do
         [ -f "$DLL" ] || continue
         NAME=$(basename "$DLL")
-        [ "$NAME" = "EarthModelStudio.ModelSdk.dll" ] && continue
+        [ "$NAME" = "GC.ModelSdk.dll" ] && continue
         cp "$DLL" "$DIR$ID.model/"
         echo "    -> model/$ID/$ID.model/$NAME"
       done
@@ -131,12 +131,12 @@ pack_launcher() {
   done
 
   # --- macOS：先得到真实 .app 目录（改名 + 同步 Info.plist）---
-  MACAPP="$ROOT_DIR/dist/mac-arm64/EarthModelStudio.app"
+  MACAPP="$ROOT_DIR/dist/mac-arm64/GC.app"
   if [ -d "$MACAPP" ]; then
     FINAL="$ROOT_DIR/dist/GC-${VERSION}-mac-arm64.app"
     rm -rf "$FINAL"
     mv "$MACAPP" "$FINAL"
-    chmod +x "$FINAL/Contents/MacOS/EarthModelStudio" 2>/dev/null || true
+    chmod +x "$FINAL/Contents/MacOS/GC" 2>/dev/null || true
     PLIST="$FINAL/Contents/Info.plist"
     if [ -f "$PLIST" ]; then
       /usr/libexec/PlistBuddy -c "Set :CFBundleName Morris GC" "$PLIST" 2>/dev/null || true
@@ -192,7 +192,7 @@ strip_intermediate_dirs() {
 
 package_mac_app() {
   DIST="$ROOT_DIR/dist/mac-arm64"
-  APP="$DIST/EarthModelStudio.app"
+  APP="$DIST/GC.app"
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   cat > "$APP/Contents/Info.plist" <<PLIST
@@ -200,13 +200,13 @@ package_mac_app() {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Earth Model Studio</string>
-  <key>CFBundleDisplayName</key><string>Earth Model Studio</string>
-  <key>CFBundleIdentifier</key><string>cn.neorf.earthmodelstudio</string>
+  <key>CFBundleName</key><string>GC</string>
+  <key>CFBundleDisplayName</key><string>GC</string>
+  <key>CFBundleIdentifier</key><string>cn.neorf.GC</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleExecutable</key><string>EarthModelStudio</string>
+  <key>CFBundleExecutable</key><string>GC</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -215,12 +215,12 @@ package_mac_app() {
 PLIST
   for f in "$DIST"/*; do
     base=$(basename "$f")
-    [ "$base" = "EarthModelStudio.app" ] && continue
+    [ "$base" = "GC.app" ] && continue
     [ "$base" = ".DS_Store" ] && continue
     mv "$f" "$APP/Contents/MacOS/"
   done
   # 应用图标：由 Assets/icon-1024.png 生成 .icns
-  ICONSRC="$ROOT_DIR/src/main/dotnet/EarthModelStudio/Assets/icon-1024.png"
+  ICONSRC="$ROOT_DIR/GC-BOOT/Assets/icon-1024.png"
   if [ -f "$ICONSRC" ] && command -v iconutil >/dev/null 2>&1; then
     ICONSET="$DIST/AppIcon.iconset"
     rm -rf "$ICONSET"; mkdir -p "$ICONSET"
@@ -241,7 +241,7 @@ PLIST
 
   # 发布包不带 .GC 运行骨架（用户首次启动自行创建），避免覆盖用户数据
   rm -rf "$APP/Contents/MacOS/.GC"
-  chmod +x "$APP/Contents/MacOS/EarthModelStudio"
+  chmod +x "$APP/Contents/MacOS/GC"
   echo "==> 已打包 $APP"
 }
 

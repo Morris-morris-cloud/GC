@@ -5,7 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.EarthModels;
 
@@ -258,7 +258,7 @@ public sealed class GeographyRuntime : IModelRuntime
         _disposables.Clear();
         _view?.StopAnimation();
         _view = null;
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 }
 

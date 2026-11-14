@@ -1,6 +1,6 @@
 #!/bin/sh
 # ---------------------------------------------------------------------------
-# Earth Model Studio 构建入口（薄封装）
+# GC 构建入口（薄封装）
 #
 #   ./build.sh build       完整发布（原 publish），带 apt 风格进度条
 #   ./build.sh check       验证：编译 + 自检 + 离屏渲染 + 产物
@@ -21,11 +21,11 @@ export AVALONIA_TELEMETRY_OPTOUT=1
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$ROOT_DIR"
 
-APP_PROJ="src/main/dotnet/EarthModelStudio/EarthModelStudio.csproj"
+APP_PROJ="GC-BOOT/GC.csproj"
 PREVIEW_PROJ="model/_engine/PreviewGen/PreviewGen.csproj"
 STAMP_PROJ="model/_engine/VersionStamp/VersionStamp.csproj"
-TEST_PROJ="src/test/dotnet/EarthModelStudio.Tests/EarthModelStudio.Tests.csproj"
-SLN="EarthModelStudio.sln"
+TEST_PROJ="GC/src/test/dotnet/GC.Tests/GC.Tests.csproj"
+SLN="GC.sln"
 VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)
 [ -n "$VERSION" ] || VERSION="1.0.0"
 

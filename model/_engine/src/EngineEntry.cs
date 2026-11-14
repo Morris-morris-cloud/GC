@@ -1,6 +1,6 @@
 using System;
 using Avalonia.Controls;
-using EarthModelStudio.ModelSdk;
+using GC.ModelSdk;
 
 namespace NeoRF.EarthModels;
 
@@ -40,6 +40,6 @@ public sealed class EarthModelRuntime : IModelRuntime
     public void Dispose()
     {
         _scene = null;
-        GC.SuppressFinalize(this);
+        System.GC.SuppressFinalize(this);
     }
 }
