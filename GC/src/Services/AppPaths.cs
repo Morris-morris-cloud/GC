@@ -39,7 +39,11 @@ public sealed class AppPaths
 
     public string CacheRoot => Path.Combine(HomeRoot, "cache");
     public string UpdateRoot => Path.Combine(HomeRoot, "update");
-    public string SettingsFile => Path.Combine(HomeRoot, "settings.json");
+
+    /// <summary>用户配置目录（与可重建的缓存分开，删 cache 不会丢设置）。</summary>
+    public string ConfigRoot => Path.Combine(HomeRoot, "config");
+
+    public string SettingsFile => Path.Combine(ConfigRoot, "settings.json");
 
     public bool IsDevelopment { get; private init; }
     public bool IsPortableModelRoot { get; private init; }
@@ -247,9 +251,12 @@ public sealed class AppPaths
     public void EnsureCreated()
     {
         Directory.CreateDirectory(HomeRoot);
+        Directory.CreateDirectory(ConfigRoot);
         Directory.CreateDirectory(CacheRoot);
         Directory.CreateDirectory(ModelRoot);
         Directory.CreateDirectory(UpdateRoot);
+
+        MigrateLegacySettings();
 
         // 开发态：让 .GC/model 与仓库里的模型保持一致（只同步清单 + 数据，不含 src 源码）。
         // 放到后台线程：这一步要复制 coastline.json 等大文件，同步做会拖慢启动。
@@ -263,6 +270,27 @@ public sealed class AppPaths
     }
 
     public void WaitForDevelopmentModels() => _developmentModelsSync.GetAwaiter().GetResult();
+
+    /// <summary>
+    /// 老版本把设置放在 .GC/settings.json。现在设置归到 .GC/config/，
+    /// 与 cache/ 分开（清缓存不会连带清掉语言、内存预算、离线源等配置）。
+    /// 迁移只做一次：新位置不存在时才搬旧的。
+    /// </summary>
+    private void MigrateLegacySettings()
+    {
+        try
+        {
+            var legacy = Path.Combine(HomeRoot, "settings.json");
+            if (!File.Exists(legacy) || File.Exists(SettingsFile)) return;
+            Directory.CreateDirectory(ConfigRoot);
+            File.Move(legacy, SettingsFile);
+            Console.WriteLine("[paths] 设置已迁移到 .GC/config/settings.json");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"迁移旧设置失败: {ex.Message}");
+        }
+    }
 
     private static void SyncDevelopmentModels(string modelRoot, string source)
     {

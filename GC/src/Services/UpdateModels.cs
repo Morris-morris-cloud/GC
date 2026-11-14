@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,6 +16,20 @@ public sealed class RepoVersion
     public string ModelDir { get; set; } = "model";
     public RepoLauncher Launcher { get; set; } = new();
     public List<RepoModel> Models { get; set; } = new();
+
+    // ---- 验签结论（解析时填入，不参与序列化） ----------------------------
+
+    /// <summary>Verified / Skipped / Unsigned / Invalid。</summary>
+    [JsonIgnore] public string SignatureTrust { get; set; } = "";
+
+    [JsonIgnore] public string? SignatureKeyId { get; set; }
+
+    [JsonIgnore] public string? SignatureError { get; set; }
+
+    /// <summary>清单是否可用：签名有效，或本机没有配置公钥（兼容期）。</summary>
+    [JsonIgnore]
+    public bool IsTrusted =>
+        SignatureTrust is nameof(ManifestTrust.Verified) or nameof(ManifestTrust.Skipped);
 }
 
 public sealed class RepoLauncher
@@ -34,6 +49,19 @@ public sealed class RepoPackage
     public long Size { get; set; }
     /// <summary>Release 附件名（用于判断是 zip 还是单文件 exe / .app.zip）。</summary>
     public string? AssetName { get; set; }
+
+    /// <summary>
+    /// 仓库里的平台产物目录，如 <c>dist/mac-arm64</c>。
+    /// 不发 Release、只把编译产物提交进仓库时，更新包就在这里找。
+    /// 清单没写时由 <see cref="Rid"/> 推导。
+    /// </summary>
+    public string? Dir { get; set; }
+
+    /// <summary>包文件名，如 <c>GC-1.0.7-mac-arm64.zip</c>；清单没写时按版本与平台标签拼。</summary>
+    public string? Name { get; set; }
+
+    /// <summary>所属平台键（win-x64 / win-arm64 / osx-arm64 …），解析清单时按字典键填入。</summary>
+    [JsonIgnore] public string Rid { get; set; } = "";
 }
 
 public sealed class RepoModel
@@ -42,6 +70,20 @@ public sealed class RepoModel
     public string Version { get; set; } = "";
     /// <summary>模型在仓库里的目录，如 model/earth-rotation。</summary>
     public string Dir { get; set; } = "";
+
+    // ---- 完整性（由 VersionStamp 计算，签名覆盖这几个字段） ----------------
+
+    /// <summary>内容指纹（构建溯源，不参与版本比较）。</summary>
+    public string? Build { get; set; }
+
+    /// <summary>模型清单 &lt;id&gt;.json 的 sha256。</summary>
+    public string? ManifestSha256 { get; set; }
+
+    /// <summary>&lt;id&gt;.model 目录的目录指纹（算法见 ContentHash）。</summary>
+    public string? FilesSha256 { get; set; }
+
+    /// <summary>参与分发的文件数。</summary>
+    public int Files { get; set; }
 }
 
 /// <summary>远端目录树里的一个条目。</summary>
@@ -71,6 +113,12 @@ public interface IModelRemote
     Task<IReadOnlyList<RepoEntry>> ListTreeAsync(string rootPath, CancellationToken ct);
     Task<byte[]> DownloadAsync(RepoEntry entry, CancellationToken ct);
     Task<byte[]?> DownloadPackageAsync(RepoPackage package, CancellationToken ct);
+
+    /// <summary>
+    /// 最近一次读到的清单**原始文本**（含 signature 字段），供 SAVEDOG 二次验签。
+    /// 默认返回 null，表示该源不支持（调用方会退化为单次验签）。
+    /// </summary>
+    Task<string?> GetRawVersionTextAsync(CancellationToken ct) => Task.FromResult<string?>(null);
 }
 
 public sealed class UpdateProgress

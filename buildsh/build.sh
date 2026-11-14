@@ -11,6 +11,11 @@ bs_build() {
 
   progress_step "清理旧产物"; progress_tick 100
   rm -rf "$ROOT_DIR/dist"; mkdir -p "$ROOT_DIR/dist"
+  # 上次打包挪出来的中间产物（.app 目录，体积大、文件多）直接移出 build，
+  # 不做递归删除：避免动辄几百个文件的不可逆删除。
+  if [ -d "$ROOT_DIR/build/trash" ]; then
+    mv "$ROOT_DIR/build/trash" "${TMPDIR:-/tmp}/gc-trash-$(date +%s)" 2>/dev/null || true
+  fi
 
   progress_step "版本戳"; progress_tick 100
   stamp_versions
@@ -36,14 +41,14 @@ bs_build() {
   _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" false || return 1
 
   progress_step "编译 Win-x64"
-  _run_publish winx64 70 publish_rid "win-x64" "dist/win-x64" true || return 1
+  _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" true || return 1
 
   progress_step "编译 Win-arm64"
   _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" true || return 1
 
   progress_step "运行骨架"; progress_tick 100
   package_mac_app
-  prepare_runtime_layout "dist/win-x64"
+  prepare_runtime_layout "dist/win-amd64"
   prepare_runtime_layout "dist/win-arm64"
   prepare_runtime_layout "dist/mac-arm64/GC.app/Contents/MacOS"
 
@@ -53,5 +58,5 @@ bs_build() {
   progress_step "收尾"; progress_tick 100
   progress_done
   echo "==> 完成，产物："
-  ls -lh "$ROOT_DIR"/dist/GC-"$VERSION"-*.zip 2>/dev/null || true
+  ls -lh "$ROOT_DIR"/dist/*/GC-"$VERSION"-*.zip 2>/dev/null || true
 }

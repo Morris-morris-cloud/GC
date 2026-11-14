@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -27,6 +28,9 @@ public sealed class GitCodeRemote : IModelRemote
     private readonly string? _fallbackUrl;
     private readonly string _displayName;
     private string _modelDir = "model";
+    private string? _rawManifest;
+    /// <summary>最近一次读到的启动器版本号，用于推导 dist 目录里的包名。</summary>
+    private string _launcherVersion = "";
 
     public string DisplayName => _displayName;
 
@@ -77,7 +81,22 @@ public sealed class GitCodeRemote : IModelRemote
             version = await ReadVersionFromAsync(_fallbackUrl, ct);
         if (version != null && !string.IsNullOrWhiteSpace(version.ModelDir))
             _modelDir = version.ModelDir.Trim('/');
+        if (version != null && !string.IsNullOrWhiteSpace(version.Launcher.Version))
+            _launcherVersion = version.Launcher.Version.Trim();
         return version;
+    }
+
+    /// <summary>最近一次读到的清单原文（SAVEDOG 二次验签用）。</summary>
+    public Task<string?> GetRawVersionTextAsync(CancellationToken ct)
+        => Task.FromResult(_rawManifest);
+
+    /// <summary>
+    /// 由 Release 覆盖版本号后同步一次，保证 dist 目录里的包名推导用的是
+    /// 「真正要装的那个版本」，而不是仓库清单里可能滞后的版本号。
+    /// </summary>
+    internal void SetLauncherVersion(string? version)
+    {
+        if (!string.IsNullOrWhiteSpace(version)) _launcherVersion = version!.Trim();
     }
 
     private async Task<RepoVersion?> ReadVersionFromAsync(string url, CancellationToken ct)
@@ -107,10 +126,20 @@ public sealed class GitCodeRemote : IModelRemote
                 payload = Encoding.UTF8.GetString(raw);
             }
             if (!payload.TrimStart().StartsWith("{", StringComparison.Ordinal)) return null;
-            var version = System.Text.Json.JsonSerializer.Deserialize<RepoVersion>(
-                payload, GC.Services.Json.Options);
+
+            // 验签与解析一起做：拿到的清单必须能说明「它是不是可信的」
+            var version = ManifestLoader.Parse(payload, out var verification);
+            if (version == null) return null;
+
             // 404 / 错误页也可能返回一个 JSON 对象，用 generated 确认这确实是版本清单
-            return version != null && !string.IsNullOrWhiteSpace(version.Generated) ? version : null;
+            if (string.IsNullOrWhiteSpace(version.Generated)) return null;
+
+            if (verification.Trust == ManifestTrust.Invalid)
+                Console.Error.WriteLine($"[gitcode] 清单验签失败: {verification.Error}");
+
+            if (version != null && !string.IsNullOrWhiteSpace(version.Generated))
+                _rawManifest = payload;
+            return version;
         }
         catch (Exception ex)
         {
@@ -283,25 +312,129 @@ public sealed class GitCodeRemote : IModelRemote
 
     public async Task<byte[]?> DownloadPackageAsync(RepoPackage package, CancellationToken ct)
     {
-        string? url = string.IsNullOrWhiteSpace(package.Url) ? null : package.Url!.Trim();
-        if (url == null && !string.IsNullOrWhiteSpace(package.Path))
+        // 先试清单直给的 url（Release 附件）：命中的情况下不多发任何一次 API 请求。
+        var direct = await TryFetchAsync(package.Url, package.Sha256, ct);
+        if (direct != null) return direct;
+
+        // url 不可用或校验不符：再去找仓库里的编译产物。
+        // 顺序：清单 path → dist/<系统>-<架构>/ 里的 zip → dist 根目录命名。
+        // 每个候选都要和已签名清单的 sha256 对一遍，对不上就换下一个，
+        // 因此「多来源」不放宽校验，只是让「不发 Release 也能更新」成立。
+        foreach (var path in LauncherArtifacts.CandidateFiles(
+                     package.Rid, package.Dir, package.Path, package.Name, _launcherVersion))
         {
-            try
+            var url = await ResolveFileUrlAsync(path, ct);
+            var bytes = await TryFetchAsync(url, package.Sha256, ct);
+            if (bytes != null) return bytes;
+        }
+
+        foreach (var dir in LauncherArtifacts.CandidateDirs(package.Rid, package.Dir))
+        {
+            var url = await FindZipInDirAsync(dir, package, ct);
+            var bytes = await TryFetchAsync(url, package.Sha256, ct);
+            if (bytes != null) return bytes;
+        }
+
+        Console.Error.WriteLine("[gitcode] 找不到可用的启动器包（Release 附件与 dist 目录都没对上）");
+        return null;
+    }
+
+    /// <summary>下载一个候选地址；<paramref name="sha256"/> 非空时必须与内容一致。</summary>
+    private async Task<byte[]?> TryFetchAsync(string? url, string? sha256, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        byte[] bytes;
+        try { bytes = await _http.GetByteArrayAsync(url!, ct); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[gitcode] 下载失败 {Short(url!)}: {ex.Message}");
+            return null;
+        }
+        if (bytes.Length == 0) return null;
+
+        if (!string.IsNullOrWhiteSpace(sha256))
+        {
+            var actual = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            if (!string.Equals(actual, sha256.Trim(), StringComparison.OrdinalIgnoreCase))
             {
-                var apiUrl = _api + package.Path!.Trim('/') + "?ref=" + _branch;
-                var text = await _http.GetStringAsync(apiUrl, ct);
-                using var doc = JsonDocument.Parse(text);
-                if (doc.RootElement.TryGetProperty("download_url", out var dl))
-                    url = dl.GetString();
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"解析启动器包地址失败: {ex.Message}");
+                Console.Error.WriteLine($"[gitcode] 包校验不符，换下一个来源: {Short(url!)}");
                 return null;
             }
         }
-        if (string.IsNullOrWhiteSpace(url)) return null;
-        return await _http.GetByteArrayAsync(url!, ct);
+
+        Console.WriteLine($"[gitcode] 启动器包来源: {Short(url!)}");
+        return bytes;
+    }
+
+    private static string Short(string url)
+        => url.Length <= 96 ? url : url[..60] + "…" + url[^24..];
+
+    /// <summary>把仓库内路径解析成直链；路径不存在或其实是目录时返回 null。</summary>
+    private async Task<string?> ResolveFileUrlAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            var url = _api + path.Trim('/') + "?ref=" + _branch;
+            var text = await _http.GetStringAsync(url, ct);
+            if (!text.TrimStart().StartsWith("{", StringComparison.Ordinal)) return null;
+
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.TryGetProperty("type", out var type) &&
+                string.Equals(type.GetString(), "dir", StringComparison.OrdinalIgnoreCase))
+                return null;
+            return doc.RootElement.TryGetProperty("download_url", out var dl)
+                ? dl.GetString() : null;
+        }
+        catch (Exception)
+        {
+            return null;   // 404 / 网络问题都当作「这个路径没有」
+        }
+    }
+
+    /// <summary>
+    /// 在 <paramref name="dir"/> 里找启动器包。
+    /// 先按「版本 + 平台」精确筛，其次接受目录里唯一的 zip（发布者可能改了命名规则），
+    /// 最终仍由 sha256 兜底。
+    /// </summary>
+    private async Task<string?> FindZipInDirAsync(string dir, RepoPackage package, CancellationToken ct)
+    {
+        try
+        {
+            var url = _api + dir.Trim('/') + "?ref=" + _branch;
+            var text = await _http.GetStringAsync(url, ct);
+            if (!text.TrimStart().StartsWith("[", StringComparison.Ordinal)) return null;
+
+            var zips = new List<(string Path, string Name)>();
+            using (var doc = JsonDocument.Parse(text))
+            {
+                foreach (var item in doc.RootElement.EnumerateArray())
+                {
+                    if (Str(item, "type") != "file") continue;
+                    var name = Str(item, "name");
+                    if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) continue;
+                    var path = Str(item, "path");
+                    zips.Add((path.Length > 0 ? path : dir + "/" + name, name));
+                }
+            }
+            if (zips.Count == 0) return null;
+
+            var version = _launcherVersion;
+            var match = zips.FindIndex(z =>
+                LauncherArtifacts.LooksLikePackage(z.Name, version, package.Rid));
+            if (match < 0)
+            {
+                if (zips.Count != 1) return null;
+                match = 0;
+            }
+
+            Console.WriteLine($"[gitcode] 在 {dir} 找到编译产物: {zips[match].Name}");
+            return await ResolveFileUrlAsync(zips[match].Path, ct);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static string Str(JsonElement item, string name)

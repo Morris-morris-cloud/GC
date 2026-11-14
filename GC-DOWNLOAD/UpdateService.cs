@@ -104,6 +104,37 @@ public sealed class UpdateService : IUpdateService
                 Message = L.I["update.noManifest"]
             };
 
+        // ---- 清单信任策略 --------------------------------------------------
+        // 签名有效 → 通过；没有签名 / 签名不符 → 默认拒绝（可用设置或环境变量放开）。
+        // 这一道闸门挡住的是「仓库被改、模型 dll 被换成木马」这类攻击。
+        var allowUnsigned = devMode ||
+                            !_settings.Current.RequireSignedManifest ||
+                            Environment.GetEnvironmentVariable("GC_ALLOW_UNSIGNED_MANIFEST") == "1";
+
+        if (!remote.IsTrusted)
+        {
+            var reason = remote.SignatureTrust == nameof(ManifestTrust.Invalid)
+                ? "清单签名无效（内容可能被篡改）"
+                : "清单未签名";
+
+            if (!allowUnsigned)
+            {
+                Console.Error.WriteLine($"[update] {reason}，已拒绝本次更新");
+                return new UpdateResult
+                {
+                    Outcome = UpdateOutcome.Unavailable,
+                    Message = $"{reason}，已拒绝更新",
+                    Error = remote.SignatureError
+                };
+            }
+
+            Console.Error.WriteLine($"[update] {reason}，当前为开发/放宽模式，继续");
+        }
+        else
+        {
+            Console.WriteLine($"[update] 清单验签通过（{remote.SignatureKeyId}）");
+        }
+
         _settings.Current.LastUpdateCheck = DateTime.UtcNow.ToString("O");
         _settings.Save();
 
@@ -248,6 +279,22 @@ public sealed class UpdateService : IUpdateService
 
             await Task.WhenAll(tasks);
 
+            // ---- 完整性校验：清单是签过名的，里面的哈希就是"正版"的定义 --------
+            // 下载到暂存目录后按同一算法复算，不一致直接丢弃，绝不安装。
+            var computed = ModelIntegrity.Compute(staging, model.Id);
+
+            if (!string.IsNullOrWhiteSpace(model.ManifestSha256) &&
+                !string.Equals(computed.ManifestSha256, model.ManifestSha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"模型清单哈希不符（期望 {Short(model.ManifestSha256)}，实际 {Short(computed.ManifestSha256)}）");
+
+            if (!string.IsNullOrWhiteSpace(model.FilesSha256) &&
+                !string.Equals(computed.FilesSha256, model.FilesSha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"模型文件哈希不符（期望 {Short(model.FilesSha256)}，实际 {Short(computed.FilesSha256)}），已丢弃");
+
             // 原子替换：先备份旧目录，成功后再删备份；失败自动回滚
             Directory.CreateDirectory(_paths.ModelRoot);
             var target = Path.Combine(_paths.ModelRoot, model.Id);
@@ -270,6 +317,25 @@ public sealed class UpdateService : IUpdateService
             {
                 try { Directory.Delete(backup, true); } catch { /* 占用时留到下次 */ }
             }
+
+            // 安装成功：把完整性记录写进模型目录，加载 dll 前会再抽查一次
+            try
+            {
+                ModelIntegrity.Write(target, model.Id, new ModelIntegrityFile
+                {
+                    Id = model.Id,
+                    Version = model.Version,
+                    ManifestSha256 = computed.ManifestSha256,
+                    FilesSha256 = computed.FilesSha256,
+                    Files = computed.Files,
+                    InstalledAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    Source = _remote.DisplayName
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"写入完整性记录失败 {model.Id}: {ex.Message}");
+            }
         }
         catch
         {
@@ -283,4 +349,7 @@ public sealed class UpdateService : IUpdateService
         foreach (var c in Path.GetInvalidFileNameChars()) value = value.Replace(c, '-');
         return value.Replace('/', '-').Replace(' ', '-');
     }
+
+    private static string Short(string? hash)
+        => string.IsNullOrEmpty(hash) ? "(空)" : hash!.Length <= 8 ? hash : hash[..8];
 }

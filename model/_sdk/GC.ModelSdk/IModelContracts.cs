@@ -9,7 +9,12 @@ namespace GC.ModelSdk;
 /// </summary>
 public interface IModelFactory
 {
-    /// <summary>契约版本。启动器目前支持 1。</summary>
+    /// <summary>
+    /// 契约版本。启动器目前支持 <b>1</b>。
+    /// 协商规则：必须与启动器支持的版本**相等**，否则启动器拒绝加载并提示用户更新；
+    /// 模型清单里还可以写 <c>minAppVersion</c> 要求更高的启动器版本。
+    /// 提升版本时必须保留旧接口的适配层，避免老客户端加载新模型后崩溃。
+    /// </summary>
     int ApiVersion { get; }
 
     /// <summary>创建一个模型运行时实例（每个窗口一个实例）。</summary>
@@ -19,6 +24,10 @@ public interface IModelFactory
 /// <summary>
 /// 模型运行时：负责把模型自己的界面交给启动器。
 /// 启动器只负责开窗口，**不参与任何渲染**。
+///
+/// 生命周期：<c>Create()</c> → <c>Prepare()</c>（后台线程，一次）→ <c>CreateView()</c>（UI 线程，一次）
+/// → 用户关窗 → <c>Dispose()</c>（UI 线程）。<c>Dispose</c> 之后不要再调用任何
+/// <see cref="IModelContext"/> 成员。
 /// </summary>
 public interface IModelRuntime : IDisposable
 {
@@ -54,15 +63,15 @@ public interface IModelContext
     /// <summary>用户在设置里分配的运行内存预算（MB），模型可据此控制缓存规模。</summary>
     int MemoryBudgetMb { get; }
 
-    /// <summary>请求关闭承载此模型的窗口。</summary>
+    /// <summary>请求关闭承载此模型的窗口。**线程安全**，任意线程可调用。</summary>
     void RequestClose();
 
     /// <summary>
     /// 汇报加载进度（0–1）与当前阶段文案。启动器的加载进度条会实时显示，
-    /// 也可以在任何时候调用（例如切换数据集时）。
+    /// 也可以在任何时候调用（例如切换数据集时）。**线程安全**，任意线程可调用。
     /// </summary>
     void ReportProgress(double value, string? message = null);
 
-    /// <summary>输出日志（启动器会写到控制台）。</summary>
+    /// <summary>输出日志（启动器会写到控制台）。**线程安全**，任意线程可调用。</summary>
     void Log(string message);
 }

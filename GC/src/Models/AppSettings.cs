@@ -46,6 +46,12 @@ public sealed class AppSettings
     /// <summary>本地模型源目录（离线教学场景可指向 U 盘 / 共享盘里的仓库）。</summary>
     public string? UpdateLocalRoot { get; set; }
 
+    /// <summary>
+    /// 要求版本清单必须带**有效签名**。默认开启：关闭后只警告不拦截，
+    /// 等于放弃「清单被篡改」的防护，只建议在自建私有构建里临时关闭。
+    /// </summary>
+    public bool RequireSignedManifest { get; set; } = true;
+
     /// <summary>已安装的模型版本：id -> version.json 里的版本。</summary>
     public Dictionary<string, string> InstalledModelVersions { get; set; } = new();
 

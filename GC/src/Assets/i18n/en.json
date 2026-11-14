@@ -15,7 +15,7 @@
   "home.installed": "Installed models",
   "home.count": "{0} models",
   "home.empty": "No models yet",
-  "home.emptyHint": "Models download from gitcode on startup; offline you can drop them into .GC/model/ or import a source on the Download page.",
+  "home.emptyHint": "Models are checked and downloaded on startup. Offline: drop model folders into .GC/model/ and reopen, or retry from the Download page once online.",
   "home.emptyAction": "Get models",
   "home.open": "Open folder",
   "home.delete": "Delete",

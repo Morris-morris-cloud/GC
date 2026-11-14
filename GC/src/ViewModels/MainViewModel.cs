@@ -181,6 +181,15 @@ public partial class MainViewModel : ObservableObject
             UpdateDetail = result.Error ?? "";
             LauncherNotice = result.LauncherMessage ?? "";
 
+            // 首次启动 + 断网：本地一个模型都没有，这时候不能只留一个空页面。
+            // 明确告诉用户「没坏、可以怎么办」，并保留状态条（不自动隐藏）。
+            if (result.Outcome == UpdateOutcome.Unavailable && Home.Models.Count == 0)
+            {
+                UpdateStatus = "暂时连不上模型源，模型库为空";
+                UpdateDetail = "可以到「下载」页点重试，或把模型文件夹放进 .GC/model/ 后重新打开";
+                return;
+            }
+
             // 模型下载完成后本次启动就刷新列表，立刻可用
             if (result.UpdatedModels > 0) Home.Refresh();
 

@@ -26,7 +26,7 @@ bs_tools() {
       dotnet --info | head -20 ;;
     dist)
       echo "==> dist 产物："
-      ls -lh "$ROOT_DIR"/dist 2>/dev/null || true ;;
+      ls -lh "$ROOT_DIR"/dist/*/GC-*.zip 2>/dev/null || ls -lh "$ROOT_DIR"/dist 2>/dev/null || true ;;
     *)
       echo "未知工具: $TASK"; return 1 ;;
   esac

@@ -23,6 +23,7 @@ public sealed class GiteaRemote : IModelRemote
 {
     private readonly SourcePreset _preset;
     private static readonly HttpClient Http = CreateHttp();
+    private string? _rawManifest;
 
     private static HttpClient CreateHttp()
     {
@@ -69,7 +70,18 @@ public sealed class GiteaRemote : IModelRemote
             // Release 提供启动器版本与平台附件
             result.Launcher.Version = fromRelease.Launcher.Version;
             foreach (var kv in fromRelease.Launcher.Packages)
+            {
+                // Release 只能说明"哪个附件"，完整性必须回到已签名清单取 sha256，
+                // 否则「有仓库写权限的人发个 Release」就能绕过验签。
+                if (fromRepo != null &&
+                    fromRepo.Launcher.Packages.TryGetValue(kv.Key, out var signed) &&
+                    !string.IsNullOrWhiteSpace(signed?.Sha256))
+                {
+                    kv.Value.Sha256 = signed!.Sha256;
+                    if (signed.Size > 0) kv.Value.Size = signed.Size;
+                }
                 result.Launcher.Packages[kv.Key] = kv.Value;
+            }
             return result;
         }
 
@@ -81,6 +93,10 @@ public sealed class GiteaRemote : IModelRemote
         // 只有模型清单时也返回，保证模型能同步；启动器版本为空表示无升级
         return result.Models.Count > 0 ? result : null;
     }
+    /// <summary>最近一次读到的清单原文（SAVEDOG 二次验签用）。</summary>
+    public Task<string?> GetRawVersionTextAsync(CancellationToken ct)
+        => Task.FromResult(_rawManifest);
+
     /// <summary>读仓库里的 version.json（模型清单 + 兜底信息）。</summary>
     private async Task<RepoVersion?> TryGetVersionFromRepoAsync(CancellationToken ct)
     {
@@ -90,8 +106,14 @@ public sealed class GiteaRemote : IModelRemote
             {
                 var text = await Http.GetStringAsync(url, ct);
                 if (!text.TrimStart().StartsWith('{')) continue;   // 可能返回 HTML
-                var doc = JsonSerializer.Deserialize<RepoVersion>(text, Json.Options);
-                if (doc != null) return doc;
+                var doc = ManifestLoader.Parse(text, out var verification);
+                if (verification.Trust == ManifestTrust.Invalid)
+                    Console.Error.WriteLine($"[gitea] 清单验签失败: {verification.Error}");
+                if (doc != null)
+                {
+                    _rawManifest = text;
+                    return doc;
+                }
             }
             catch (Exception ex)
             {
@@ -282,12 +304,35 @@ public sealed class GiteaRemote : IModelRemote
 
     public async Task<byte[]?> DownloadPackageAsync(RepoPackage package, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(package.Url)) return null;
-        try { return await Http.GetByteArrayAsync(package.Url, ct); }
-        catch (Exception ex)
+        // 与 GitCode 一致的策略：Release 附件 → 清单路径 → dist/<系统>-<架构>/ 里的编译产物。
+        // 每个来源都要过 sha256（来自已签名清单），所以多来源不降低安全性。
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(package.Url)) candidates.Add(package.Url!.Trim());
+        foreach (var path in LauncherArtifacts.CandidateFiles(
+                     package.Rid, package.Dir, package.Path, package.Name, ""))
+            candidates.Add(_preset.RawUrl(path));
+
+        foreach (var candidate in candidates)
         {
-            Console.Error.WriteLine($"[gitea] 下载更新包失败: {ex.Message}");
-            return null;
+            byte[] bytes;
+            try { bytes = await Http.GetByteArrayAsync(candidate, ct); }
+            catch (Exception) { continue; }
+            if (bytes.Length == 0) continue;
+
+            if (!string.IsNullOrWhiteSpace(package.Sha256))
+            {
+                var actual = Convert.ToHexString(
+                    System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+                if (!string.Equals(actual, package.Sha256.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine($"[gitea] 包校验不符，换下一个来源: {candidate}");
+                    continue;
+                }
+            }
+
+            Console.WriteLine($"[gitea] 启动器包来源: {candidate}");
+            return bytes;
         }
+        return null;
     }
 }

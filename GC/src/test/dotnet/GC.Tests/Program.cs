@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text.Json;
 using GC.Models;
 using Avalonia;
 using Avalonia.Controls;
@@ -81,7 +84,6 @@ internal static class Program
         var fixtureVersion = Json.Read<RepoVersion>(versionFile)!;
         fixtureVersion.Models.RemoveAll(model =>
             model.Id is not "earth-rotation" and not "earth-revolution");
-        Json.Write(Path.Combine(remote, "version.json"), fixtureVersion);
         foreach (var dir in Directory.GetDirectories(Path.Combine(repoRoot, "model")))
         {
             var id = Path.GetFileName(dir);
@@ -94,6 +96,28 @@ internal static class Program
             File.Copy(manifest, Path.Combine(dest, id + ".json"), true);
             CopyTree(data, Path.Combine(dest, id + ".model"));
         }
+
+        // 按远端实际内容重算完整性哈希（与 VersionStamp 同一算法），然后签名。
+        // 客户端会复算这两项，不一致就拒绝安装 —— 这一步必须与构建端一致。
+        foreach (var m in fixtureVersion.Models)
+        {
+            var computed = ModelIntegrity.Compute(Path.Combine(remote, "model", m.Id), m.Id);
+            m.ManifestSha256 = computed.ManifestSha256;
+            m.FilesSha256 = computed.FilesSha256;
+            m.Files = computed.Files.Count;
+        }
+
+        var signer = ManifestSignature.TryLoadPrivateKey(
+            Path.Combine(repoRoot, ".signing", "gc-signing.pem"));
+        if (signer == null)
+        {
+            Console.WriteLine("FAIL: 缺少签名私钥 .signing/gc-signing.pem，无法构造可信清单");
+            return 1;
+        }
+
+        var remoteManifest = Path.Combine(remote, "version.json");
+        WriteSigned(remoteManifest, fixtureVersion, signer);
+        Console.WriteLine($"远端清单已签名（{ManifestSignature.Algorithm}）");
 
         // EMS_HOME 指向不含 .sln 的临时目录 -> 非开发态，走真实 .GC 布局
         Environment.SetEnvironmentVariable("EMS_HOME", tmp);
@@ -119,7 +143,7 @@ internal static class Program
         Check(paths.ModelRoot == modelRoot, "模型安装目录位于 .GC/model");
         Check(paths.CacheRoot.StartsWith(paths.HomeRoot, StringComparison.Ordinal), "模型与启动器下载暂存位于 .GC/cache");
         Check(paths.UpdateRoot.StartsWith(paths.HomeRoot, StringComparison.Ordinal), "启动器更新位于 .GC/update");
-        Check(File.Exists(paths.SettingsFile), ".GC/settings.json 已创建");
+        Check(File.Exists(paths.SettingsFile), ".GC/config/settings.json 已创建");
 
         // 1) 首次启动：模型全部下载并立即落地
         var r1 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
@@ -140,7 +164,7 @@ internal static class Program
         Check(r2.UpdatedModels == 0, "版本未变时不重复下载");
 
         // 3) 远端模型改版：只更新这一个，并且本次启动立即生效
-        var rv = Json.Read<RepoVersion>(Path.Combine(remote, "version.json"))!;
+        var rv = Json.Read<RepoVersion>(remoteManifest)!;
         Check(rv.Models.Count == 2 && !string.IsNullOrWhiteSpace(rv.Models[0].Version),
             "version.json 里模型版本由构建自动生成");
         var changed = rv.Models[0];
@@ -148,12 +172,21 @@ internal static class Program
         var stampName = "_version-stamp.txt";
         File.WriteAllText(Path.Combine(remote, "model", changed.Id,
             changed.Id + ".model", stampName), "new content");
-        Json.Write(Path.Combine(remote, "version.json"), rv);
+
+        // 内容变了 → 指纹必须跟着变，并且清单要重新签名，否则客户端会（正确地）拒绝
+        var changedHash = ModelIntegrity.Compute(Path.Combine(remote, "model", changed.Id), changed.Id);
+        changed.ManifestSha256 = changedHash.ManifestSha256;
+        changed.FilesSha256 = changedHash.FilesSha256;
+        changed.Files = changedHash.Files.Count;
+        WriteSigned(remoteManifest, rv, signer);
+
         var r3 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
         Console.WriteLine($"模型改版: {r3.Message} 更新数={r3.UpdatedModels}");
         Check(r3.UpdatedModels == 1, "模型版本变化只更新 1 个模型");
         Check(File.Exists(Path.Combine(modelRoot, changed.Id, changed.Id + ".model", stampName)),
             "新版本本次启动立即生效");
+        Check(File.Exists(Path.Combine(modelRoot, changed.Id, changed.Id + ".integrity.json")),
+            "安装后写入完整性记录");
 
         // 4) 启动器新版：用 LauncherUpdater 下载到当前目录（与旧版并列）
         var rid = LauncherRuntimeInfo.CurrentRid;
@@ -165,8 +198,13 @@ internal static class Program
         var zip = Path.Combine(tmp, "GC-" + rid + ".zip");
         ZipFile.CreateFromDirectory(stage, zip);
         rv.Launcher.Version = "9.9.9";
-        rv.Launcher.Packages[rid] = new RepoPackage { Url = zip };
-        Json.Write(Path.Combine(remote, "version.json"), rv);
+        rv.Launcher.Packages[rid] = new RepoPackage
+        {
+            Url = zip,
+            Sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(zip))).ToLowerInvariant(),
+            Size = new FileInfo(zip).Length
+        };
+        WriteSigned(remoteManifest, rv, signer);
 
         // 造一个旧版在当前目录
         var oldName = "GC-1.0.0-" + LauncherUpdater.PlatformLabel + ".exe";
@@ -200,7 +238,60 @@ internal static class Program
             Check(script.Contains("GC-*.app") || script.Contains("GC-*"), "脚本按 GC-* 匹配删除");
         }
 
-        // 6) 断网兜底：保留本地模型，不清空
+        // 5b) 只发产物、不发 Release：更新包只存在于仓库 dist/<系统>-<架构>/ 目录里。
+        //     清单不写 url、不写 path，只给 dir + name + sha256，客户端要能自己找过去。
+        var distDir = Path.Combine(remote, "dist", LauncherUpdater.PlatformLabel);
+        Directory.CreateDirectory(distDir);
+        var distName = "GC-9.9.10-" + LauncherUpdater.PlatformLabel + ".zip";
+        var distZip = Path.Combine(distDir, distName);
+        File.Copy(zip, distZip, true);
+
+        string Sha(string file) =>
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file))).ToLowerInvariant();
+
+        rv.Launcher.Version = "9.9.10";
+        rv.Launcher.Packages[rid] = new RepoPackage
+        {
+            Dir = "dist/" + LauncherUpdater.PlatformLabel,
+            Name = distName,
+            Sha256 = Sha(distZip),
+            Size = new FileInfo(distZip).Length
+        };
+        WriteSigned(remoteManifest, rv, signer);
+
+        var dlDist = Task.Run(() => LauncherUpdater.DownloadAsync(paths, updater.Remote, null))
+            .GetAwaiter().GetResult();
+        Console.WriteLine($"dist 目录更新: {dlDist.Message}");
+        Check(dlDist.State == UpdateRunState.Ready, "仓库 dist/<系统>-<架构>/ 里的产物能找到并下载");
+        // 包名来自 zip 内容（这里仍是 9.9.9 的文件），所以要断言清单版本
+        Check(dlDist.Version == "9.9.10", "下载的确实是 dist 目录里声明的那个版本");
+
+        // 5c) 往 dist/ 里塞一个哈希不匹配的包：必须拒绝（sha256 来自已签名清单）
+        File.WriteAllText(distZip, "evil payload");
+        var dlEvil = Task.Run(() => LauncherUpdater.DownloadAsync(paths, updater.Remote, null))
+            .GetAwaiter().GetResult();
+        Check(dlEvil.State == UpdateRunState.Failed, "dist 目录里哈希不符的包被拒绝");
+
+        // 还原到 9.9.9，后面的篡改 / 断网用例继续用这份清单
+        rv.Launcher.Version = "9.9.9";
+        rv.Launcher.Packages[rid] = new RepoPackage
+        {
+            Url = zip,
+            Sha256 = Sha(zip),
+            Size = new FileInfo(zip).Length
+        };
+        WriteSigned(remoteManifest, rv, signer);
+
+        // 6) 篡改检测：改一个字节但不重新签名 -> 必须判为不可信
+        var tampered = File.ReadAllText(remoteManifest).Replace("\"9.9.9\"", "\"9.9.8\"");
+        var tamperResult = ManifestSignature.Verify(tampered, requireSignature: true);
+        Check(tamperResult.Trust == ManifestTrust.Invalid, "被篡改的清单验签失败");
+        File.WriteAllText(remoteManifest, tampered);
+        var r6 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
+        Check(r6.Outcome == UpdateOutcome.Unavailable, "清单被篡改时拒绝更新");
+        WriteSigned(remoteManifest, rv, signer);
+
+        // 7) 断网兜底：保留本地模型，不清空
         var offline = new UpdateService(paths, settings, new GitCodeRemote("http://127.0.0.1:1/nope"));
         var beforeCount = settings.Current.InstalledModelVersions.Count;
         var r5 = Task.Run(() => offline.RunAsync(true, null)).GetAwaiter().GetResult();
@@ -214,6 +305,13 @@ internal static class Program
             ? "=== 自动更新链路全部通过 ==="
             : $"=== 有 {failures} 项失败 ===");
         return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>序列化清单并用私钥签名（测试里模拟一次正式发布）。</summary>
+    private static void WriteSigned(string path, RepoVersion version, ECDsa key)
+    {
+        var text = JsonSerializer.Serialize(version, Json.Options) + "\n";
+        File.WriteAllText(path, ManifestSignature.SignDocument(text, key, "gc-2026-11"));
     }
 
     private static void CopyTree(string src, string dst)

@@ -15,7 +15,7 @@
   "home.installed": "已安装模型",
   "home.count": "{0} 个模型",
   "home.empty": "模型库还是空的",
-  "home.emptyHint": "启动时会从 gitcode 自动下载模型；离线可把模型放进 .GC/model/，或在「下载」页导入模型源。",
+  "home.emptyHint": "启动时会自动检查并下载模型。若当前断网：可把模型文件夹放进 .GC/model/ 后重新打开，或联网后在「下载」页点重试。",
   "home.emptyAction": "去下载模型",
   "home.open": "打开目录",
   "home.delete": "删除",

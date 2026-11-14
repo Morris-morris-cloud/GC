@@ -12,12 +12,40 @@ function Invoke-LoggedDotNet {
     }
 }
 
-function Invoke-VersionStamp {
-    Write-Host '==> 自动计算模型版本并生成 version.json'
-    Invoke-LoggedDotNet -Name 'stamp' -Arguments @(
-        'run', '--project', $script:StampProject, '-c', 'Release', '--',
-        $script:BuildRoot, $script:BuildVersion
+function Invoke-ManifestSign {
+    $key = Join-Path $script:BuildRoot '.signing/gc-signing.pem'
+    if (-not (Test-Path $key)) {
+        Write-Host '!! 未找到签名私钥 .signing/gc-signing.pem，version.json 未签名（客户端会拒绝更新）'
+        return
+    }
+    $keyId = if ($env:GC_SIGNING_KEY_ID) { $env:GC_SIGNING_KEY_ID } else { 'gc-2026-11' }
+    Write-Host "==> 签名 version.json ($keyId)"
+    Invoke-LoggedDotNet -Name 'sign' -Arguments @(
+        'run', '--project', (Join-Path $script:BuildRoot 'GC-SAVEDOG/GC-SAVEDOG.csproj'),
+        '-c', 'Release', '--', 'sign',
+        '--manifest', (Join-Path $script:BuildRoot 'version.json'),
+        '--key', $key, '--key-id', $keyId
     )
+    Copy-Item (Join-Path $script:BuildRoot 'version.json') (Join-Path $script:BuildRoot 'model/version.json') -Force
+}
+
+function Invoke-VersionStamp {
+    param([switch]$LauncherOnly)
+    if ($LauncherOnly) {
+        Write-Host '==> 刷新启动器包信息（sha256 / 体积 / dist 路径）'
+        Invoke-LoggedDotNet -Name 'stamp' -Arguments @(
+            'run', '--project', $script:StampProject, '-c', 'Release', '--',
+            $script:BuildRoot, $script:BuildVersion, '--launcher-only'
+        )
+    }
+    else {
+        Write-Host '==> 自动计算模型版本并生成 version.json'
+        Invoke-LoggedDotNet -Name 'stamp' -Arguments @(
+            'run', '--project', $script:StampProject, '-c', 'Release', '--',
+            $script:BuildRoot, $script:BuildVersion
+        )
+    }
+    Invoke-ManifestSign
 }
 
 function Build-Models {
@@ -51,7 +79,7 @@ function Prepare-RuntimeLayout {
     if (-not (Test-Path $destination)) { return }
 
     Remove-Item (Join-Path $destination 'model'), (Join-Path $destination 'examples') -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Force -Path (Join-Path $destination '.GC/model'), (Join-Path $destination '.GC/cache'), (Join-Path $destination '.GC/update') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $destination '.GC/model'), (Join-Path $destination '.GC/cache'), (Join-Path $destination '.GC/update'), (Join-Path $destination '.GC/config') | Out-Null
     Set-Content -Path (Join-Path $destination '.GC/model/README.txt') -Encoding UTF8 -Value @'
 模型库目录（.GC/model/）
 启动时程序会读取 GitCode 仓库的 version.json，把最新版模型下载到这里。
@@ -59,12 +87,13 @@ function Prepare-RuntimeLayout {
 
 运行目录：
   <可执行文件>
-  .GC/settings.json
+  GC-SAVEDOG      更新守护进程（验签 + 原子替换 + 失败回滚）
+  .GC/config/settings.json   用户设置（删 .GC/cache 不会丢配置）
     .GC/model/      本目录（下载的模型）
     .GC/cache/      下载暂存
     .GC/update/     待下次启动应用的启动器更新
 '@
-    $settingsPath = Join-Path $destination '.GC/settings.json'
+    $settingsPath = Join-Path $destination '.GC/config/settings.json'
     if (-not (Test-Path $settingsPath)) {
         Set-Content -Path $settingsPath -Encoding UTF8 -Value @'
 {
@@ -73,6 +102,7 @@ function Prepare-RuntimeLayout {
   "renderFps": 30,
   "memoryMb": 2048,
   "autoUpdateOnStartup": true,
+  "requireSignedManifest": true,
     "updateRepository": "https://gitcode.com/Morris_1/GC",
   "updateManifestUrl": "",
   "updateLocalRoot": "",
@@ -104,6 +134,21 @@ function Publish-Rid {
         "-p:PublishSingleFile=$singleValue", "-p:IncludeNativeLibrariesForSelfExtract=$singleValue",
         '-p:PublishTrimmed=false', '-o', $outputPath
     )
+
+    # 更新守护进程：与主程序同目录（裁剪单文件，70MB -> 14MB）
+    # 裁剪的前提是 JSON 全部走源生成上下文（GC-SAVEDOG/SavedogJson.cs）
+    $savedogProj = Join-Path $script:BuildRoot 'GC-SAVEDOG/GC-SAVEDOG.csproj'
+    if (Test-Path $savedogProj) {
+        Write-Host "==> 编译 GC-SAVEDOG ($Rid)（裁剪单文件）"
+        Invoke-LoggedDotNet -Name "savedog-$($Rid -replace '-', '')" -Arguments @(
+            'publish', $savedogProj, '-c', 'Release', '-r', $Rid,
+            '--self-contained', 'true', "-p:Version=$script:BuildVersion", '-p:DebugType=none',
+            '-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true',
+            '-p:PublishTrimmed=true', '-p:TrimMode=full',
+            '-p:JsonSerializerIsReflectionEnabledByDefault=false', '-o', $outputPath
+        )
+    }
+
     Remove-Item (Join-Path $outputPath 'model'), (Join-Path $outputPath 'examples') -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -136,11 +181,27 @@ function Pack-Launcher {
     Write-Host "==> 生成启动器产物（GC-$script:BuildVersion-<平台>）"
 
     foreach ($platform in @(@{ Rid = 'win-x64'; Label = 'win-amd64' }, @{ Rid = 'win-arm64'; Label = 'win-arm64' })) {
-        $sourceDir = Join-Path $dist $platform.Rid
+        # 产物落点 dist/<系统>-<架构>/，与 dist/mac-arm64 一致
+        $sourceDir = Join-Path $dist $platform.Label
+        if (-not (Test-Path $sourceDir)) { $sourceDir = Join-Path $dist $platform.Rid }
         if (-not (Test-Path $sourceDir)) { continue }
-        $executable = Get-ChildItem $sourceDir -Filter '*.exe' | Select-Object -First 1
+        # 注意排除守护进程：GC-SAVEDOG.exe 在字典序里排在 GC.exe 前面
+        $executable = Get-ChildItem $sourceDir -Filter '*.exe' |
+            Where-Object { $_.Name -notlike 'GC-SAVEDOG*' } | Select-Object -First 1
         if ($null -eq $executable) { continue }
-        Copy-Item $executable.FullName (Join-Path $dist "GC-$script:BuildVersion-$($platform.Label).exe") -Force
+
+        $temp = Join-Path $dist ".winpkg-$($platform.Label)"
+        Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force -Path $temp | Out-Null
+        Copy-Item $executable.FullName (Join-Path $temp "GC-$script:BuildVersion-$($platform.Label).exe") -Force
+        $savedogExe = Join-Path $sourceDir 'GC-SAVEDOG.exe'
+        if (Test-Path $savedogExe) { Copy-Item $savedogExe (Join-Path $temp 'GC-SAVEDOG.exe') -Force }
+
+        $zipPath = Join-Path $dist "$($platform.Label)/GC-$script:BuildVersion-$($platform.Label).zip"
+        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+        Compress-Archive -Path (Join-Path $temp '*') -DestinationPath $zipPath -CompressionLevel Optimal
+        Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "    -> dist/$($platform.Label)/GC-$script:BuildVersion-$($platform.Label).zip"
     }
 
     $macApp = Join-Path $dist 'mac-arm64/GC.app'
@@ -158,8 +219,12 @@ function Pack-Launcher {
         if (Get-Command xattr -ErrorAction SilentlyContinue) { & xattr -cr $finalApp 2>$null }
     }
 
-    Get-ChildItem $dist | Where-Object { $_.Name -like "GC-$script:BuildVersion-*.exe" -or $_.Name -like "GC-$script:BuildVersion-*.app" } | ForEach-Object {
-        $zipPath = Join-Path $dist ($_.BaseName + '.zip')
+    # Windows 的 zip 已在上面的循环里生成（含 GC-SAVEDOG.exe），这里只处理 .app
+    Get-ChildItem $dist | Where-Object { $_.Name -like "GC-$script:BuildVersion-*.app" } | ForEach-Object {
+        $label = $_.BaseName -replace "^GC-$([regex]::Escape($script:BuildVersion))-", ''
+        $targetDir = Join-Path $dist $label
+        New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+        $zipPath = Join-Path $targetDir ($_.BaseName + '.zip')
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
         if ($_.PSIsContainer) {
             Remove-Item (Join-Path $_.FullName 'Contents/MacOS/.GC') -Recurse -Force -ErrorAction SilentlyContinue
@@ -171,19 +236,30 @@ function Pack-Launcher {
         else {
             Compress-Archive -Path $_.FullName -DestinationPath $zipPath -CompressionLevel Optimal
         }
+        Write-Host "    -> dist/$label/$($_.BaseName).zip"
     }
 
-    Remove-Item (Join-Path $dist "GC-$script:BuildVersion-*.exe") -Force -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path $dist "GC-$script:BuildVersion-*.app") -Recurse -Force -ErrorAction SilentlyContinue
+    # 原始产物（.exe / .app 目录）不再保留：只发布 zip
+    $trash = Join-Path $script:BuildRoot 'build/trash'
+    New-Item -ItemType Directory -Force -Path $trash | Out-Null
+    Get-ChildItem $dist -Force | Where-Object {
+        $_.Name -like "GC-$script:BuildVersion-*.exe" -or $_.Name -like "GC-$script:BuildVersion-*.app"
+    } | ForEach-Object {
+        Move-Item $_.FullName (Join-Path $trash "$($_.Name)-$([DateTime]::Now.Ticks)") -Force -ErrorAction SilentlyContinue
+    }
     Remove-IntermediateDirectories
-    Invoke-VersionStamp
+    Invoke-VersionStamp -LauncherOnly
     Write-Host '==> dist 可发布 zip：'
-    Get-ChildItem $dist -Filter "GC-$script:BuildVersion-*.zip" | Select-Object Name, Length
+    Get-ChildItem $dist -Recurse -Filter "GC-$script:BuildVersion-*.zip" | Select-Object FullName, Length
 }
 
 function Remove-IntermediateDirectories {
-    foreach ($name in @('win-x64', 'win-arm64', 'mac-arm64')) {
-        Remove-Item (Join-Path $script:BuildRoot "dist/$name") -Recurse -Force -ErrorAction SilentlyContinue
+    # 平台目录里只留最终 zip（其它都是 publish 中间产物）
+    foreach ($name in @('win-amd64', 'win-x64', 'win-arm64', 'mac-arm64')) {
+        $dir = Join-Path $script:BuildRoot "dist/$name"
+        if (-not (Test-Path $dir)) { continue }
+        Get-ChildItem $dir -Force | Where-Object { $_.Name -notlike "GC-$script:BuildVersion-*.zip" } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
     Get-ChildItem (Join-Path $script:BuildRoot 'dist') -Filter '.DS_Store' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force
 }
@@ -248,12 +324,12 @@ function Invoke-FullBuild {
 
         Start-BuildStep '版本戳'; Invoke-VersionStamp; Complete-BuildStep
         Start-BuildStep '编译 Mac'; Publish-Rid 'osx-arm64' 'dist/mac-arm64' $false; Complete-BuildStep
-        Start-BuildStep '编译 Win-x64'; Publish-Rid 'win-x64' 'dist/win-x64' $true; Complete-BuildStep
+        Start-BuildStep '编译 Win-x64'; Publish-Rid 'win-x64' 'dist/win-amd64' $true; Complete-BuildStep
         Start-BuildStep '编译 Win-arm64'; Publish-Rid 'win-arm64' 'dist/win-arm64' $true; Complete-BuildStep
 
         Start-BuildStep '运行骨架'
         New-MacAppBundle
-        Prepare-RuntimeLayout 'dist/win-x64'
+        Prepare-RuntimeLayout 'dist/win-amd64'
         Prepare-RuntimeLayout 'dist/win-arm64'
         Prepare-RuntimeLayout 'dist/mac-arm64/GC.app/Contents/MacOS'
         Complete-BuildStep
@@ -261,7 +337,7 @@ function Invoke-FullBuild {
         Start-BuildStep '打包 zip'; Pack-Launcher; Complete-BuildStep
         Start-BuildStep '收尾'; Complete-BuildStep
         Write-Host '==> 完成，产物：'
-        Get-ChildItem (Join-Path $script:BuildRoot 'dist') -Filter "GC-$script:BuildVersion-*.zip" | Select-Object Name, Length
+        Get-ChildItem (Join-Path $script:BuildRoot 'dist') -Recurse -Filter "GC-$script:BuildVersion-*.zip" | Select-Object FullName, Length
     }
     finally { Complete-BuildProgress }
 }

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-11-14T10:53:39Z",
+  "generated": "2026-11-14T11:34:35Z",
   "repository": "https://gitcode.com/Morris_1/GC",
   "branch": "main",
   "modelDir": "model",
@@ -9,24 +9,40 @@
     "revision": "",
     "packages": {
       "win-x64": {
-        "path": "dist/GC-win-x64.zip",
-        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-win-x64.zip"
+        "path": "dist/win-amd64/GC-1.0.7-win-amd64.zip",
+        "dir": "dist/win-amd64",
+        "name": "GC-1.0.7-win-amd64.zip",
+        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-win-amd64.zip",
+        "sha256": "f90ff51ac6b041ae238cbeb4672622b0d029142a9d8b0705f08e654336512308",
+        "size": 46363183
       },
       "win-arm64": {
-        "path": "dist/GC-win-arm64.zip",
-        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-win-arm64.zip"
+        "path": "dist/win-arm64/GC-1.0.7-win-arm64.zip",
+        "dir": "dist/win-arm64",
+        "name": "GC-1.0.7-win-arm64.zip",
+        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-win-arm64.zip",
+        "sha256": "0b2bab2c3ac7e6223d8dd0b0faf9a0994319fa5ad13826addf7b402619b812e0",
+        "size": 44390354
       },
       "osx-arm64": {
-        "path": "dist/GC-osx-arm64.zip",
-        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-osx-arm64.zip"
+        "path": "dist/mac-arm64/GC-1.0.7-mac-arm64.zip",
+        "dir": "dist/mac-arm64",
+        "name": "GC-1.0.7-mac-arm64.zip",
+        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-mac-arm64.zip",
+        "sha256": "e5fd355bace68dc0794eb3e049cbef63c952a60a765ab3806adaf1199e1b09ab",
+        "size": 9178314
       },
       "osx-x64": {
-        "path": "dist/GC-osx-x64.zip",
-        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-osx-x64.zip"
+        "path": "dist/mac-x64/GC-1.0.7-mac-x64.zip",
+        "dir": "dist/mac-x64",
+        "name": "GC-1.0.7-mac-x64.zip",
+        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-mac-x64.zip"
       },
       "linux-x64": {
-        "path": "dist/GC-linux-x64.zip",
-        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-linux-x64.zip"
+        "path": "dist/linux-amd64/GC-1.0.7-linux-amd64.zip",
+        "dir": "dist/linux-amd64",
+        "name": "GC-1.0.7-linux-amd64.zip",
+        "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-linux-amd64.zip"
       }
     }
   },
@@ -34,32 +50,54 @@
     {
       "id": "contour-map",
       "version": "1.0",
-      "build": "d3eb662a36",
+      "build": "e4b3f2b87e",
+      "manifestSha256": "ee0897d46ee85126fbfd0d07f5ca3111950d0c36f9b8a80e4eb6ae85d226da4f",
+      "filesSha256": "b1f323fb41dec4f45992a30ff8726f3307f83b564127aff99bcb3d044c79d2bd",
+      "files": 5,
       "dir": "model/contour-map"
     },
     {
       "id": "earth-geography",
       "version": "1.8",
-      "build": "d5ad961ed1",
+      "build": "3b645c45c2",
+      "manifestSha256": "a9f30fd4a1dd0aeccb88c892579c93bf32a92379d7b3f545b28f6cac612f9871",
+      "filesSha256": "0e55d2f9bacc3e0ff42f5c45d9e7c265864df9784b1609c09dcb32d21b4addfc",
+      "files": 11,
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
       "version": "1.6",
-      "build": "287b1d86af",
+      "build": "947efa36bb",
+      "manifestSha256": "feb715cde8ad5da9ecfb48785a95e6fc82930cc92c668514b328915366c2f57a",
+      "filesSha256": "a37e0b493c78bb0a04a276512b612be3f8e7a178ed1a7fc72acb5353aa57f7c5",
+      "files": 7,
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
       "version": "1.6",
-      "build": "83124cb2ac",
+      "build": "a803d9c020",
+      "manifestSha256": "56ed397cbc008bd9ec8bea0ee34a94a28ab29ce39a8b096b0629e529883b4dff",
+      "filesSha256": "4e4428812d18d15a99105e73c027b99f3197033f0138d643ba69c15fabc9d8f6",
+      "files": 7,
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
       "version": "1.5",
-      "build": "b8930576fd",
+      "build": "02a555272a",
+      "manifestSha256": "d00034888d9b9da03338b7f394d1bdf33f73b1fbdd7e8f154d85b9080318ab13",
+      "filesSha256": "4a5fbf898df1d98eddf68b5d3929ae7b25cd7bcdfdfa36b5ad0ed72d9941d049",
+      "files": 6,
       "dir": "model/scale-calculator"
     }
-  ]
+  ],
+  "signature": {
+    "alg": "ECDSA-P256-SHA256",
+    "keyId": "gc-2026-11",
+    "value": "LHaF2bw+IZeWUw2qLQM1IQHoNXsHNko38dyjP45Jy41KtlyhvJhhFaNh+THKhAU+6jSzV1eFHgbwasboYBOa5w==",
+    "contentSha256": "749055593bf9839837428d900d523b3363486556970cbf4e2daa25001ab174c8",
+    "signedAt": "2026-11-14T11:36:03Z"
+  }
 }

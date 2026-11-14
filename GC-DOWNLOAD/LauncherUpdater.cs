@@ -303,48 +303,120 @@ public static class LauncherUpdater
                 !version.Launcher.Packages.TryGetValue("default", out pkg))
                 return Fail($"该平台（{rid}）没有对应发布包");
 
+            // ---- 信任闸门 ---------------------------------------------------
+            // 启动器更新会替换可执行文件，风险最高：清单没签名就一律不动。
+            // 只有显式设置 GC_ALLOW_UNSIGNED_MANIFEST=1（自建私有构建）才放行。
+            var allowUnsigned =
+                Environment.GetEnvironmentVariable("GC_ALLOW_UNSIGNED_MANIFEST") == "1";
+
+            if (!version.IsTrusted && !allowUnsigned)
+            {
+                var reason = version.SignatureTrust == nameof(ManifestTrust.Invalid)
+                    ? "清单签名无效"
+                    : "清单未签名";
+                Console.Error.WriteLine($"[update] 启动器更新被拒绝：{reason}");
+                return Fail($"{reason}，已拒绝下载启动器更新");
+            }
+
+            if (string.IsNullOrWhiteSpace(pkg!.Sha256))
+            {
+                Console.Error.WriteLine("[update] 清单没有提供 sha256，拒绝下载启动器更新");
+                return Fail("清单缺少该平台的 sha256，已拒绝下载（无法校验完整性）");
+            }
+
             progress?.Report(new UpdateProgressInfo { Value = 0.20, Stage = $"正在下载 v{latest}" });
 
             var bytes = await remote.DownloadPackageAsync(pkg!, ct);
             if (bytes == null || bytes.Length == 0) return Fail("下载失败：发布包为空");
 
-            // sha256 校验（Release 提供时）
-            if (!string.IsNullOrWhiteSpace(pkg!.Sha256))
+            // sha256 校验（清单已验签，这里的 sha256 就是"正版"的定义）
             {
                 var actual = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
                 if (!string.Equals(actual, pkg.Sha256!.Trim(), StringComparison.OrdinalIgnoreCase))
-                    return Fail("下载文件校验失败（sha256 不符）");
+                    return Fail("下载文件校验失败（sha256 与已签名清单不符）");
             }
 
-            progress?.Report(new UpdateProgressInfo { Value = 0.60, Stage = "正在解压更新包" });
+            progress?.Report(new UpdateProgressInfo { Value = 0.55, Stage = "正在校验更新包" });
 
-            // 更新包先完整保存在下载目录，重启替换脚本再移入安装目录。
-            var staging = Path.Combine(paths.CacheRoot, "launcher-staging");
-            if (Directory.Exists(staging)) Directory.Delete(staging, true);
-            Directory.CreateDirectory(staging);
+            var updateRoot = paths.UpdateRoot;
+            Directory.CreateDirectory(updateRoot);
 
-            var zip = Path.Combine(paths.CacheRoot, "launcher-" + Safe(latest) + ".zip");
+            // 更新包留在 .GC/update，交给 SAVEDOG 自己解压 —— 不信任"预解压目录"，
+            // 避免「解压后被替换」的中间窗口。
+            var zip = Path.Combine(updateRoot, "package.zip");
+            if (File.Exists(zip)) File.Delete(zip);
             await File.WriteAllBytesAsync(zip, bytes, ct);
-            try { ZipSafety.ExtractToDirectory(zip, staging); }
-            finally { try { File.Delete(zip); } catch { } }
 
-            // 只展平「单个非 .app 顶层目录」的 zip
-            FlattenStaging(staging);
+            try
+            {
+                var inspection = SafeArchive.Inspect(zip);
+                Console.WriteLine($"[update] 更新包检查通过：{inspection.Entries} 个条目，" +
+                                  $"{inspection.UncompressedBytes / 1024 / 1024} MB");
+            }
+            catch (Exception ex)
+            {
+                try { File.Delete(zip); } catch { }
+                return Fail("更新包安全性检查失败: " + ex.Message);
+            }
 
-            progress?.Report(new UpdateProgressInfo { Value = 0.80, Stage = "正在暂存新版本" });
+            // 二次验签用的清单副本：SAVEDOG 不信任"启动器说它验过了"
+            var rawManifest = await remote.GetRawVersionTextAsync(ct);
+            var manifestCopy = Path.Combine(updateRoot, "version.json");
+            if (!string.IsNullOrWhiteSpace(rawManifest))
+                File.WriteAllText(manifestCopy, rawManifest!);
+            else if (File.Exists(manifestCopy))
+                File.Delete(manifestCopy);
 
-            var payload = Path.Combine(paths.UpdateRoot, "payload");
-            if (Directory.Exists(payload)) Directory.Delete(payload, true);
-            Directory.CreateDirectory(payload);
-            var packageName = MoveToPayload(staging, payload);
-            try { Directory.Delete(staging, true); } catch { }
-            if (packageName == null) return Fail("解压结果里没有找到新版启动器");
+            // 包名：GC-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）
+            var packageName = $"GC-{latest}-{PlatformLabel}" + (OperatingSystem.IsMacOS() ? ".app" : ".exe");
 
-            // 写标记（纯文本，脚本读它）：只含相对信息，无绝对路径
-            Directory.CreateDirectory(paths.UpdateRoot);
-            File.WriteAllText(Path.Combine(paths.UpdateRoot, "update.txt"),
-                $"NAME={packageName}\nVERSION={latest}\nPLATFORM={PlatformLabel}\n" +
-                $"INSTALL_REL={Path.GetRelativePath(paths.UpdateRoot, paths.InstallDirectory)}\n");
+            var request = new SavedogRequest
+            {
+                Version = latest,
+                Rid = rid,
+                PlatformLabel = PlatformLabel,
+                PackageName = packageName,
+                PackageZip = "package.zip",
+                PayloadDir = "payload",
+                ManifestPath = "version.json",
+                PackageSha256 = pkg.Sha256!.Trim().ToLowerInvariant(),
+                PackageSize = bytes.LongLength,
+                RequireSignature = version.IsTrusted,
+                InstallRelative = Path.GetRelativePath(updateRoot, paths.InstallDirectory),
+                CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            };
+            Json.Write(Path.Combine(updateRoot, SavedogFiles.ApplyRequest), request);
+
+            // 兼容兜底：没有 SAVEDOG 的旧安装，仍然按老方式预解压 + 脚本替换
+            string? legacyPath = null;
+            if (SavedogLauncher.Find(paths) == null)
+            {
+                Console.WriteLine("[update] 未找到 GC-SAVEDOG，使用兼容脚本流程");
+                progress?.Report(new UpdateProgressInfo { Value = 0.7, Stage = "正在解压更新包" });
+
+                var staging = Path.Combine(paths.CacheRoot, "launcher-staging");
+                if (Directory.Exists(staging)) Directory.Delete(staging, true);
+                Directory.CreateDirectory(staging);
+                SafeArchive.ExtractToDirectory(zip, staging);
+                FlattenStaging(staging);
+
+                var payload = Path.Combine(updateRoot, "payload");
+                if (Directory.Exists(payload)) Directory.Delete(payload, true);
+                Directory.CreateDirectory(payload);
+                var legacyName = MoveToPayload(staging, payload);
+                try { Directory.Delete(staging, true); } catch { }
+                if (legacyName == null) return Fail("解压结果里没有找到新版启动器");
+
+                packageName = legacyName;
+                request.PackageName = legacyName;
+                Json.Write(Path.Combine(updateRoot, SavedogFiles.ApplyRequest), request);
+                legacyPath = Path.Combine(payload, legacyName);
+
+                // 老脚本读这个纯文本标记，只含相对信息
+                File.WriteAllText(Path.Combine(updateRoot, "update.txt"),
+                    $"NAME={legacyName}\nVERSION={latest}\nPLATFORM={PlatformLabel}\n" +
+                    $"INSTALL_REL={request.InstallRelative}\n");
+            }
 
             progress?.Report(new UpdateProgressInfo { Value = 1.0, Stage = "下载完成" });
 
@@ -354,7 +426,7 @@ public static class LauncherUpdater
                 Version = latest,
                 Message = $"v{latest} 已暂存到 .GC/update",
                 PackageName = packageName,
-                NewAppPath = Path.Combine(payload, packageName)
+                NewAppPath = legacyPath
             };
         }
         catch (OperationCanceledException) { return Fail("已取消"); }
@@ -370,21 +442,30 @@ public static class LauncherUpdater
     // ---------------------------------------------------------------- 应用（下次启动）
 
     /// <summary>
-    /// 生成替换脚本并启动。脚本等本进程退出后：
-    ///   启动新版 -> 删除同平台且版本号 != latest 的 GC-* 文件 -> 清理标记。
+    /// 安排应用已下载的新版。
+    ///   首选 <b>GC-SAVEDOG</b>：二次验签、原子替换、启动后健康检查、失败自动回滚；
+    ///   找不到 SAVEDOG 时退回旧脚本流程（只用于从老版本升级的过渡）。
     /// 返回 true 表示调用方应立即退出进程。
     /// </summary>
     public static bool ScheduleApply(AppPaths paths, string packageName)
     {
-        var marker = Path.Combine(paths.UpdateRoot, "update.txt");
-        if (!File.Exists(marker)) return false;
-
         // 安全阀：绝不在源码目录执行替换（防止误删源码）
         if (File.Exists(Path.Combine(paths.InstallDirectory, "GC.sln")))
         {
             Console.Error.WriteLine("源码版：新版已下载，但拒绝在源码目录执行替换");
             return false;
         }
+
+        if (File.Exists(Path.Combine(paths.UpdateRoot, SavedogFiles.ApplyRequest)))
+        {
+            string? savedogError = null;
+            if (SavedogLauncher.TryStart(paths, Environment.ProcessId, out savedogError))
+                return true;
+            Console.Error.WriteLine($"[update] {savedogError}，改用兼容脚本");
+        }
+
+        var marker = Path.Combine(paths.UpdateRoot, "update.txt");
+        if (!File.Exists(marker)) return false;
 
         try
         {
@@ -420,13 +501,30 @@ public static class LauncherUpdater
         }
     }
 
-    /// <summary>启动时若有待应用更新，安排脚本并让 Main 直接退出。</summary>
+    /// <summary>启动时若有待应用更新：交给 SAVEDOG，由调用方退出进程。</summary>
     public static bool TryApplyPending(AppPaths paths)
     {
         if (paths.IsDevelopment) return false;
         if (Environment.GetEnvironmentVariable("EMS_SELFTEST") == "1") return false;
         if (Environment.GetEnvironmentVariable("EMS_NO_SELF_UPDATE") == "1") return false;
 
+        // 新协议：apply-request.json + package.zip（SAVEDOG 自己解压 + 验签）
+        var requestPath = Path.Combine(paths.UpdateRoot, SavedogFiles.ApplyRequest);
+        if (File.Exists(requestPath))
+        {
+            var request = Json.Read<SavedogRequest>(requestPath);
+            var zipPath = request == null
+                ? null
+                : Path.Combine(paths.UpdateRoot, request.PackageZip);
+
+            if (request != null && zipPath != null && File.Exists(zipPath))
+                return ScheduleApply(paths, request.PackageName);
+
+            Console.Error.WriteLine("[update] 更新申请不完整，已清理");
+            try { File.Delete(requestPath); } catch { }
+        }
+
+        // 旧协议：update.txt + payload（从老版本升级时仍可能遇到）
         var marker = Path.Combine(paths.UpdateRoot, "update.txt");
         if (!File.Exists(marker)) return false;
 

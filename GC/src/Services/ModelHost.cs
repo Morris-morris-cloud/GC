@@ -71,6 +71,40 @@ public sealed class ModelHost
 
     private Session CreateSession(ModelPackage package, Action requestClose, Action<double, string?>? progress)
     {
+        // ---- 契约协商 -------------------------------------------------------
+        // 先做廉价检查：不满足就直接拒绝，避免加载了才发现不兼容。
+        var declaredApi = package.Manifest.ApiVersion;
+        if (declaredApi < 1)
+            throw new InvalidOperationException($"模型清单的 apiVersion 非法: {declaredApi}");
+
+        if (declaredApi > SupportedApiVersion)
+            throw new InvalidOperationException(
+                $"该模型需要更新的启动器（模型契约 v{declaredApi}，当前支持 v{SupportedApiVersion}）。" +
+                "请先更新启动器，或让模型作者发布兼容版本。");
+
+        var minApp = package.Manifest.MinAppVersion;
+        if (!string.IsNullOrWhiteSpace(minApp) &&
+            CompareVersions(LauncherRuntimeInfo.CurrentLauncherVersion, minApp!) < 0)
+            throw new InvalidOperationException(
+                $"该模型要求启动器 ≥ v{minApp}，当前为 v{LauncherRuntimeInfo.CurrentLauncherVersion}");
+
+        // ---- 完整性：dll 会被直接执行，加载前必须确认它没被改过 ----------------
+        var integrity = ModelIntegrity.VerifyForLoad(package.Directory, package.Id);
+        if (!integrity.Ok)
+        {
+            var message = $"模型完整性校验失败（{package.Id}）：{integrity.Message}。" +
+                          "请删除该模型目录让启动器重新下载。";
+            if (Environment.GetEnvironmentVariable("GC_ALLOW_TAMPERED_MODELS") == "1")
+                Console.Error.WriteLine("[warn] " + message + "（已按 GC_ALLOW_TAMPERED_MODELS 放行）");
+            else
+                throw new InvalidOperationException(message);
+        }
+        else if (!integrity.Present && Environment.GetEnvironmentVariable("GC_STRICT_MODELS") == "1")
+        {
+            throw new InvalidOperationException(
+                $"模型缺少完整性记录（{package.Id}），严格模式下拒绝加载");
+        }
+
         var assemblyPath = package.AssemblyPath;
         if (!File.Exists(assemblyPath))
             throw new FileNotFoundException($"模型缺少功能程序集：{assemblyPath}", assemblyPath);
@@ -89,7 +123,8 @@ public sealed class ModelHost
 
             if (factory.ApiVersion != SupportedApiVersion)
                 throw new InvalidOperationException(
-                    $"模型契约版本 {factory.ApiVersion} 与启动器 {SupportedApiVersion} 不一致");
+                    $"模型程序集的契约版本为 v{factory.ApiVersion}，启动器支持 v{SupportedApiVersion}；" +
+                    "请更新到匹配的版本");
 
             var runtime = factory.Create();
             var modelContext = new ModelContext(package, L.I.Language, _memory.BudgetMb, requestClose, progress);
@@ -116,6 +151,34 @@ public sealed class ModelHost
             if (typeof(IModelFactory).IsAssignableFrom(type)) return type;
         }
         return null;
+    }
+
+    /// <summary>比较 1.0.10 与 1.0.9 这类版本号（按数字段比较，不按字符串）。</summary>
+    private static int CompareVersions(string left, string right)
+    {
+        static int[] Parts(string value)
+        {
+            var text = value.Trim().TrimStart('v', 'V');
+            var pieces = text.Split('.');
+            var numbers = new int[Math.Max(4, pieces.Length)];
+            for (var i = 0; i < pieces.Length; i++)
+            {
+                var digits = new string(Array.FindAll(pieces[i].ToCharArray(), char.IsDigit));
+                if (digits.Length > 6) digits = digits[..6];
+                numbers[i] = int.TryParse(digits, out var n) ? n : 0;
+            }
+            return numbers;
+        }
+
+        var a = Parts(left);
+        var b = Parts(right);
+        for (var i = 0; i < Math.Max(a.Length, b.Length); i++)
+        {
+            var x = i < a.Length ? a[i] : 0;
+            var y = i < b.Length ? b[i] : 0;
+            if (x != y) return x < y ? -1 : 1;
+        }
+        return 0;
     }
 
     private sealed class Session : IDisposable

@@ -21,7 +21,7 @@ model/
   _engine/                        # 共享引擎源码
     src/                          #   CelestialView / PlanetTexture / EarthModelView / SphereRaster…
     PreviewGen/                   #   用模型渲染器生成封面的小工具
-    VersionStamp/                 #   按内容指纹自动打版本、生成 version.json
+    VersionStamp/                 #   生成 version.json（手写版本 + 完整性哈希）
   <模型 id>/
     <模型 id>.json                # 清单：名称、i18n、版本、程序集入口、封面
     src/                          # 模型自己的源码（csproj + IModelFactory 实现）
@@ -34,22 +34,34 @@ model/
       i18n/en.json
 ```
 
-## 版本是自动改的
+## 版本、指纹与完整性
 
 `./build.sh models`（或 `./build.sh stamp`）会调用 `model/_engine/VersionStamp`：
 
-1. 对每个模型，把 `<id>.json`（去掉 `version` / `updatedAt`）与 `<id>.model/` 下所有文件
-   按路径排序做 SHA-256 指纹，得到版本号 `1.0-<10位指纹>`；
-2. 把这个版本写回 `<id>.json` 的 `version` 与 `updatedAt`；
-3. 生成仓库根 `version.json` 和 `model/version.json`（内容相同），里面记录
-   启动器版本、各平台更新包地址、每个模型的 id / 版本 / 仓库目录。
+1. 读每个模型的 `<id>.json`，**保留作者手写的 `version`**（如 `1.6`）——
+   版本号是对用户可见的语义版本，不由指纹自动覆盖；
+2. 计算 `build`：`<id>.json`（去掉 `build` / `updatedAt`）与 `<id>.model/` 下所有文件
+   按路径排序后的 SHA-256 指纹前 10 位，**仅用于构建溯源**；
+3. 计算完整性哈希（客户端下载后会复算，不一致就丢弃）：
+   - `manifestSha256` = 清单文件本身的 sha256
+   - `filesSha256` = `<id>.model` 目录指纹
+4. 生成仓库根 `version.json` 与 `model/version.json`（内容相同），再用
+   `.signing/gc-signing.pem` 签名（ECDSA P-256），两份文件写的是**同一份签名**。
 
-**所以只要改了模型文件，版本号就自动变**，不需要手工维护；内容没变时重复构建版本号保持不变。
-客户端启动时读 `version.json`，和 `.GC/settings.json` 里记录的版本一比对就知道要不要下载。
+**改了模型内容必须手动升 `version`**，否则客户端认为版本没变，不会下载。
+（`build` 会变，但它不参与版本比较。）
 
-> 改了 `scene.json` 或引擎源码后，跑 `./build.sh models`，再把 `version.json` 和 `model/`
-> 推送到 gitcode；客户端下次启动会下载新模型并**本次启动立即生效**。
-> 启动器自身更新包由 `./build.sh publish` 生成（`dist/GC-<rid>.zip`），下载后**下次启动才应用**。
+哈希算法（构建端与客户端共用 `GC/src/Security/ContentHash.cs`，不会出现两套实现）：
+
+```
+fileHash = SHA256(文件字节)
+dirHash  = SHA256( 按相对路径 ordinal 升序，对每个文件拼接 "<相对路径>\0<fileHash>\n" )
+```
+
+相对路径统一 `/`，跳过 `.` 开头文件、`bin/`、`obj/`、`*.user`；不含时间戳/权限位。
+
+安装成功后客户端会在模型目录写 `<id>.integrity.json`，每次加载 dll 前抽查
+dll / json 的哈希 —— 本地文件被替换会直接拒绝加载。
 
 ## `<id>.json`（模型清单，启动器只读它）
 
@@ -60,24 +72,45 @@ model/
   "nameI18n": { "zh-CN": "地球自转", "en": "Earth Rotation" },
   "description": "……",
   "descriptionI18n": { "zh-CN": "……", "en": "……" },
-  "version": "1.0-3f9a2c1b7d",
-  "updatedAt": "2026-11-07T08:00:00Z",
+  "version": "1.6",
+  "updatedAt": "2026-11-14T08:00:00Z",
   "author": "NeoRF",
   "tags": ["astronomy", "geography"],
   "assembly": "EarthRotationModel.dll",
   "type": "NeoRF.EarthModels.RotationModelFactory",
   "preview": "preview.png",
-  "apiVersion": 1
+  "apiVersion": 1,
+  "minAppVersion": "1.0.7"
 }
 ```
 
 | 字段 | 作用 |
 | --- | --- |
-| `version` | **自动生成**，模型包内容指纹；客户端靠它判断是否需要更新 |
+| `version` | **作者手写**的语义版本；客户端靠它判断是否需要更新 |
 | `assembly` | 功能程序集文件名，相对 `<id>.model`；留空按 `<id>.dll` 找 |
 | `type` | 实现 `IModelFactory` 的完整类型名；留空则自动找第一个实现 |
 | `preview` | 封面图，默认 `preview.png` |
-| `apiVersion` | 模型契约版本，目前为 1 |
+| `apiVersion` | 模型契约版本，目前为 1；高于启动器支持版本会拒绝加载并提示升级 |
+| `minAppVersion` | 可选，要求的最低启动器版本（如 `1.0.7`） |
+
+`build` / `manifestSha256` / `filesSha256`（只出现在 `version.json` 里）由构建自动写入，
+**不要手改**。
+
+## 最小可分发结构
+
+一个能跑的最小模型只需要三个文件：
+
+```
+model/hello/
+  hello.json                  # 清单（id / version / assembly / type / apiVersion）
+  hello.model/
+    HelloModel.dll            # 实现 IModelFactory，返回任意 Avalonia 控件
+```
+
+其余（`preview.png`、`i18n/`、`scene.json`、`land.json`）都是可选的：
+没有封面用默认灰图，没有语言包用清单里的 `name` / `description`。
+源码放在同目录的 `src/` 里，`./build.sh models` 会自动编译并把 dll 复制进 `hello.model/`。
+
 
 ## 模型契约（model/_sdk）
 
@@ -152,5 +185,9 @@ public interface IModelContext
 
 - **自动更新（推荐）**：把 `version.json` 和 `model/` 推到 gitcode 仓库，启动器开机自检并下载到 `.GC/model/`
 - **离线源**：把整个仓库目录（含 `version.json` + `model/`）拷到 U 盘 / 共享盘，
-  在 `.GC/settings.json` 填 `updateLocalRoot` 指向它
+  在 `.GC/config/settings.json` 填 `updateLocalRoot` 指向它
 - **手动导入**：在「下载」页粘贴任意 git 仓库 / zip / 本地目录，读取其中的 `model/` 文件夹
+
+> 三种方式都会**验签**：`version.json` 必须由受信任私钥签名，否则客户端拒绝安装。
+> 自己维护分支时，用 `dotnet run --project GC-SAVEDOG -- keygen` 生成密钥，
+> 把公钥加进 `GC/src/Security/SignatureKeyring.cs`，再用 `--sign`/`build.sh stamp` 签名。

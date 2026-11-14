@@ -33,7 +33,7 @@ bs_check() {
   fi
 
   progress_step "产物检查"
-  _n=$(ls "$ROOT_DIR"/dist/GC-"$VERSION"-*.zip 2>/dev/null | wc -l | tr -d ' ')
+  _n=$(ls "$ROOT_DIR"/dist/*/GC-"$VERSION"-*.zip 2>/dev/null | wc -l | tr -d ' ')
   if [ "$_n" -ge 3 ]; then
     progress_tick 100
   else

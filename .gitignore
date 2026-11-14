@@ -1,6 +1,9 @@
 # 运行数据目录（settings/model/cache/update），绝不入库
 .GC/
 
+# 签名私钥：绝对不入库（公钥写在 GC/src/Security/SignatureKeyring.cs 里）
+.signing/
+
 # .NET 构建中间产物（已跟踪的历史文件不动，只防新增）
 bin/
 obj/

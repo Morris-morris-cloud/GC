@@ -86,13 +86,19 @@ public sealed class GitCodeReleaseRemote : IModelRemote
 
         if (!gotRelease)
         {
-            // 没有 Release：启动器版本留空（表示这个源没有可升级的启动器），
-            // 但模型清单仍然有效，保证模型能正常同步。
-            Console.WriteLine($"[gitcode] {DisplayName}: Release 为空（模型清单仍可用）");
-            if (version != null)
+            // 没有 Release ≠ 不能更新：清单已签名，且每个平台包都写了 sha256，
+            // 走「仓库 dist/<系统>-<架构>/ 里的编译产物」同样可信。
+            // 这里保留清单里的 launcher 版本与包信息，让下载端去 dist 目录找包。
+            var v = (version?.Launcher.Version ?? "").Trim();
+            var n = version?.Launcher.Packages.Count ?? 0;
+            if (v.Length == 0 || n == 0)
             {
-                version.Launcher.Version = "";
-                version.Launcher.Packages.Clear();
+                Console.WriteLine($"[gitcode] {DisplayName}: 没有 Release，清单里也没有启动器包");
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"[gitcode] {DisplayName}: 没有 Release，改用清单声明的 v{v}（{n} 个平台包，去 dist/ 找产物）");
             }
         }
         return version;
@@ -120,6 +126,7 @@ public sealed class GitCodeReleaseRemote : IModelRemote
         if (latest == null || string.IsNullOrWhiteSpace(latest.Version)) return false;
 
         version.Launcher.Version = latest.Version;
+        _content.SetLauncherVersion(latest.Version);
 
         _assets.Clear();
         foreach (var asset in latest.Assets)

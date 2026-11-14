@@ -35,6 +35,11 @@ public partial class App : Application
             var window = new MainWindow();
             window.Show();
 
+            // 健康标记：GC-SAVEDOG 正在等这个文件。主窗口能显示出来，
+            // 就说明「新版本确实能启动」，它据此决定保留新版还是回滚。
+            StartupHealth.MarkHealthy(services.Paths.UpdateRoot,
+                LauncherRuntimeInfo.CurrentLauncherVersion);
+
             // 首帧之后再构造 ViewModel：Post 而非依赖 Opened，
             // 因为 Opened 在某些情况下不触发（headless / 部分平台），
             // 会导致 DataContext 一直是 null、主页面白屏。

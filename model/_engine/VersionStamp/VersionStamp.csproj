@@ -8,5 +8,11 @@
     <AssemblyName>VersionStamp</AssemblyName>
     <RootNamespace>VersionStamp</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- 与启动器 / SAVEDOG 共用同一份哈希实现，保证"构建端算的"和"客户端验的"完全一致 -->
+    <Compile Include="..\..\..\GC\src\Security\ContentHash.cs" Link="Shared\ContentHash.cs" />
+    <!-- 平台标签与 dist 目录推导也共用：构建端写进清单的路径，必须和下载端找的路径一致 -->
+    <Compile Include="..\..\..\GC-DOWNLOAD\LauncherArtifacts.cs" Link="Shared\LauncherArtifacts.cs" />
+  </ItemGroup>
 
 </Project>
