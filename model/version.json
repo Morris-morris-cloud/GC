@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "generated": "2026-11-13T15:19:06Z",
+  "generated": "2026-11-14T01:23:14Z",
   "repository": "https://gitcode.com/2509_92447106/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
     "version": "1.0.6",
-    "revision": "6db90790d3",
+    "revision": "98cff12092",
     "packages": {
       "win-x64": {
         "path": "dist/GC-win-x64.zip",
@@ -32,27 +32,33 @@
   },
   "models": [
     {
+      "id": "contour-map",
+      "version": "1.0",
+      "build": "e7f837d0ef",
+      "dir": "model/contour-map"
+    },
+    {
       "id": "earth-geography",
       "version": "1.8",
-      "build": "912c6d5619",
+      "build": "143e56bed8",
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
       "version": "1.6",
-      "build": "d34ade3c3f",
+      "build": "26a2bd8f68",
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
       "version": "1.6",
-      "build": "033c8f1696",
+      "build": "1a81492baa",
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
       "version": "1.5",
-      "build": "85a274733d",
+      "build": "79711a44a8",
       "dir": "model/scale-calculator"
     }
   ]

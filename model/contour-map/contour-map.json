@@ -1,0 +1,30 @@
+{
+  "id": "contour-map",
+  "nameI18n": {
+    "zh-CN": "等高线地形图",
+    "en": "Contour Map"
+  },
+  "descriptionI18n": {
+    "zh-CN": "立体地形与平面等高线联动，判读山峰、山脊、山谷、鞍部、陡崖五种部位。",
+    "en": "Link 3D relief with contour lines; identify peaks, ridges, valleys, saddles and cliffs."
+  },
+  "author": "Morris GC",
+  "tags": [
+    "geography",
+    "map",
+    "contour",
+    "terrain"
+  ],
+  "assembly": "ContourMapModel.dll",
+  "type": "NeoRF.ContourMap.ContourMapFactory",
+  "version": "1.0",
+  "chrome": {
+    "titleBar": "#0C1828",
+    "titleBorder": "#1B2740",
+    "titleText": "#EAF2FF",
+    "button": "#9FB4D4",
+    "frame": "#0A1524"
+  },
+  "updatedAt": "2026-11-14T01:23:14Z",
+  "build": "e7f837d0ef"
+}
