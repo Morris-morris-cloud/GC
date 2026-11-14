@@ -112,35 +112,43 @@ public static class TerrainAnalyzer
         return (a + b - 2 * c) / 1000.0 * 6.0;
     }
 
-    /// <summary>按海拔给颜色（分层设色，与课本一致：绿→黄→棕→白）。</summary>
+    /// <summary>
+    /// 教科书规范的**分层设色**：按固定高程档位套用固定色阶，档内不渐变。
+    ///
+    /// 人教版七年级上册的分层设色色阶（自低到高）：
+    ///   深绿 → 浅绿 → 绿 → 浅黄 → 黄 → 浅褐 → 褐 → 浅棕 → 白
+    /// 关键点：**同一档内颜色完全相同**，这样一眼就能数出有几层，
+    /// 而不是课本上那种连续渐变。
+    /// </summary>
     public static (byte R, byte G, byte B) ColorForHeight(float h, float min, float max)
     {
-        var t = max - min < 1 ? 0.5 : Math.Clamp((h - min) / (max - min), 0, 1);
+        // 按绝对高程分档（教科书就是这么画的：看的是海拔，不是相对高度）
+        const float band = 200f;   // 每 200 米一档
 
-        // 低：深绿 → 草绿 → 黄 → 土黄 → 棕 → 浅棕 → 白
-        var stops = new (double T, byte R, byte G, byte B)[]
-        {
-            (0.00,  46, 110,  72),   // 深绿（谷底）
-            (0.30,  96, 158,  84),   // 草绿
-            (0.55, 186, 196,  96),   // 黄绿
-            (0.72, 214, 178, 108),   // 土黄
-            (0.86, 176, 132,  96),   // 棕
-            (0.95, 208, 186, 164),   // 浅棕
-            (1.00, 245, 245, 245)    // 雪白
-        };
-
-        for (var i = 0; i < stops.Length - 1; i++)
-        {
-            var a = stops[i]; var b = stops[i + 1];
-            if (t >= a.T && t <= b.T)
-            {
-                var k = (t - a.T) / Math.Max(1e-6, b.T - a.T);
-                return (Lerp(a.R, b.R, k), Lerp(a.G, b.G, k), Lerp(a.B, b.B, k));
-            }
-        }
-        var last = stops[^1];
-        return (last.R, last.G, last.B);
+        if (h < 200) return (0x1E, 0x6B, 0x3A);      // 深绿：< 200 m
+        if (h < 400) return (0x4E, 0x9E, 0x4E);      // 浅绿：200–400
+        if (h < 600) return (0xA8, 0xC6, 0x66);      // 绿：400–600
+        if (h < 800) return (0xE8, 0xE2, 0x9A);      // 浅黄：600–800
+        if (h < 1000) return (0xE0, 0xC0, 0x5A);     // 黄：800–1000
+        if (h < 1200) return (0xC8, 0x9A, 0x63);     // 浅褐：1000–1200
+        if (h < 1400) return (0xA8, 0x74, 0x4C);     // 褐：1200–1400
+        if (h < 1600) return (0xC8, 0xA8, 0x8C);     // 浅棕：1400–1600
+        return (0xF5, 0xF5, 0xF0);                   // 白：> 1600（雪线以上）
     }
+
+    /// <summary>该颜色属于哪一档（用于图例）。</summary>
+    public static string BandName(float h) => h switch
+    {
+        < 200 => "200 米以下",
+        < 400 => "200–400 米",
+        < 600 => "400–600 米",
+        < 800 => "600–800 米",
+        < 1000 => "800–1000 米",
+        < 1200 => "1000–1200 米",
+        < 1400 => "1200–1400 米",
+        < 1600 => "1400–1600 米",
+        _ => "1600 米以上"
+    };
 
     private static byte Lerp(byte a, byte b, double k)
         => (byte)Math.Clamp(a + (b - a) * k, 0, 255);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -244,6 +245,9 @@ public sealed class ContourView : Control
     // ---- 右侧：等高线俯视图 ----
     private void DrawContourMap(DrawingContext dc, Rect r)
     {
+        // 底部预留剖面图的空间
+        var profileH = Math.Min(132, r.Height * 0.30);
+        if (profileH > 50) r = new Rect(r.X, r.Y, r.Width, r.Height - profileH);
         // 分层设色底图
         const int N = 96;
         for (var j = 0; j < N; j++)
@@ -308,6 +312,60 @@ public sealed class ContourView : Control
             }
         }
 
+        // ── 教科书地形符号 ──
+
+        // 河流：蓝色线（沿谷底流）
+        if (Field.River.Count > 1)
+        {
+            var geo = new StreamGeometry();
+            using (var g = geo.Open())
+            {
+                g.BeginFigure(P(Field.River[0].U, Field.River[0].V), false);
+                for (var i = 1; i < Field.River.Count; i++)
+                    g.LineTo(P(Field.River[i].U, Field.River[i].V));
+                g.EndFigure(false);
+            }
+            var riverPen = new Pen(new SolidColorBrush(Color.Parse("#2F7FD0")), 2.2);
+            riverPen.LineJoin = PenLineJoin.Round;
+            riverPen.LineCap = PenLineCap.Round;
+            dc.DrawGeometry(null, riverPen, geo);
+        }
+
+        // 山峰：▲ + 高程数字（教科书标注法）
+        foreach (var (pu, pv, ph) in Field.Peaks.Take(4))
+        {
+            var at = P(pu, pv);
+            var tri = new StreamGeometry();
+            using (var g = tri.Open())
+            {
+                g.BeginFigure(new Point(at.X, at.Y - 6), true);
+                g.LineTo(new Point(at.X - 5.5, at.Y + 4));
+                g.LineTo(new Point(at.X + 5.5, at.Y + 4));
+                g.EndFigure(true);
+            }
+            dc.DrawGeometry(new SolidColorBrush(Color.Parse("#3A2A18")), null, tri);
+            Text(dc, ((int)ph).ToString(), at.X + 8, at.Y - 8, 10, Color.Parse("#3A2A18"), true);
+        }
+
+        // 陡崖：锯齿符号（教科书用锯齿线表示陡崖）
+        foreach (var (cu, cv) in Field.Cliffs.Take(40))
+        {
+            var at = P(cu, cv);
+            var saw = new StreamGeometry();
+            using (var g = saw.Open())
+            {
+                g.BeginFigure(new Point(at.X - 3, at.Y + 3), false);
+                for (var i = 0; i < 3; i++)
+                {
+                    var x0 = at.X - 3 + i * 3;
+                    g.LineTo(new Point(x0 + 1.5, at.Y - 2));
+                    g.LineTo(new Point(x0 + 3, at.Y + 3));
+                }
+                g.EndFigure(false);
+            }
+            dc.DrawGeometry(null, new Pen(new SolidColorBrush(Color.Parse("#8B2E2E")), 1.4), saw);
+        }
+
         // 悬停十字
         if (_hasHover)
         {
@@ -318,8 +376,163 @@ public sealed class ContourView : Control
             dc.DrawEllipse(new SolidColorBrush(Colors.White), new Pen(new SolidColorBrush(CAccent), 2), at, 5, 5);
         }
 
+        DrawNorthArrow(dc, r);
+        DrawScaleBar(dc, r);
+        DrawLegend(dc, r);
+        DrawProfile(dc, r);
+
         // 边框
         dc.DrawRectangle(null, new Pen(new SolidColorBrush(CLine), 1.2), r);
+    }
+
+    /// <summary>
+    /// 地形剖面图（教科书等高线图必配）：沿图幅中部的一条南北剖面线，
+    /// 画出地面起伏并标注各点海拔。这是最能体现「等高线图 ↔ 立体地形」关系的图。
+    /// </summary>
+    private void DrawProfile(DrawingContext dc, Rect mapRect)
+    {
+        var h = Math.Min(132, mapRect.Height * 0.30);
+        var r = new Rect(mapRect.X, mapRect.Bottom - h, mapRect.Width, h);
+        if (r.Height < 50) return;
+
+        // 背景
+        dc.FillRectangle(new SolidColorBrush(Color.FromArgb(235, 252, 250, 244)), r);
+        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 1.0), r);
+
+        // 纵轴比例：0 → 最大高程
+        var maxH = Math.Max(1f, Field.MaxHeight);
+        var baseY = r.Bottom - 18;
+        var topY = r.Y + 16;
+
+        // 水平网格（每 200 m 一条）
+        for (var hh = 200f; hh < maxH; hh += 200)
+        {
+            var gy = baseY - (hh / maxH) * (baseY - topY);
+            dc.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(70, 42, 52, 70)), 0.8),
+                new Point(r.X, gy), new Point(r.Right, gy));
+            Text(dc, $"{hh:0}", r.X + 2, gy - 8, 7.5, Color.Parse("#5A6B80"));
+        }
+        // 基准线
+        dc.DrawLine(new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 1.2),
+            new Point(r.X, baseY), new Point(r.Right, baseY));
+
+        // 剖面线：沿图幅中部（v = 0.5）自西向东
+        const int N = 160;
+        var geo = new StreamGeometry();
+        using (var g = geo.Open())
+        {
+            for (var i = 0; i <= N; i++)
+            {
+                var u = (double)i / N;
+                var hv = Field.SampleSmooth(u, 0.5);
+                var y = baseY - (hv / maxH) * (baseY - topY);
+                var x = r.X + u * r.Width;
+                if (i == 0) g.BeginFigure(new Point(x, y), false);
+                else g.LineTo(new Point(x, y));
+            }
+            g.EndFigure(false);
+        }
+        dc.DrawGeometry(null, new Pen(new SolidColorBrush(Color.Parse("#B03A2E")), 2.0), geo);
+
+        // 剖面线上的几个关键点（与等高线图上的位置对应）
+        var marks = new[] { 0.0, 0.25, 0.5, 0.75, 1.0 };
+        foreach (var u in marks)
+        {
+            var hv = Field.SampleSmooth(u, 0.5);
+            var y = baseY - (hv / maxH) * (baseY - topY);
+            var x = r.X + u * r.Width;
+            dc.DrawEllipse(new SolidColorBrush(Color.Parse("#B03A2E")), null, new Point(x, y), 3, 3);
+            Text(dc, $"{hv:0}", x, y - 13, 8, Color.Parse("#8B2E24"), true, TextAlignment.Center);
+        }
+
+        // 标注：剖面线在图上的位置
+        Text(dc, T("profile.title"), r.X + 6, r.Y + 3, 9, Color.Parse("#2A3446"), true);
+        dc.DrawLine(new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 1.2, dashStyle: DashStyle.Dash),
+            new Point(r.X + r.Width / 2, mapRect.Y), new Point(r.X + r.Width / 2, r.Y));
+    }
+
+    /// <summary>指北针（教科书地图必备，位于图幅右上角）。</summary>
+    private void DrawNorthArrow(DrawingContext dc, Rect r)
+    {
+        var x = r.Right - 26;
+        var y = r.Y + 20;
+        var tri = new StreamGeometry();
+        using (var g = tri.Open())
+        {
+            g.BeginFigure(new Point(x, y - 12), true);
+            g.LineTo(new Point(x - 5, y + 6));
+            g.LineTo(new Point(x, y + 2));
+            g.EndFigure(true);
+        }
+        dc.DrawGeometry(new SolidColorBrush(Color.Parse("#2A3446")), null, tri);
+        var tri2 = new StreamGeometry();
+        using (var g2 = tri2.Open())
+        {
+            g2.BeginFigure(new Point(x, y - 12), true);
+            g2.LineTo(new Point(x + 5, y + 6));
+            g2.LineTo(new Point(x, y + 2));
+            g2.EndFigure(true);
+        }
+        dc.DrawGeometry(new SolidColorBrush(Color.Parse("#8FA0B8")), null, tri2);
+        Text(dc, "N", x, y + 8, 9.5, Color.Parse("#2A3446"), true, TextAlignment.Center);
+    }
+
+    /// <summary>比例尺（教科书地图必备，左下角）。</summary>
+    private void DrawScaleBar(DrawingContext dc, Rect r)
+    {
+        var x = r.X + 14;
+        var y = r.Bottom - 22;
+        var w = 90.0;
+        var h = 5.0;
+
+        // 分黑白相间的格（教科书比例尺画法）
+        for (var i = 0; i < 4; i++)
+        {
+            var seg = new Rect(x + i * w / 4, y, w / 4, h);
+            dc.FillRectangle(new SolidColorBrush(i % 2 == 0
+                ? Color.Parse("#2A3446") : Color.Parse("#FFFFFF")), seg);
+            dc.DrawRectangle(new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 0.8), seg);
+        }
+        Text(dc, "0", x, y - 11, 8.5, Color.Parse("#2A3446"), align: TextAlignment.Center);
+        Text(dc, "1 km", x + w, y - 11, 8.5, Color.Parse("#2A3446"), align: TextAlignment.Center);
+    }
+
+    /// <summary>分层设色图例（教科书右下角的色阶表）。</summary>
+    private void DrawLegend(DrawingContext dc, Rect r)
+    {
+        var bands = new (float From, float To)[]
+        {
+            (0, 200), (200, 400), (400, 600), (600, 800),
+            (800, 1000), (1000, 1200), (1200, 1400), (1400, 1600), (1600, 2000)
+        };
+
+        var w = 62.0;
+        var rowH = 11.0;
+        var h = bands.Length * rowH + 16;
+        var x = r.Right - w - 12;
+        var y = r.Bottom - h - 12;
+
+        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(210, 255, 255, 255)), null,
+            new Rect(x, y, w, h));
+        dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 0.9),
+            new Rect(x, y, w, h));
+
+        Text(dc, T("legend.title"), x + 5, y + 3, 8.5, Color.Parse("#2A3446"), true);
+
+        for (var i = 0; i < bands.Length; i++)
+        {
+            var (from, to) = bands[i];
+            var mid = (from + to) / 2;
+            var (cr, cg, cb) = TerrainAnalyzer.ColorForHeight(mid, 0, 2000);
+            var cy = y + 14 + i * rowH;
+            dc.FillRectangle(new SolidColorBrush(Color.FromRgb(cr, cg, cb)),
+                new Rect(x + 5, cy, 14, rowH - 2));
+            dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.Parse("#2A3446")), 0.6),
+                new Rect(x + 5, cy, 14, rowH - 2));
+
+            var label = to >= 2000 ? ">1600 m" : $"{from:0}–{to:0} m";
+            Text(dc, label, x + 23, cy, 8, Color.Parse("#2A3446"));
+        }
     }
 
     // ---------------------------------------------------------------- 文字

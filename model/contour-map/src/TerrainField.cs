@@ -93,6 +93,7 @@ public sealed class TerrainField
             case TerrainKind.Plateau:  BuildPlateau(); break;
             case TerrainKind.Plain:    BuildPlain(); break;
         }
+        BuildFeatures();
     }
 
     private void BuildMountain()
@@ -294,6 +295,89 @@ public sealed class TerrainField
             if (du * du + dv * dv <= r * r) return f;
         }
         return TerrainFeature.None;
+    }
+
+    /// <summary>
+    /// 河流：从最高点出发，沿最陡下降方向流到图边。
+    /// 教科书上的河流画蓝色线，且**只在河谷（等高线凸向高处的一侧）里流**。
+    /// </summary>
+    public List<(double U, double V)> River { get; } = new();
+
+    /// <summary>山峰位置（用于画 ▲ 与高程数字）：局部最高点。</summary>
+    public List<(double U, double V, float Height)> Peaks { get; } = new();
+
+    /// <summary>陡崖位置（用于画锯齿线）：坡度极大处。</summary>
+    public List<(double U, double V)> Cliffs { get; } = new();
+
+    /// <summary>找出山峰、陡崖，并生成河流线。</summary>
+    private void BuildFeatures()
+    {
+        // --- 山峰：局部最高且足够高 ---
+        const int step = 4;
+        for (var y = step; y < Size - step; y += step)
+        {
+            for (var x = step; x < Size - step; x += step)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+                var h = Heights[y, x];
+                if (h < MaxHeight * 0.55) continue;
+
+                var isMax = true;
+                for (var dy = -step; dy <= step && isMax; dy += step)
+                for (var dx = -step; dx <= step; dx += step)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    if (Heights[y + dy, x + dx] > h) { isMax = false; break; }
+                }
+                if (isMax) Peaks.Add((u, v, h));
+            }
+        }
+        Peaks.Sort((a, b) => b.Height.CompareTo(a.Height));
+
+        // --- 陡崖：坡度极大 ---
+        const int cstep = 3;
+        for (var y = cstep; y < Size - cstep; y += cstep)
+        {
+            for (var x = cstep; x < Size - cstep; x += cstep)
+            {
+                var u = (double)x / (Size - 1);
+                var v = (double)y / (Size - 1);
+                var h = 0.004;
+                var du = (Heights[y, x + 2] - Heights[y, x - 2]) / (2 * h * (Size - 1)) / 1000;
+                var dv = (Heights[y + 2, x] - Heights[y - 2, x]) / (2 * h * (Size - 1)) / 1000;
+                var slope = Math.Sqrt(du * du + dv * dv);
+                if (slope > 0.11) Cliffs.Add((u, v));
+            }
+        }
+
+        // --- 河流：从最高点沿最陡下降方向走 ---
+        if (Peaks.Count > 0)
+        {
+            var start = Peaks[0];
+            var cu = start.U; var cv = start.V;
+            River.Add((cu, cv));
+            const int maxSteps = 400;
+            for (var step2 = 0; step2 < maxSteps; step2++)
+            {
+                var h0 = SampleSmooth(cu, cv);
+                double bestU = 0, bestV = 0; var bestH = h0; var found = false;
+                for (var a = 0; a < 16; a++)
+                {
+                    var ang = a * Math.PI * 2 / 16;
+                    var nu = cu + Math.Cos(ang) * 0.012;
+                    var nv = cv + Math.Sin(ang) * 0.012;
+                    if (nu < 0 || nu > 1 || nv < 0 || nv > 1) continue;
+                    var nh = SampleSmooth(nu, nv);
+                    if (nh < bestH) { bestH = nh; bestU = nu; bestV = nv; found = true; }
+                }
+                if (!found) break;
+                cu = bestU; cv = bestV;
+                River.Add((cu, cv));
+                if (cu <= 0.001 || cu >= 0.999 || cv <= 0.001 || cv >= 0.999) break;
+                if (bestH < MinHeight + 20) break;
+            }
+        }
     }
 
     /// <summary>等高线高度列表：从 MaxHeight 往下按等高距取整。</summary>

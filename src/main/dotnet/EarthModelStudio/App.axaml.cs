@@ -35,16 +35,22 @@ public partial class App : Application
             var window = new MainWindow();
             window.Show();
 
+            // 首帧之后再构造 ViewModel：Post 而非依赖 Opened，
+            // 因为 Opened 在某些情况下不触发（headless / 部分平台），
+            // 会导致 DataContext 一直是 null、主页面白屏。
+            // 扫描模型 / 加载封面在后台线程做，UI 线程只负责赋值，
+            // 这样窗口能立刻响应，不会卡在白屏。
             MainViewModel vm = null!;
-            window.Opened += (_, _) =>
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Task.Run(() => new MainViewModel(services))
+                .ContinueWith(t =>
                 {
-                    vm = new MainViewModel(services);
-                    window.DataContext = vm;
-                    WireMainViewModel(vm, window, services, desktop);
-                }, Avalonia.Threading.DispatcherPriority.Background);
-            };
+                    vm = t.Result;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        window.DataContext = vm;
+                        WireMainViewModel(vm, window, services, desktop);
+                    }, Avalonia.Threading.DispatcherPriority.Background);
+                }, System.Threading.Tasks.TaskScheduler.Default);
 
             // 应用图标不依赖 ViewModel，先设好让窗口一出现就有图标
             try

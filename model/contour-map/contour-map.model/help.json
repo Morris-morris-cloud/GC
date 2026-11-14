@@ -43,6 +43,17 @@
         ]
       },
       {
+        "h": "地图上的教科书符号",
+        "lines": [
+          "分层设色：按固定高程档位套固定色阶（深绿→浅绿→绿→浅黄→黄→浅褐→褐→白），同一档内颜色完全相同。",
+          "山峰用 ▲ 加高程数字标注。",
+          "河流用蓝色线表示，沿谷底（等高线凸向高处的一侧）流。",
+          "陡崖用红色锯齿线表示。",
+          "指北针在图幅右上角，比例尺在左下角，分层设色图例在右下角。",
+          "地形剖面图在图幅底部：沿南北中线剖开地面，标出各点海拔，看清起伏。"
+        ]
+      },
+      {
         "h": "容易出错的地方",
         "lines": [
           "把「等高线密集 = 陡」记反：密集是陡，稀疏是缓。",
@@ -94,6 +105,17 @@
           "Hills: low elevation, gentle slopes, sparse winding contours.",
           "Plateau: high but flat on top — contours sparse in the middle and crowded at the edges.",
           "Plain: low and flat — few or no contour lines at all."
+        ]
+      },
+      {
+        "h": "Textbook map symbols",
+        "lines": [
+          "Hypsometric tint: fixed colour bands by elevation (dark green → light green → green → pale yellow → yellow → light brown → brown → white); each band is a flat colour.",
+          "Peaks are marked with a ▲ and their elevation.",
+          "Rivers are drawn in blue along the valley floor (where contours bulge uphill).",
+          "Cliffs are marked with a red saw-tooth line.",
+          "A north arrow sits top-right, a scale bar bottom-left, and the tint legend bottom-right.",
+          "The terrain profile along the bottom cuts the ground open and labels elevations, showing the relief at a glance."
         ]
       },
       {

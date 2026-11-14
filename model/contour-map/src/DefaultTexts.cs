@@ -15,6 +15,8 @@ internal static class DefaultTexts
         ["kind.hill"] = "丘陵",
         ["kind.plateau"] = "高原",
         ["kind.plain"] = "平原",
+        ["legend.title"] = "分层设色",
+        ["profile.title"] = "地形剖面图",
         ["btn.color"] = "上色",
         ["btn.colorOn"] = "取消上色",
 
@@ -51,6 +53,8 @@ internal static class DefaultTexts
         ["kind.hill"] = "Hills",
         ["kind.plateau"] = "Plateau",
         ["kind.plain"] = "Plain",
+        ["legend.title"] = "Hypsometric tint",
+        ["profile.title"] = "Terrain profile",
         ["btn.color"] = "Colour",
         ["btn.colorOn"] = "No colour",
 
