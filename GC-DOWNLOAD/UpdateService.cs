@@ -17,7 +17,7 @@ namespace GC.Services;
 /// .GC/model/&lt;id&gt;，本次启动立即生效。任何失败都保留本地已装模型。
 /// 启动器更新由 LauncherUpdater / LauncherUpdateFlow 独立负责，不在这里。
 /// </summary>
-public sealed class UpdateService
+public sealed class UpdateService : IUpdateService
 {
     private readonly AppPaths _paths;
     private readonly SettingsService _settings;
@@ -34,55 +34,6 @@ public sealed class UpdateService
 
     /// <summary>换源：测速选出最快的一个后，用它的 remote 覆盖当前实例。</summary>
     public void UseRemote(IModelRemote remote) => _remote = remote;
-
-    private static string? _versionOverride;
-
-    public static string CurrentLauncherVersion
-    {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(_versionOverride)) return _versionOverride!;
-
-            // 用**本程序集**的版本，而不是 GetEntryAssembly()。
-            // EntryAssembly 在宿主（dotnet run / 测试宿主 / 单文件解包）下可能指向别的程序，
-            // 读出来会变成 1.0.0，导致「明明是最新版却一直提示有更新」。
-            var asm = typeof(UpdateService).Assembly;
-            var v = asm.GetName().Version;
-            if (v == null || (v.Major == 0 && v.Minor == 0 && v.Build == 0))
-            {
-                // 兜底：读 InformationalVersion（Directory.Build.props 里的 <Version>）
-                var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-                if (!string.IsNullOrWhiteSpace(info))
-                {
-                    var core = info!.Split('+')[0].Trim();
-                    if (Version.TryParse(core, out var iv))
-                        v = iv;
-                }
-            }
-            if (v == null) return "0.0.0";
-            return $"{Math.Max(0, v.Major)}.{Math.Max(0, v.Minor)}.{Math.Max(0, v.Build)}";
-        }
-    }
-
-    /// <summary>测试 / 自检时临时指定版本号。</summary>
-    public static void OverrideLauncherVersion(string? version) => _versionOverride = version;
-
-    public static string CurrentRid
-    {
-        get
-        {
-            var arch = RuntimeInformation.OSArchitecture switch
-            {
-                Architecture.Arm64 => "arm64",
-                Architecture.X86 => "x86",
-                _ => "x64"
-            };
-            if (OperatingSystem.IsWindows()) return "win-" + arch;
-            if (OperatingSystem.IsMacOS()) return "osx-" + arch;
-            if (OperatingSystem.IsLinux()) return "linux-" + arch;
-            return RuntimeInformation.RuntimeIdentifier;
-        }
-    }
 
     /// <summary>
     /// 同步版本（无法测速时用）：按设置里的仓库地址映射到内置源。

@@ -11,10 +11,10 @@
 - UI：C# + .NET 8（可切 .NET 10）+ Avalonia，跨平台
 - 模型加载：`AssemblyLoadContext` 加载模型自带 dll，契约与 Avalonia 走默认上下文，关窗即卸载
 - 目标平台：**macOS arm64 / Windows x64 / Windows arm64**，一条命令全部编译
-- 更新仓库：<https://gitcode.com/2509_92447106/GC>，模型目录 <https://gitcode.com/2509_92447106/GC/tree/main/model>
+- 更新仓库：<https://gitcode.com/Morris_1/GC>，模型目录 <https://gitcode.com/Morris_1/GC/tree/main/model>
 
 ## 运行目录（发布包里就长这样）
-
+Windows 用 `.\build.ps1`（参数相同）；PowerShell 实现位于 `buildps1/`，不依赖 Git Bash 或 WSL。
 ```
 <安装目录>/
   GC.exe | GC.app/
@@ -36,7 +36,7 @@
 | 启动器 | 下载对应平台 zip 到 `.GC/update/payload`，写 `pending.json` | **下次启动时应用**（独立脚本覆盖程序并重启） |
 
 - 默认更新仓库写在 `.GC/settings.json` 的 `updateRepository`：
-  `https://gitcode.com/2509_92447106/GC`（也可换成自己的仓库或 `.../tree/main/model` 地址）
+  `https://gitcode.com/Morris_1/GC`（也可换成自己的仓库或 `.../tree/main/model` 地址）
 - 版本来自仓库根 `version.json`（由 `./build.sh stamp` 生成）：模型版本 = **模型包内容指纹**，
   所以**改了模型文件，版本号自动变**；启动器版本 = 构建版本。
 - `settings.json` 记录 `installedModelVersions` / `pendingLauncherVersion` / `lastUpdateCheck`。
@@ -44,8 +44,8 @@
 - 设置页可关闭自动更新；状态条可手动「检查更新」（忽略开关强制检查）。
 - 离线教室：把仓库（含 `version.json` + `model/`）拷到 U 盘，在 `settings.json` 填
   `updateLocalRoot` 指向它，即可完全离线更新。
-- 发新版：把 `dist/GC-<rid>.zip` 上传到 Release / 仓库 `dist/`，把直链填进 `version.json`
-  对应平台的 `url`（`./build.sh publish` 会生成 zip 并自动写入 `sha256` / `size`）。
+- 发新版：运行 `./build.sh build`，把生成的 `dist/GC-<版本>-*.zip` 上传到 Release / 仓库 `dist/`，
+  把直链填进 `version.json` 对应平台的 `url`（构建会生成 zip 并自动写入 `sha256` / `size`）。
   更新包只含程序文件，**不会覆盖 `.GC/` 里的模型与设置**。
 
 ## 目录结构
@@ -56,6 +56,8 @@ Repository/
 ├── Directory.Build.props            # 公共构建属性
 ├── version.json                     # ★ 自动生成的版本清单（推送到仓库后才生效）
 ├── build.sh / build.ps1             # 构建脚本
+├── buildsh/                         # POSIX shell 构建实现
+├── buildps1/                        # 原生 PowerShell 构建实现
 ├── GC/                              # 启动器主要代码
 │   └── src/
 │       ├── GC.Core.csproj
@@ -67,6 +69,8 @@ Repository/
 │   ├── GC-BOOT.csproj
 │   ├── Program.cs
 │   └── app.manifest
+├── GC-DOWNLOAD/                     # 模型、源仓库与启动器下载更新实现
+│   └── GC-DOWNLOAD.csproj
 ├── GC-DRAW/PlayerWindow.cs          # 通用模型窗口宿主；实际绘制由模型提供
 ├── model/                           # ★ 模型的一切
 │   ├── version.json                 #   与根 version.json 相同（便于按 model/ 地址读取）
@@ -88,28 +92,32 @@ Repository/
 ## 构建与运行
 
 ```bash
-./build.sh build           # 编译整个解决方案
-./build.sh models          # 编译模型 dll + 生成封面 + 自动打版本
-./build.sh stamp           # 只重新生成 version.json 与模型版本
-./build.sh run             # 运行
-./build.sh test            # 离屏校验：页面 + 真实加载模型窗口截图
+./build.sh build           # 完整三平台发布：编译启动器、准备运行目录并生成更新包 ZIP
+./build.sh check           # 编译、自检、离屏渲染及发布 ZIP 完整性检查；通常在 build 后运行
+./build.sh models          # 编译模型 dll、生成封面并更新版本清单
+./build.sh stamp           # 只重新生成根目录与 model/ 下的 version.json
+./build.sh run             # 以 Debug 配置运行启动器
+./build.sh test            # 运行离屏校验并将截图写入 build/screenshots/
 ./build.sh update-test     # 离线验证自动更新链路（不联网、不替换程序）
-./build.sh publish         # 三平台发布（不内置模型）+ 建 .GC 骨架 + 生成更新包
-./build.sh pack-models     # 单独打包模型 -> dist/models-<version>.zip
-./build.sh pack-launcher   # 生成三个平台的启动器更新包 zip
-./build.sh clean
+./build.sh pack-models     # 编译模型并打包到 dist/models-<版本>.zip
+./build.sh pack-launcher   # 将已有平台发布目录打成启动器更新 ZIP
+./build.sh doctor          # 显示 dotnet 环境信息
+./build.sh dist            # 列出 dist/ 中的产物
+./build.sh clean           # 清理 build/ 与 dist/ 等构建产物
 ```
 
+`build` 是完整发布入口，不是单纯的解决方案编译；`check` 会检查至少三个版本化发布 ZIP。
+需要指定版本时，可追加 `-version=<版本>`（或 `--version=<版本>`），脚本会同步更新 `Directory.Build.props`。
 Windows 用 `.\build.ps1`（参数相同）。
 
 | 产物 | 平台 |
 | --- | --- |
-| `dist/mac-arm64/GC.app` | macOS Apple Silicon |
-| `dist/win-x64/GC.exe` | Windows x64 |
-| `dist/win-arm64/GC.exe` | Windows on ARM |
+| `dist/GC-<版本>-mac-arm64.zip` | macOS Apple Silicon 应用包 |
+| `dist/GC-<版本>-win-amd64.zip` | Windows x64 单文件启动器 |
+| `dist/GC-<版本>-win-arm64.zip` | Windows on ARM 单文件启动器 |
 
-均为自包含单文件启动器，**发布包内不含模型**。改完模型：
-`./build.sh models` → 把 `version.json` 和 `model/` 推送到 gitcode → 客户端下次启动自动更新。
+Windows 产物是自包含单文件启动器；macOS 产物是 `.app` 的 ZIP。**发布包内不含模型**。
+改完模型后运行 `./build.sh models`，再把根目录 `version.json` 和 `model/` 推送到 gitcode，客户端下次启动时自动更新。
 
 ## 模型契约
 

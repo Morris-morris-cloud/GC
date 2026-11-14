@@ -11,11 +11,11 @@ namespace GC.Services;
 ///   GC(.exe | .app/...)
 ///   .GC/
 ///     settings.json     设置与已安装版本记录
-///     model/            模型（启动时下载；model 目录也在 .GC 里）
+///     model/            模型（启动时下载）
 ///     cache/            下载缓存 / 原子替换暂存
 ///     update/           待下次启动应用的启动器更新包
 /// </code>
-/// 开发态同样使用 .GC/model，并自动把仓库 model/ 的可分发部分同步进去。
+/// 开发态同样使用仓库根 .GC/model，并自动同步仓库 model/ 的可分发部分。
 /// EMS_MODELS / EMS_DATA / EMS_HOME 可显式覆盖。
 /// </summary>
 public sealed class AppPaths
@@ -31,7 +31,7 @@ public sealed class AppPaths
     /// <summary>.GC 目录。</summary>
     public string HomeRoot { get; private init; } = "";
 
-    /// <summary>模型库，恒为 &lt;HomeRoot&gt;/model。</summary>
+    /// <summary>模型库。</summary>
     public string ModelRoot { get; private init; } = "";
 
     /// <summary>兼容旧代码：数据目录即 .GC。</summary>
@@ -54,7 +54,8 @@ public sealed class AppPaths
         //
         // 重要：源码版由 `dotnet run` 启动时 Environment.ProcessPath 指向 dotnet 宿主，
         // 直接用它会把 .GC 与更新包写到 dotnet 安装目录去，所以必须先识别源码版。
-        var repoRoot = Environment.GetEnvironmentVariable("EMS_HOME");
+        var explicitHome = Environment.GetEnvironmentVariable("EMS_HOME");
+        var repoRoot = explicitHome;
         if (string.IsNullOrWhiteSpace(repoRoot) || !Directory.Exists(repoRoot))
             repoRoot = FindRepoRoot(baseDir);
         var isDev = !string.IsNullOrEmpty(repoRoot) &&
@@ -63,8 +64,12 @@ public sealed class AppPaths
         string installDir;
         if (isDev)
         {
-            // 源码版：安装目录 = 仓库根，.GC 与更新都放这里
+            // 源码版：安装目录 = 仓库根
             installDir = repoRoot!;
+        }
+        else if (!string.IsNullOrWhiteSpace(explicitHome) && Directory.Exists(explicitHome))
+        {
+            installDir = explicitHome;
         }
         else
         {
@@ -120,7 +125,7 @@ public sealed class AppPaths
         var envModels = Environment.GetEnvironmentVariable("EMS_MODELS");
         var modelRoot = !string.IsNullOrWhiteSpace(envModels)
             ? envModels!
-            : Path.Combine(home, "model");      // 统一：model 目录在 .GC 里
+            : Path.Combine(home, "model");
 
         return new AppPaths
         {
@@ -140,7 +145,6 @@ public sealed class AppPaths
             Directory.CreateDirectory(dir);
             var probe = Path.Combine(dir, ".write-test");
             File.WriteAllText(probe, "ok");
-            File.Delete(probe);
             return true;
         }
         catch

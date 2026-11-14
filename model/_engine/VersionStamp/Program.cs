@@ -10,7 +10,7 @@ using System.Text.Json.Nodes;
 //       仓库根 version.json 与 model/version.json（内容相同，便于两种源地址读取）。
 
 // 仓库地址（编译产物的 Release 也发在这里）：与启动器默认 updateRepository 保持一致。
-const string Repository = "https://gitcode.com/2509_92447106/GC";
+const string Repository = "https://gitcode.com/Morris_1/GC";
 
 var root = args.Length > 0 ? Path.GetFullPath(args[0]) : Directory.GetCurrentDirectory();
 var launcherVersion = args.Length > 1 && !string.IsNullOrWhiteSpace(args[1]) ? args[1] : "1.0.0";

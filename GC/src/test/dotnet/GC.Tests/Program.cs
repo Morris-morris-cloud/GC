@@ -12,6 +12,7 @@ using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using GC;
+using GC.Download;
 using GC.Services;
 using GC.ViewModels;
 using GC.Views;
@@ -29,6 +30,7 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        DownloadModuleHost.Factory = new DownloadModuleFactory();
         if (args.Length > 0 && args[0] == "--update-test")
             return RunUpdateTest(args.Length > 1 ? args[1] : FindRepoRoot());
 
@@ -76,7 +78,10 @@ internal static class Program
 
         // 模拟远端仓库：version.json + 每个模型的 <id>.json / <id>.model/
         Directory.CreateDirectory(Path.Combine(remote, "model"));
-        File.Copy(versionFile, Path.Combine(remote, "version.json"), true);
+        var fixtureVersion = Json.Read<RepoVersion>(versionFile)!;
+        fixtureVersion.Models.RemoveAll(model =>
+            model.Id is not "earth-rotation" and not "earth-revolution");
+        Json.Write(Path.Combine(remote, "version.json"), fixtureVersion);
         foreach (var dir in Directory.GetDirectories(Path.Combine(repoRoot, "model")))
         {
             var id = Path.GetFileName(dir);
@@ -93,7 +98,7 @@ internal static class Program
         // EMS_HOME 指向不含 .sln 的临时目录 -> 非开发态，走真实 .GC 布局
         Environment.SetEnvironmentVariable("EMS_HOME", tmp);
         Environment.SetEnvironmentVariable("EMS_DATA", home);
-        Environment.SetEnvironmentVariable("EMS_MODELS", modelRoot);
+        Environment.SetEnvironmentVariable("EMS_MODELS", null);
         Environment.SetEnvironmentVariable("EMS_NO_SELF_UPDATE", "1");
 
         var paths = AppPaths.Discover();
@@ -111,11 +116,13 @@ internal static class Program
 
         Console.WriteLine($"运行目录: {paths.HomeRoot}");
         Console.WriteLine($"模型库:   {paths.ModelRoot}");
-        Check(paths.ModelRoot == modelRoot, ".GC/model 是下载目标");
+        Check(paths.ModelRoot == modelRoot, "模型安装目录位于 .GC/model");
+        Check(paths.CacheRoot.StartsWith(paths.HomeRoot, StringComparison.Ordinal), "模型与启动器下载暂存位于 .GC/cache");
+        Check(paths.UpdateRoot.StartsWith(paths.HomeRoot, StringComparison.Ordinal), "启动器更新位于 .GC/update");
         Check(File.Exists(paths.SettingsFile), ".GC/settings.json 已创建");
 
         // 1) 首次启动：模型全部下载并立即落地
-        var r1 = updater.RunAsync(true, null).GetAwaiter().GetResult();
+        var r1 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
         Console.WriteLine($"首次启动: {r1.Message} 更新数={r1.UpdatedModels}");
         Check(r1.UpdatedModels == 2, "首次启动下载 2 个模型");
         foreach (var id in new[] { "earth-rotation", "earth-revolution" })
@@ -128,7 +135,7 @@ internal static class Program
         }
 
         // 2) 版本没变：不重复下载
-        var r2 = updater.RunAsync(true, null).GetAwaiter().GetResult();
+        var r2 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
         Console.WriteLine($"二次检查: {r2.Message} 更新数={r2.UpdatedModels}");
         Check(r2.UpdatedModels == 0, "版本未变时不重复下载");
 
@@ -142,15 +149,15 @@ internal static class Program
         File.WriteAllText(Path.Combine(remote, "model", changed.Id,
             changed.Id + ".model", stampName), "new content");
         Json.Write(Path.Combine(remote, "version.json"), rv);
-        var r3 = updater.RunAsync(true, null).GetAwaiter().GetResult();
+        var r3 = Task.Run(() => updater.RunAsync(true, null)).GetAwaiter().GetResult();
         Console.WriteLine($"模型改版: {r3.Message} 更新数={r3.UpdatedModels}");
         Check(r3.UpdatedModels == 1, "模型版本变化只更新 1 个模型");
         Check(File.Exists(Path.Combine(modelRoot, changed.Id, changed.Id + ".model", stampName)),
             "新版本本次启动立即生效");
 
         // 4) 启动器新版：用 LauncherUpdater 下载到当前目录（与旧版并列）
-        var rid = UpdateService.CurrentRid;
-        Console.WriteLine($"当前平台: {rid}，启动器版本: {UpdateService.CurrentLauncherVersion}");
+        var rid = LauncherRuntimeInfo.CurrentRid;
+        Console.WriteLine($"当前平台: {rid}，启动器版本: {LauncherRuntimeInfo.CurrentLauncherVersion}");
         var stage = Path.Combine(tmp, "launcher-stage");
         Directory.CreateDirectory(stage);
         File.WriteAllText(Path.Combine(stage, "GC-9.9.9-" + LauncherUpdater.PlatformLabel + ".exe"),
@@ -165,12 +172,17 @@ internal static class Program
         var oldName = "GC-1.0.0-" + LauncherUpdater.PlatformLabel + ".exe";
         File.WriteAllText(Path.Combine(paths.InstallDirectory, oldName), "old launcher");
 
-        var dl = LauncherUpdater.DownloadAsync(paths, updater.Remote, null).GetAwaiter().GetResult();
+        var dl = Task.Run(() => LauncherUpdater.DownloadAsync(paths, updater.Remote, null))
+            .GetAwaiter().GetResult();
         Console.WriteLine($"启动器下载: {dl.Message}");
         Check(dl.State == UpdateRunState.Ready, "启动器下载成功");
         Check(!string.IsNullOrWhiteSpace(dl.PackageName), "得到新版包名");
-        Check(File.Exists(Path.Combine(paths.InstallDirectory, dl.PackageName ?? "")),
-            "新版已存到当前目录");
+                Check(File.Exists(Path.Combine(paths.UpdateRoot, "payload", dl.PackageName ?? "")) ||
+                            Directory.Exists(Path.Combine(paths.UpdateRoot, "payload", dl.PackageName ?? "")),
+                        "新版暂存于 .GC/update/payload");
+                Check(!File.Exists(Path.Combine(paths.InstallDirectory, dl.PackageName ?? "")) &&
+                            !Directory.Exists(Path.Combine(paths.InstallDirectory, dl.PackageName ?? "")),
+                        "下载阶段不会把新版写入安装目录");
         Check(File.Exists(Path.Combine(paths.InstallDirectory, oldName)),
             "旧版仍在（删除由替换脚本在重启后做）");
 
@@ -191,7 +203,7 @@ internal static class Program
         // 6) 断网兜底：保留本地模型，不清空
         var offline = new UpdateService(paths, settings, new GitCodeRemote("http://127.0.0.1:1/nope"));
         var beforeCount = settings.Current.InstalledModelVersions.Count;
-        var r5 = offline.RunAsync(true, null).GetAwaiter().GetResult();
+        var r5 = Task.Run(() => offline.RunAsync(true, null)).GetAwaiter().GetResult();
         Check(r5.Outcome == UpdateOutcome.Unavailable &&
               settings.Current.InstalledModelVersions.Count == beforeCount &&
               Directory.Exists(Path.Combine(modelRoot, "earth-rotation")),

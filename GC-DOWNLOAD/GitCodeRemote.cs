@@ -11,14 +11,14 @@ namespace GC.Services;
 
 /// <summary>
 /// gitcode 仓库源。默认地址来自 AppSettings.UpdateRepository
-/// （https://gitcode.com/2509_92447106/GC），可改成任意 gitcode 仓库或
+/// （https://gitcode.com/Morris_1/GC），可改成任意 gitcode 仓库或
 /// https://gitcode.com/&lt;owner&gt;/&lt;repo&gt;/tree/&lt;branch&gt;/model 这样的地址。
 /// 匿名访问 v5 contents API：目录 -> 数组，文件 -> { content: base64 }；
 /// 文件项自带 download_url（raw.gitcode.com/blobs/&lt;sha&gt;/...），可直接下载二进制。
 /// </summary>
 public sealed class GitCodeRemote : IModelRemote
 {
-    public const string DefaultRepository = "https://gitcode.com/2509_92447106/GC";
+    public const string DefaultRepository = "https://gitcode.com/Morris_1/GC";
 
     private readonly HttpClient _http;
     private readonly string _api;
@@ -59,9 +59,9 @@ public sealed class GitCodeRemote : IModelRemote
     {
         var raw = string.IsNullOrWhiteSpace(url) ? DefaultRepository : url!.Trim();
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return ("2509_92447106", "GC", "main");
+            return ("Morris_1", "GC", "main");
         var parts = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2) return ("2509_92447106", "GC", "main");
+        if (parts.Length < 2) return ("Morris_1", "GC", "main");
         var owner = parts[0];
         var repo = parts[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
             ? parts[1][..^4] : parts[1];

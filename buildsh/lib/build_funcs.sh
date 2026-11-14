@@ -44,7 +44,7 @@ prepare_runtime_layout() {
   mkdir -p "$DEST/.GC/model" "$DEST/.GC/cache" "$DEST/.GC/update"
   cat > "$DEST/.GC/model/README.txt" <<'TXT'
 模型库目录（.GC/model/）
-启动时程序会读取 gitcode 仓库的 version.json，把最新版模型下载到这里。
+启动时程序会读取 GitCode 仓库的 version.json，把最新版模型下载到这里。
 离线使用也可以手动放入 <模型id>/<模型id>.json + <模型id>/<模型id>.model/。
 
 运行目录：
@@ -62,7 +62,7 @@ TXT
   "renderFps": 30,
   "memoryMb": 2048,
   "autoUpdateOnStartup": true,
-  "updateRepository": "https://gitcode.com/2509_92447106/GC",
+  "updateRepository": "https://gitcode.com/Morris_1/GC",
   "updateManifestUrl": "",
   "updateLocalRoot": "",
   "installedModelVersions": {},

@@ -25,7 +25,7 @@ public partial class DownloadViewModel : ObservableObject
 
     public ObservableCollection<SourceItemViewModel> Sources { get; } = new();
     public ObservableCollection<RemoteModelRowViewModel> Models { get; } = new();
-    public ObservableCollection<DownloadJob> Jobs => _services.Downloads.Jobs;
+    public ObservableCollection<IDownloadJob> Jobs => _services.Downloads.Jobs;
 
     [ObservableProperty] private SourceItemViewModel? _selectedSource;
     [ObservableProperty] private string _importUrl = "";
@@ -264,19 +264,19 @@ public partial class DownloadViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CancelJob(DownloadJob? job)
+    private void CancelJob(IDownloadJob? job)
     {
         if (job != null) _services.Downloads.Cancel(job);
     }
 
     [RelayCommand]
-    private void RetryJob(DownloadJob? job)
+    private void RetryJob(IDownloadJob? job)
     {
         if (job != null) _services.Downloads.Retry(job);
     }
 
     [RelayCommand]
-    private void RemoveJob(DownloadJob? job)
+    private void RemoveJob(IDownloadJob? job)
     {
         if (job != null) _services.Downloads.Remove(job);
     }
@@ -291,17 +291,17 @@ public partial class DownloadViewModel : ObservableObject
     private void OnJobsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems != null)
-            foreach (DownloadJob job in e.NewItems) job.PropertyChanged += OnJobPropertyChanged;
+            foreach (IDownloadJob job in e.NewItems) job.PropertyChanged += OnJobPropertyChanged;
         if (e.OldItems != null)
-            foreach (DownloadJob job in e.OldItems) job.PropertyChanged -= OnJobPropertyChanged;
+            foreach (IDownloadJob job in e.OldItems) job.PropertyChanged -= OnJobPropertyChanged;
         UpdateJobState();
     }
 
     private void OnJobPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(DownloadJob.State))
+        if (e.PropertyName == nameof(IDownloadJob.State))
         {
-            if (sender is DownloadJob { State: DownloadState.Completed })
+            if (sender is IDownloadJob { State: DownloadState.Completed })
                 _services.Models.NotifyChanged();
         }
         UpdateJobState();

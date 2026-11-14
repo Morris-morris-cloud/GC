@@ -38,7 +38,7 @@ public sealed class AppSettings
     public bool AutoUpdateOnStartup { get; set; } = true;
 
     /// <summary>默认更新仓库地址。</summary>
-    public string UpdateRepository { get; set; } = "https://gitcode.com/2509_92447106/GC";
+    public string UpdateRepository { get; set; } = "https://gitcode.com/Morris_1/GC";
 
     /// <summary>版本清单地址覆盖（留空则按 UpdateRepository 拼接）。</summary>
     public string? UpdateManifestUrl { get; set; }

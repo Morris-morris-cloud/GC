@@ -10,15 +10,17 @@ public sealed class AppServices
     public AppPaths Paths { get; }
     public SettingsService Settings { get; }
     public ModelRepository Models { get; }
-    public DownloadCenter Downloads { get; }
+    public IDownloadCenter Downloads { get; }
     public MemoryBudget Memory { get; }
-    public ModelSourceClient Sources { get; }
+    public IModelSourceClient Sources { get; }
     /// <summary>模型加载器：只负责把模型程序集跑起来，不渲染。</summary>
     public ModelHost ModelHost { get; }
     /// <summary>启动时检查模型 / 启动器更新。</summary>
-    public UpdateService Updates { get; }
+    public IUpdateService Updates { get; }
     /// <summary>双源测速选择器（Xhmcl / GitCode 取最快）。</summary>
-    public SourceSelector Selector { get; }
+    public ISourceSelector Selector { get; }
+    public ILauncherUpdateService LauncherUpdates { get; }
+    public IDownloadModule DownloadModule { get; }
 
     private AppServices(AppPaths paths)
     {
@@ -26,12 +28,16 @@ public sealed class AppServices
         Settings = new SettingsService(paths);
         Settings.Load();                         // 先读设置，才知道用在线源还是本地离线源
         Models = new ModelRepository(paths);
-        Sources = new ModelSourceClient(paths);
-        Downloads = new DownloadCenter(paths, Models);
+        var factory = DownloadModuleHost.Factory
+            ?? throw new InvalidOperationException("GC-DOWNLOAD 模块尚未注册");
+        DownloadModule = factory.Create(paths, Settings, Models);
+        Sources = DownloadModule.Sources;
+        Downloads = DownloadModule.Downloads;
         Memory = new MemoryBudget();
         ModelHost = new ModelHost(paths, Settings, Memory);
-        Selector = new SourceSelector();
-        Updates = new UpdateService(paths, Settings, UpdateService.CreateRemote(Settings.Current));
+        Selector = DownloadModule.Selector;
+        Updates = DownloadModule.Updates;
+        LauncherUpdates = DownloadModule.LauncherUpdates;
     }
 
     public static AppServices Create()

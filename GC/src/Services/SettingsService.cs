@@ -18,6 +18,12 @@ public sealed class SettingsService
     public void Load()
     {
         Current = Json.Read<AppSettings>(_paths.SettingsFile) ?? new AppSettings();
+        if (Current.UpdateRepository.Contains("gitcode.com/2509_92447106/GC", StringComparison.OrdinalIgnoreCase))
+        {
+            Current.UpdateRepository = Current.UpdateRepository.Replace(
+                "2509_92447106", "Morris_1", StringComparison.OrdinalIgnoreCase);
+            Save();
+        }
         SeedDefaultSource();
         if (Current.MemoryMb < 256) Current.MemoryMb = 2048;
     }
@@ -28,7 +34,7 @@ public sealed class SettingsService
     /// 老配置里的自定义源会被清理掉。
     /// </summary>
     public const string DefaultSourceId = "gitcode";
-    public const string DefaultSourceUrl = "https://gitcode.com/2509_92447106/GC";
+    public const string DefaultSourceUrl = "https://gitcode.com/Morris_1/GC";
 
     private void SeedDefaultSource()
     {

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <RootNamespace>GC.Download</RootNamespace>
+    <AssemblyName>GC.Download</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="$(MvvmVersion)" />
+    <ProjectReference Include="..\GC\src\GC.Core.csproj" />
+  </ItemGroup>
+
+</Project>

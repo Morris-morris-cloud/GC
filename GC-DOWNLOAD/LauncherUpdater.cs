@@ -23,31 +23,14 @@ namespace GC.Services;
 //   · 一切落盘内容（脚本、标记）只用相对路径，绝不写绝对路径
 // ===========================================================================
 
-public sealed class UpdateProgressInfo
-{
-    public double Value { get; init; }
-    public string Stage { get; init; } = "";
-}
-
-public enum UpdateRunState { UpToDate, Ready, Failed }
-
-public sealed class UpdateRunResult
-{
-    public UpdateRunState State { get; init; }
-    public string Version { get; init; } = "";
-    public string Message { get; init; } = "";
-    public string? PackageName { get; init; }
-    public string? NewAppPath { get; init; }
-}
-
 /// <summary>下载 / 检查 / 应用启动器更新的唯一入口。</summary>
 public static class LauncherUpdater
 {
     /// <summary>当前运行程序的版本号（来自程序集）。</summary>
-    public static string RunningVersion => UpdateService.CurrentLauncherVersion;
+    public static string RunningVersion => LauncherRuntimeInfo.CurrentLauncherVersion;
 
     /// <summary>当前 RID，如 osx-arm64。</summary>
-    public static string CurrentRid => UpdateService.CurrentRid;
+    public static string CurrentRid => LauncherRuntimeInfo.CurrentRid;
 
     /// <summary>文件名里用的「系统-架构」标签，如 mac-arm64 / win-amd64。</summary>
     public static string PlatformLabel => CurrentRid switch
@@ -333,11 +316,9 @@ public static class LauncherUpdater
                     return Fail("下载文件校验失败（sha256 不符）");
             }
 
-            progress?.Report(new UpdateProgressInfo { Value = 0.60, Stage = "正在解压到当前目录" });
+            progress?.Report(new UpdateProgressInfo { Value = 0.60, Stage = "正在解压更新包" });
 
-            // 解压到临时中转目录，再搬到当前运行目录
-            var installDir = paths.InstallDirectory;
-            Directory.CreateDirectory(installDir);
+            // 更新包先完整保存在下载目录，重启替换脚本再移入安装目录。
             var staging = Path.Combine(paths.CacheRoot, "launcher-staging");
             if (Directory.Exists(staging)) Directory.Delete(staging, true);
             Directory.CreateDirectory(staging);
@@ -350,16 +331,20 @@ public static class LauncherUpdater
             // 只展平「单个非 .app 顶层目录」的 zip
             FlattenStaging(staging);
 
-            progress?.Report(new UpdateProgressInfo { Value = 0.80, Stage = "正在安装新版本" });
+            progress?.Report(new UpdateProgressInfo { Value = 0.80, Stage = "正在暂存新版本" });
 
-            var packageName = MoveToInstallDir(staging, installDir, latest);
+            var payload = Path.Combine(paths.UpdateRoot, "payload");
+            if (Directory.Exists(payload)) Directory.Delete(payload, true);
+            Directory.CreateDirectory(payload);
+            var packageName = MoveToPayload(staging, payload);
             try { Directory.Delete(staging, true); } catch { }
             if (packageName == null) return Fail("解压结果里没有找到新版启动器");
 
             // 写标记（纯文本，脚本读它）：只含相对信息，无绝对路径
             Directory.CreateDirectory(paths.UpdateRoot);
             File.WriteAllText(Path.Combine(paths.UpdateRoot, "update.txt"),
-                $"NAME={packageName}\nVERSION={latest}\nPLATFORM={PlatformLabel}\n");
+                $"NAME={packageName}\nVERSION={latest}\nPLATFORM={PlatformLabel}\n" +
+                $"INSTALL_REL={Path.GetRelativePath(paths.UpdateRoot, paths.InstallDirectory)}\n");
 
             progress?.Report(new UpdateProgressInfo { Value = 1.0, Stage = "下载完成" });
 
@@ -367,9 +352,9 @@ public static class LauncherUpdater
             {
                 State = UpdateRunState.Ready,
                 Version = latest,
-                Message = $"v{latest} 已下载到当前目录",
+                Message = $"v{latest} 已暂存到 .GC/update",
                 PackageName = packageName,
-                NewAppPath = Path.Combine(installDir, packageName)
+                NewAppPath = Path.Combine(payload, packageName)
             };
         }
         catch (OperationCanceledException) { return Fail("已取消"); }
@@ -447,8 +432,8 @@ public static class LauncherUpdater
 
         var name = ReadMarker(marker, "NAME");
         if (string.IsNullOrWhiteSpace(name)) return false;
-        if (!File.Exists(Path.Combine(paths.InstallDirectory, name!)) &&
-            !Directory.Exists(Path.Combine(paths.InstallDirectory, name!)))
+        var payloadPath = Path.Combine(paths.UpdateRoot, "payload", name!);
+        if (!File.Exists(payloadPath) && !Directory.Exists(payloadPath))
             return false;   // 新版本不在了，放弃
 
         return ScheduleApply(paths, name!);
@@ -460,27 +445,33 @@ public static class LauncherUpdater
     {
         var s = new System.Text.StringBuilder();
         s.AppendLine("#!/bin/sh");
-        s.AppendLine("# script lives in .GC/update/ ; install dir is two levels up");
+        s.AppendLine("# script lives in .GC/update/ ; install path is recorded relatively");
         s.AppendLine("HERE=$(CDPATH= cd -- \"$(dirname -- \"$0\")\" && pwd)");
-        s.AppendLine("DST=$(CDPATH= cd -- \"$HERE/../..\" && pwd)");
         s.AppendLine("MARKER=\"$HERE/update.txt\"");
         s.AppendLine();
         s.AppendLine("# read marker");
         s.AppendLine("NEWNAME=$(sed -n 's/^NAME=//p' \"$MARKER\" 2>/dev/null | head -1)");
         s.AppendLine("NEWVER=$(sed -n 's/^VERSION=//p' \"$MARKER\" 2>/dev/null | head -1)");
         s.AppendLine("NEWPLAT=$(sed -n 's/^PLATFORM=//p' \"$MARKER\" 2>/dev/null | head -1)");
-        s.AppendLine("if [ -z \"$NEWNAME\" ] || [ -z \"$NEWVER\" ]; then");
+        s.AppendLine("INSTALLREL=$(sed -n 's/^INSTALL_REL=//p' \"$MARKER\" 2>/dev/null | head -1)");
+        s.AppendLine("if [ -z \"$NEWNAME\" ] || [ -z \"$NEWVER\" ] || [ -z \"$INSTALLREL\" ]; then");
         s.AppendLine("  echo \"marker incomplete, abort\"; rm -f \"$HERE\"/*.sh 2>/dev/null; exit 1");
         s.AppendLine("fi");
-        s.AppendLine("NEW=\"$DST/$NEWNAME\"");
-        s.AppendLine("if [ ! -e \"$NEW\" ]; then");
+        s.AppendLine("DST=$(CDPATH= cd -- \"$HERE/$INSTALLREL\" && pwd)");
+        s.AppendLine("PAYLOAD=\"$HERE/payload/$NEWNAME\"");
+        s.AppendLine("if [ ! -e \"$PAYLOAD\" ]; then");
         s.AppendLine("  echo \"new package missing, abort\"; rm -f \"$HERE\"/*.sh 2>/dev/null; exit 1");
         s.AppendLine("fi");
         s.AppendLine();
         s.AppendLine("# wait for old process to exit (this script is started by it)");
         s.AppendLine("sleep 2");
         s.AppendLine();
-        s.AppendLine("# launch new version first");
+        s.AppendLine("# move the staged package into the install directory");
+        s.AppendLine("NEW=\"$DST/$NEWNAME\"");
+        s.AppendLine("rm -rf \"$NEW\"");
+        s.AppendLine("mv \"$PAYLOAD\" \"$NEW\"");
+        s.AppendLine();
+        s.AppendLine("# launch new version");
         s.AppendLine("if [ -d \"$NEW\" ]; then open \"$NEW\" 2>/dev/null &");
         s.AppendLine("elif [ -x \"$NEW\" ]; then \"$NEW\" >/dev/null 2>&1 &");
         s.AppendLine("fi");
@@ -522,18 +513,28 @@ public static class LauncherUpdater
         s.AppendLine("@echo off");
         s.AppendLine("chcp 65001 >nul 2>&1");
         s.AppendLine("set \"HERE=%~dp0\"");
-        s.AppendLine("set \"DST=%~dp0..\\..\"");
         s.AppendLine("set \"MARKER=%~dp0update.txt\"");
         s.AppendLine("timeout /t 2 /nobreak >nul");
         s.AppendLine();
         s.AppendLine("set \"NEWNAME=\"");
         s.AppendLine("set \"NEWVER=\"");
         s.AppendLine("set \"NEWPLAT=\"");
+        s.AppendLine("set \"INSTALLREL=\"");
         s.AppendLine("for /f \"tokens=2 delims==\" %%A in ('findstr /b \"NAME=\" \"%MARKER%\" 2^>nul') do set \"NEWNAME=%%A\"");
         s.AppendLine("for /f \"tokens=2 delims==\" %%A in ('findstr /b \"VERSION=\" \"%MARKER%\" 2^>nul') do set \"NEWVER=%%A\"");
         s.AppendLine("for /f \"tokens=2 delims==\" %%A in ('findstr /b \"PLATFORM=\" \"%MARKER%\" 2^>nul') do set \"NEWPLAT=%%A\"");
+        s.AppendLine("for /f \"tokens=2 delims==\" %%A in ('findstr /b \"INSTALL_REL=\" \"%MARKER%\" 2^>nul') do set \"INSTALLREL=%%A\"");
         s.AppendLine("if \"%NEWNAME%\"==\"\" (echo marker incomplete, abort & del /Q \"%~f0\" >nul 2>&1 & exit /b 1)");
-        s.AppendLine("if not exist \"%DST%\\%NEWNAME%\" (echo new package missing, abort & del /Q \"%~f0\" >nul 2>&1 & exit /b 1)");
+        s.AppendLine("if \"%INSTALLREL%\"==\"\" (echo install path missing, abort & del /Q \"%~f0\" >nul 2>&1 & exit /b 1)");
+        s.AppendLine("for %%I in (\"%HERE%%INSTALLREL%\") do set \"DST=%%~fI\"");
+        s.AppendLine("set \"PAYLOAD=%HERE%payload\\%NEWNAME%\"");
+        s.AppendLine("if not exist \"%PAYLOAD%\" (echo new package missing, abort & del /Q \"%~f0\" >nul 2>&1 & exit /b 1)");
+        s.AppendLine();
+        s.AppendLine("rem move the staged package into the install directory");
+        s.AppendLine("if exist \"%DST%\\%NEWNAME%\" rmdir /S /Q \"%DST%\\%NEWNAME%\" 2>nul");
+        s.AppendLine("if exist \"%DST%\\%NEWNAME%\" del /Q \"%DST%\\%NEWNAME%\" 2>nul");
+        s.AppendLine("move \"%PAYLOAD%\" \"%DST%\\%NEWNAME%\" >nul");
+        s.AppendLine("if errorlevel 1 (echo failed to install update & exit /b 1)");
         s.AppendLine();
         s.AppendLine("rem launch new version");
         s.AppendLine("start \"\" \"%DST%\\%NEWNAME%\"");
@@ -574,10 +575,10 @@ public static class LauncherUpdater
     }
 
     /// <summary>
-    /// 把 staging 里的新版搬到当前目录，与旧版并列。
-    /// 返回新版包名（GC-&lt;版本&gt;-&lt;平台&gt;.app/.exe）。.GC 绝不覆盖。
+    /// 把 staging 里的新版搬入下载目录的 payload。
+    /// 返回新版包名（GC-&lt;版本&gt;-&lt;平台&gt;.app/.exe）。
     /// </summary>
-    private static string? MoveToInstallDir(string staging, string installDir, string latest)
+    private static string? MoveToPayload(string staging, string payload)
     {
         try
         {
@@ -585,7 +586,7 @@ public static class LauncherUpdater
             {
                 var name = Path.GetFileName(entry);
                 if (string.Equals(name, ".GC", StringComparison.OrdinalIgnoreCase)) continue;
-                var dest = Path.Combine(installDir, name);
+                var dest = Path.Combine(payload, name);
 
                 if (Directory.Exists(dest)) Directory.Delete(dest, true);
                 else if (File.Exists(dest)) File.Delete(dest);

@@ -29,10 +29,10 @@ public partial class AboutViewModel : ObservableObject
     public string AppName => "Morris GC";
 
     /// <summary>启动器版本号，如 v1.0.2。</summary>
-    public string VersionText => "v" + UpdateService.CurrentLauncherVersion;
+    public string VersionText => "v" + LauncherRuntimeInfo.CurrentLauncherVersion;
 
     /// <summary>当前平台标识，如 win-x64 / osx-arm64。</summary>
-    public string PlatformText => UpdateService.CurrentRid;
+    public string PlatformText => LauncherRuntimeInfo.CurrentRid;
 
     public string RepositoryText => _services.Settings.Current.UpdateRepository;
 

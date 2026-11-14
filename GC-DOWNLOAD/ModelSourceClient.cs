@@ -14,9 +14,9 @@ namespace GC.Services;
 /// <summary>
 /// 从链接导入模型源。
 /// 支持：git 仓库地址（GitHub / GitLab / Gitee / 任意 git 地址）、zip 直链、本地目录。
-/// 仓库里的 model/ 目录就是模型列表；下载后缓存到 cache/sources/&lt;id&gt;。
+/// 仓库里的 model/ 目录就是模型列表；下载后缓存在应用缓存目录。
 /// </summary>
-public sealed class ModelSourceClient
+public sealed class ModelSourceClient : IModelSourceClient
 {
     private readonly AppPaths _paths;
     private static readonly HttpClient Http = CreateHttp();

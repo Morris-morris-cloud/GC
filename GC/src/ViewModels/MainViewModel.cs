@@ -46,8 +46,8 @@ public partial class MainViewModel : ObservableObject
 
     public event Action<ModelPackage>? PlayerRequested;
 
-    public string VersionText => "v" + UpdateService.CurrentLauncherVersion;
-    public string PlatformText => UpdateService.CurrentRid;
+    public string VersionText => "v" + LauncherRuntimeInfo.CurrentLauncherVersion;
+    public string PlatformText => LauncherRuntimeInfo.CurrentRid;
 
     public MainViewModel(AppServices services)
     {
@@ -143,7 +143,7 @@ public partial class MainViewModel : ObservableObject
             {
                 var fastest = await _services.Selector.PickFastestAsync(
                     force, default);
-                _services.Updates.UseRemote(SourceSelector.CreateRemote(fastest));
+                _services.Updates.UseRemote(_services.DownloadModule.CreateRemote(fastest));
                 var lat = _services.Selector.LastLatency;
                 UpdateDetail = "源：" + fastest.Name +
                     (lat.Count > 0 ? "（" + string.Join("，", lat.Select(kv =>
@@ -155,7 +155,7 @@ public partial class MainViewModel : ObservableObject
             }
 
             // 启动器：读 Release latest 版本号，与当前运行版本不同就弹窗询问
-            var latest = await LauncherUpdater.CheckAsync(_services.Updates.Remote);
+            var latest = await _services.LauncherUpdates.CheckAsync(_services.Updates.Remote);
             if (latest != null)
             {
                 var agreed = LauncherUpdateHandler != null &&

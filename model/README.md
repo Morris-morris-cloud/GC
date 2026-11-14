@@ -5,7 +5,7 @@
 
 > 模型相关的一切都在 `model/` 里：共享引擎源码 `model/_engine/`、契约源码 `model/_sdk/`、
 > 每个模型自己的源码 `model/<id>/src/`，编译产物与数据 `model/<id>/<id>.model/`。
-> 仓库根目录只有 `src/`（启动器）和 `model/`，没有任何旁路目录。
+> 仓库根还包含 `GC-DOWNLOAD/` 下载更新项目；这里的 `model/` 仍独立保存模型源码与可分发内容。
 
 - 发布态模型库在 **`<可执行文件>/.GC/model/`**；开发态直接用仓库根 `model/`
 - 优先级：`EMS_MODELS` 环境变量 → 开发态仓库根 `model/` → 发布态 `.GC/model/`

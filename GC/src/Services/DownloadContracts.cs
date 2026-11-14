@@ -1,0 +1,157 @@
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
+using GC.Models;
+
+namespace GC.Services;
+
+public enum DownloadState
+{
+    Queued,
+    Running,
+    Completed,
+    Failed,
+    Canceled
+}
+
+public interface IDownloadJob : INotifyPropertyChanged
+{
+    RemoteModel Model { get; }
+    string Id { get; }
+    string Name { get; }
+    string Version { get; }
+    CancellationTokenSource Cts { get; }
+    DownloadState State { get; set; }
+    double Progress { get; set; }
+    string StatusText { get; }
+    string DetailText { get; }
+    string? Error { get; set; }
+    bool IsActive { get; }
+    bool CanRetry { get; }
+    bool IsDone { get; }
+    void RefreshText();
+}
+
+public interface IDownloadCenter
+{
+    ObservableCollection<IDownloadJob> Jobs { get; }
+    event Action? Installed;
+    IDownloadJob Enqueue(RemoteModel model);
+    void Cancel(IDownloadJob job);
+    void Retry(IDownloadJob job);
+    void Remove(IDownloadJob job);
+    void ClearFinished();
+    int ActiveCount { get; }
+}
+
+public interface IModelSourceClient
+{
+    Task<SourceIndex> FetchAsync(ModelSource source, bool force, IProgress<string>? log, CancellationToken ct);
+}
+
+public interface IUpdateService
+{
+    IModelRemote Remote { get; }
+    void UseRemote(IModelRemote remote);
+    Task<UpdateResult> RunAsync(bool force, IProgress<UpdateProgress>? progress, CancellationToken ct = default);
+}
+
+public interface ISourceSelector
+{
+    SourcePreset? Current { get; }
+    System.Collections.Generic.IReadOnlyDictionary<string, long> LastLatency { get; }
+    Task<SourcePreset> PickFastestAsync(bool force = false, CancellationToken ct = default);
+}
+
+public interface ILauncherUpdateService
+{
+    Task<string?> CheckAsync(IModelRemote remote, CancellationToken ct = default);
+    Task<UpdateRunResult> DownloadAsync(AppPaths paths, IModelRemote remote,
+        IProgress<UpdateProgressInfo>? progress = null, CancellationToken ct = default);
+    bool ScheduleApply(AppPaths paths, string packageName);
+    bool TryApplyPending(AppPaths paths);
+}
+
+public enum UpdateRunState { UpToDate, Ready, Failed }
+
+public sealed class UpdateProgressInfo
+{
+    public double Value { get; init; }
+    public string Stage { get; init; } = "";
+}
+
+public sealed class UpdateRunResult
+{
+    public UpdateRunState State { get; init; }
+    public string Version { get; init; } = "";
+    public string Message { get; init; } = "";
+    public string? PackageName { get; init; }
+    public string? NewAppPath { get; init; }
+}
+
+public interface IDownloadModule
+{
+    IDownloadCenter Downloads { get; }
+    IModelSourceClient Sources { get; }
+    IUpdateService Updates { get; }
+    ISourceSelector Selector { get; }
+    ILauncherUpdateService LauncherUpdates { get; }
+    IModelRemote CreateRemote(SourcePreset preset);
+}
+
+public interface IDownloadModuleFactory
+{
+    IDownloadModule Create(AppPaths paths, SettingsService settings, ModelRepository models);
+    bool TryApplyPending(AppPaths paths);
+}
+
+public static class DownloadModuleHost
+{
+    public static IDownloadModuleFactory? Factory { get; set; }
+}
+
+public static class LauncherRuntimeInfo
+{
+    private static string? _versionOverride;
+
+    public static string CurrentLauncherVersion
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(_versionOverride)) return _versionOverride!;
+            var assembly = typeof(AppServices).Assembly;
+            var version = assembly.GetName().Version;
+            if (version == null || (version.Major == 0 && version.Minor == 0 && version.Build == 0))
+            {
+                var info = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<
+                    System.Reflection.AssemblyInformationalVersionAttribute>(assembly)?.InformationalVersion;
+                if (!string.IsNullOrWhiteSpace(info) && Version.TryParse(info.Split('+')[0].Trim(), out var parsed))
+                    version = parsed;
+            }
+            return version == null
+                ? "0.0.0"
+                : $"{Math.Max(0, version.Major)}.{Math.Max(0, version.Minor)}.{Math.Max(0, version.Build)}";
+        }
+    }
+
+    public static string CurrentRid
+    {
+        get
+        {
+            var architecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
+            {
+                System.Runtime.InteropServices.Architecture.Arm64 => "arm64",
+                System.Runtime.InteropServices.Architecture.X86 => "x86",
+                _ => "x64"
+            };
+            if (OperatingSystem.IsWindows()) return "win-" + architecture;
+            if (OperatingSystem.IsMacOS()) return "osx-" + architecture;
+            if (OperatingSystem.IsLinux()) return "linux-" + architecture;
+            return System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+        }
+    }
+
+    public static void OverrideLauncherVersion(string? version) => _versionOverride = version;
+}

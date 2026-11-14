@@ -52,7 +52,7 @@ public static class LauncherUpdateFlow
             var progress = new Progress<UpdateProgressInfo>(p =>
                 progressWindow.Report(p.Value, p.Stage));
 
-            var result = await LauncherUpdater.DownloadAsync(
+            var result = await services.LauncherUpdates.DownloadAsync(
                 services.Paths, services.Updates.Remote, progress);
 
             if (result.State == UpdateRunState.Failed)
@@ -68,7 +68,7 @@ public static class LauncherUpdateFlow
             progressWindow.Report(1, $"v{result.Version} 下载完成，正在重启…");
 
             // 4. 安排替换（下次启动生效 / 脚本接管重启）
-            var scheduled = LauncherUpdater.ScheduleApply(
+            var scheduled = services.LauncherUpdates.ScheduleApply(
                 services.Paths, result.PackageName ?? "");
 
             if (!scheduled)

@@ -9,17 +9,8 @@ using GC.Models;
 
 namespace GC.Services;
 
-public enum DownloadState
-{
-    Queued,
-    Running,
-    Completed,
-    Failed,
-    Canceled
-}
-
 /// <summary>一条下载任务（进入后台列表后一直保留，直到用户清除）。</summary>
-public sealed partial class DownloadJob : ObservableObject
+public sealed partial class DownloadJob : ObservableObject, IDownloadJob
 {
     public RemoteModel Model { get; }
     public string Id => Model.Id;
@@ -66,13 +57,13 @@ public sealed partial class DownloadJob : ObservableObject
 }
 
 /// <summary>下载中心：最多 2 个并发，任务在「后台列表」里折叠展示。</summary>
-public sealed class DownloadCenter
+public sealed class DownloadCenter : IDownloadCenter
 {
     private readonly ModelRepository _repository;
     private readonly AppPaths _paths;
     private readonly SemaphoreSlim _slots = new(2);
 
-    public ObservableCollection<DownloadJob> Jobs { get; } = new();
+    public ObservableCollection<IDownloadJob> Jobs { get; } = new();
     public event Action? Installed;
 
     public DownloadCenter(AppPaths paths, ModelRepository repository)
@@ -81,7 +72,7 @@ public sealed class DownloadCenter
         _repository = repository;
     }
 
-    public DownloadJob Enqueue(RemoteModel model)
+    public IDownloadJob Enqueue(RemoteModel model)
     {
         var running = Jobs.FirstOrDefault(j => j.Id.Equals(model.Id, StringComparison.OrdinalIgnoreCase) && j.IsActive);
         if (running != null) return running;
@@ -92,7 +83,7 @@ public sealed class DownloadCenter
         return job;
     }
 
-    private async Task RunAsync(DownloadJob job)
+    private async Task RunAsync(IDownloadJob job)
     {
         // 在 UI 线程构造，回调自动回到 UI 线程
         var progress = new Progress<(long Done, long Total)>(p =>
@@ -135,20 +126,20 @@ public sealed class DownloadCenter
         }
     }
 
-    public void Cancel(DownloadJob job)
+    public void Cancel(IDownloadJob job)
     {
         try { job.Cts.Cancel(); } catch { }
         if (job.State == DownloadState.Queued) job.State = DownloadState.Canceled;
     }
 
-    public void Retry(DownloadJob job)
+    public void Retry(IDownloadJob job)
     {
         if (job.IsActive) return;
         Jobs.Remove(job);
         Enqueue(job.Model);
     }
 
-    public void Remove(DownloadJob job)
+    public void Remove(IDownloadJob job)
     {
         Cancel(job);
         Jobs.Remove(job);

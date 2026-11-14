@@ -53,12 +53,12 @@ public sealed class SourcePreset
     {
         Id = "gitcode",
         Name = "GitCode",
-        HomeUrl = "https://gitcode.com/2509_92447106/GC",
+        HomeUrl = "https://gitcode.com/Morris_1/GC",
         ApiBase = "https://api.gitcode.com/api/v5",
         RawBase = "https://gitcode.com",
         Kind = "gitcode",
         RawStyle = "plain",
-        Owner = "2509_92447106",
+        Owner = "Morris_1",
         Repo = "GC",
         Branch = "main"
     };

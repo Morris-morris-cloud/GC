@@ -15,7 +15,7 @@ namespace GC.Services;
 /// 取**最快且内容可用**的那个作为本次下载源；探测结果缓存一段时间，
 /// 避免每次点下载都重新测速。
 /// </summary>
-public sealed class SourceSelector
+public sealed class SourceSelector : ISourceSelector
 {
     private static readonly HttpClient Http = CreateHttp();
 

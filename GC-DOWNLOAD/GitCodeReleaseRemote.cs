@@ -50,9 +50,9 @@ public sealed class GitCodeReleaseRemote : IModelRemote
     {
         var raw = string.IsNullOrWhiteSpace(url) ? GitCodeRemote.DefaultRepository : url!.Trim();
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return ("2509_92447106", "GC");
+            return ("Morris_1", "GC");
         var parts = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2) return ("2509_92447106", "GC");
+        if (parts.Length < 2) return ("Morris_1", "GC");
         var repo = parts[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
             ? parts[1][..^4] : parts[1];
         return (parts[0], repo);

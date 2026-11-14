@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GC\src\GC.Core.csproj" />
+    <ProjectReference Include="..\GC-DOWNLOAD\GC-DOWNLOAD.csproj" />
   </ItemGroup>
 
 </Project>

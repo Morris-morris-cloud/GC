@@ -21,7 +21,7 @@ public sealed class Contributor
     /// </summary>
     private static readonly Dictionary<string, string> DisplayNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["2509_92447106"] = "Morris"
+        ["Morris_1"] = "Morris"
     };
 
     /// <summary>头像地址：GitCode 用邮箱哈希拼头像，取不到时返回 null。</summary>
@@ -63,13 +63,13 @@ public static class ContributorsService
     public static string BuildUrl(string repository)
     {
         var raw = string.IsNullOrWhiteSpace(repository)
-            ? GitCodeRemote.DefaultRepository : repository.Trim();
+            ? SourcePreset.GitCode.HomeUrl : repository.Trim();
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return "https://api.gitcode.com/api/v5/repos/2509_92447106/GC/contributors";
+            return "https://api.gitcode.com/api/v5/repos/Morris_1/GC/contributors";
 
         var parts = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
-            return "https://api.gitcode.com/api/v5/repos/2509_92447106/GC/contributors";
+            return "https://api.gitcode.com/api/v5/repos/Morris_1/GC/contributors";
 
         var repo = parts[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
             ? parts[1][..^4] : parts[1];
