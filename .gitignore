@@ -23,3 +23,31 @@ dist/
 build/
 .pytest_cache/
 .mypy_cache/
+
+# ---- GC-UI（Flutter 前端）----
+# Flutter / Dart 构建产物与本地工具状态
+GC-UI/frontend/.dart_tool/
+GC-UI/frontend/.flutter-plugins
+GC-UI/frontend/.flutter-plugins-dependencies
+GC-UI/frontend/.packages
+GC-UI/frontend/build/
+GC-UI/frontend/**/Flutter/ephemeral/
+GC-UI/frontend/**/GeneratedPluginRegistrant.*
+GC-UI/frontend/**/generated_plugin_registrant.*
+GC-UI/frontend/**/generated_plugins.cmake
+GC-UI/frontend/**/generated_plugins.h
+GC-UI/frontend/**/generated_plugin_registrant.h
+GC-UI/frontend/**/generated_plugin_registrant.cc
+GC-UI/frontend/**/generated_plugin_registrant.swift
+GC-UI/frontend/**/flutter_export_environment.sh
+GC-UI/frontend/**/xcschemes/xcschememanagement.plist
+GC-UI/frontend/**/Pods/
+GC-UI/frontend/**/Podfile.lock
+GC-UI/frontend/**/.symlinks/
+GC-UI/frontend/**/Runner.xcworkspace/xcuserdata/
+GC-UI/frontend/**/Runner.xcodeproj/xcuserdata/
+GC-UI/frontend/**/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+GC-UI/frontend/**/DebugProfile.entitlements.bak
+GC-UI/frontend/**/*.iml
+GC-UI/frontend/test/shots/
+

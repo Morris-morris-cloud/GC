@@ -14,6 +14,35 @@
 - 目标平台：**macOS arm64 / Windows x64 / Windows arm64**（Linux 可自行编译，未列入发布矩阵）
 - 更新仓库：<https://gitcode.com/Morris_1/GC>，模型目录 <https://gitcode.com/Morris_1/GC/tree/main/model>
 
+## GC-UI：前后端分离版（Flutter 前端）
+
+`GC-UI/` 是同一套服务层的**前后端分离**实现，界面改用 Flutter，Windows 与 macOS 共用一套代码：
+
+```
+GC-UI/
+├── backend/GC.UI.Server/   .NET 8 本地 HTTP 服务（复用 GC/src + GC-DOWNLOAD）+ 模型窗口宿主
+└── frontend/               Flutter 桌面应用（windows/ 与 macos/ 原生 runner）
+```
+
+- **前端**：Flutter（`flutter create --platforms=windows,macos` 生成两个原生壳），负责首页 / 下载 / 设置 / 关于
+- **后端**：.NET 8 最小 API，只监听 `127.0.0.1`，负责模型扫描、下载、更新、设置持久化
+- **模型窗口**：仍由 .NET 承载 —— 模型 dll 返回的是 Avalonia `Control`，渲染栈属于模型契约，不能换
+
+`GC-UI/` 的详情、平台选型理由与接口列表见 [`GC-UI/README.md`](GC-UI/README.md)。
+「关于」页会直接展示 **源码语言：C#、前端：Flutter**（由后端 `/api/about` 下发）。
+
+```bash
+# 后端
+dotnet run --project GC-UI/backend/GC.UI.Server
+
+# 前端（另开终端）
+cd GC-UI/frontend && flutter pub get
+flutter run -d windows     # 或 -d macos
+```
+
+详见 [GC-UI/README.md](GC-UI/README.md)（含完整接口表、构建脚本与测试说明）。
+
+
 ## 快速开始
 
 ```bash
