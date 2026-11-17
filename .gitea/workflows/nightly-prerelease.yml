@@ -107,7 +107,7 @@ jobs:
 
       - name: 保存构建产物（便于排查）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: nightly-build
           path: dist/*.zip
