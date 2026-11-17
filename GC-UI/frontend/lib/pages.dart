@@ -1786,7 +1786,10 @@ class _AboutPageViewState extends State<AboutPageView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                GcSectionTitle(T('about.developers')),
+                GcSectionTitle(
+                  T('about.developers'),
+                  trailing: GcHint(T('about.contributorsHint')),
+                ),
                 const SizedBox(height: 12),
                 if ((_about?.contributors ?? const <ContributorInfo>[]).isEmpty)
                   GcHint(T('about.noContributors'))
