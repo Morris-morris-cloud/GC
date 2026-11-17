@@ -31,6 +31,10 @@ class ShellPage extends StatefulWidget {
 }
 
 class _ShellPageState extends State<ShellPage> {
+  /// 页面缓存：键为「索引:语言」。同一个页面只构建一次，切走时用
+  /// [Offstage] 保活（不参与布局/绘制），切回来无需重建、状态也不丢。
+  final Map<String, Widget> _pages = <String, Widget>{};
+
   @override
   void initState() {
     super.initState();
@@ -78,7 +82,27 @@ class _ShellPageState extends State<ShellPage> {
       );
     }
 
-    switch (controller.index) {
+    // 只构建当前页；其余已访问页面保留在树上但处于 Offstage。
+    final key = '${controller.index}:${I18n.language.value}';
+    _pages.putIfAbsent(key, () => _buildPage(controller, controller.index));
+
+    final visibleKey = key;
+    return Stack(
+      children: <Widget>[
+        for (final entry in _pages.entries)
+          Offstage(
+            offstage: entry.key != visibleKey,
+            child: TickerMode(
+              enabled: entry.key == visibleKey,
+              child: entry.value,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPage(ShellController controller, int index) {
+    switch (index) {
       case 1:
         return DownloadPageView(controller: controller);
       case 2:
@@ -241,7 +265,8 @@ class _UpdateBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
       child: Row(
         children: <Widget>[
-          const Text('⟳', style: TextStyle(fontSize: 16, color: GcColors.accent)),
+          Text('⟳',
+              style: TextStyle(fontSize: 16, color: GcColors.accent)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

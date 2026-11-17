@@ -13,6 +13,9 @@ public sealed class AppSettings
     /// <summary>light | dark</summary>
     public string Theme { get; set; } = "light";
 
+    /// <summary>主题强调色（#RRGGBB），由设置页自定义并持久化。</summary>
+    public string AccentColor { get; set; } = "#8FB6FF";
+
     /// <summary>渲染帧率：24 / 30 / 60 / 90 / 120（上限 120，关闭 VSync 同步）</summary>
     public int RenderFps { get; set; } = 120;
 
@@ -37,8 +40,8 @@ public sealed class AppSettings
     /// <summary>启动时检查模型 / 启动器是否为最新版。</summary>
     public bool AutoUpdateOnStartup { get; set; } = true;
 
-    /// <summary>默认更新仓库地址。</summary>
-    public string UpdateRepository { get; set; } = "https://gitcode.com/Morris_1/GC";
+    /// <summary>默认更新仓库地址（暂时只使用 Xhmcl，GitCode 实现保留但不再调用）。</summary>
+    public string UpdateRepository { get; set; } = "https://git.xhmcl.com/Morris/GC";
 
     /// <summary>版本清单地址覆盖（留空则按 UpdateRepository 拼接）。</summary>
     public string? UpdateManifestUrl { get; set; }

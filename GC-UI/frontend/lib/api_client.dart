@@ -152,6 +152,7 @@ class SettingsInfo {
   SettingsInfo.fromJson(Map<String, dynamic> json)
       : language = json['language'] as String? ?? 'auto',
         theme = json['theme'] as String? ?? 'light',
+        accentColor = json['accentColor'] as String? ?? '#8FB6FF',
         renderFps = (json['renderFps'] as num?)?.toInt() ?? 120,
         memoryMb = (json['memoryMb'] as num?)?.toInt() ?? 2048,
         memoryAuto = json['memoryAuto'] as bool? ?? true,
@@ -176,6 +177,7 @@ class SettingsInfo {
 
   final String language;
   final String theme;
+  final String accentColor;
   final int renderFps;
   final int memoryMb;
   final bool memoryAuto;
@@ -200,6 +202,7 @@ class SettingsPatch {
   const SettingsPatch({
     this.language,
     this.theme,
+    this.accentColor,
     this.renderFps,
     this.memoryMb,
     this.memoryAuto,
@@ -212,6 +215,7 @@ class SettingsPatch {
 
   final String? language;
   final String? theme;
+  final String? accentColor;
   final int? renderFps;
   final int? memoryMb;
   final bool? memoryAuto;
@@ -225,6 +229,7 @@ class SettingsPatch {
     final map = <String, dynamic>{};
     if (language != null) map['language'] = language;
     if (theme != null) map['theme'] = theme;
+    if (accentColor != null) map['accentColor'] = accentColor;
     if (renderFps != null) map['renderFps'] = renderFps;
     if (memoryMb != null) map['memoryMb'] = memoryMb;
     if (memoryAuto != null) map['memoryAuto'] = memoryAuto;

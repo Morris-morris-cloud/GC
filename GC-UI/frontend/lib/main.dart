@@ -6,6 +6,9 @@ import 'shell.dart';
 import 'theme.dart';
 
 void main() {
+  // 桌面端无需异步初始化外部插件：尽早绑定并直接渲染首帧，
+  // 让窗口在引擎就绪后立刻出现，后端探测在外壳里异步进行。
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const GcUiApp());
 }
 
@@ -25,14 +28,21 @@ class _GcUiAppState extends State<GcUiApp> {
 
   @override
   Widget build(BuildContext context) {
+    // 语言与强调色都会触发重建：只重建 MaterialApp 的主题层，
+    // 不触碰页面状态（页面由 ShellPage 自己持有）。
     return ValueListenableBuilder<String>(
       valueListenable: I18n.language,
       builder: (context, language, _) {
-        return MaterialApp(
-          title: 'Morris GC',
-          debugShowCheckedModeBanner: false,
-          theme: buildGcTheme(),
-          home: ShellPage(controller: _controller),
+        return ValueListenableBuilder<Color>(
+          valueListenable: GcPalette.accent,
+          builder: (context, accent, _) {
+            return MaterialApp(
+              title: 'Morris GC',
+              debugShowCheckedModeBanner: false,
+              theme: buildGcTheme(),
+              home: ShellPage(controller: _controller),
+            );
+          },
         );
       },
     );

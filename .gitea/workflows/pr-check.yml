@@ -1,0 +1,140 @@
+# ---------------------------------------------------------------------------
+# PR 审核流水线（Gitea Actions）
+#
+# 触发：向 main / gc-ui 提 PR（新建、追加提交、重新打开、取消草稿）时执行。
+# 覆盖：后端编译、后端自检、前端静态分析 / 测试、依赖漏洞与硬编码密钥扫描，
+#       最后用 review-gate 汇总，任意一项失败则整条流水线失败（阻止合并）。
+# ---------------------------------------------------------------------------
+name: PR 审核
+
+on:
+  pull_request:
+    branches: [main, gc-ui]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # Avalonia 遥测任务在 CI 只读目录会写日志失败并中断编译（MSB4018）
+  AVALONIA_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+jobs:
+  backend-build:
+    name: 后端编译
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 还原依赖
+        run: dotnet restore GC.sln
+
+      - name: 编译整个解决方案（Release）
+        run: dotnet build GC.sln -c Release --no-restore
+
+      - name: 编译 GC-UI 后端（前后端契约变更时单独验证）
+        run: dotnet build GC-UI/backend/GC.UI.Server/GC.UI.Server.csproj -c Release --no-restore
+
+  backend-test:
+    name: 后端自检
+    runs-on: ubuntu-latest
+    needs: backend-build
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 运行 GC.Tests（含离屏渲染 / 清单校验）
+        run: dotnet run --project GC/src/test/dotnet/GC.Tests/GC.Tests.csproj -c Release
+
+  frontend:
+    name: 前端检查（Flutter）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖
+        working-directory: GC-UI/frontend
+        run: flutter pub get
+
+      - name: 静态分析
+        working-directory: GC-UI/frontend
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: 单元 / 组件测试
+        working-directory: GC-UI/frontend
+        run: flutter test
+
+  security:
+    name: 安全扫描
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 依赖漏洞扫描（含传递依赖）
+        run: |
+          dotnet restore GC.sln
+          dotnet list GC.sln package --vulnerable --include-transitive
+
+      - name: 硬编码密钥 / 口令扫描
+        run: |
+          set +e
+          echo "扫描源码中的疑似明文口令 / 令牌…"
+          MATCHES=$(grep -rInE \
+            --include='*.cs' --include='*.dart' --include='*.yml' --include='*.yaml' \
+            --include='*.sh' --include='*.ps1' --include='*.json' \
+            '(password|passwd|secret|api[_-]?key|access[_-]?token)[[:space:]]*[:=][[:space:]]*["'\''][^"'\''[:space:]]{6,}' \
+            . 2>/dev/null | grep -vE 'example|placeholder|dummy|CHANGEME|YOUR_|\$\{\{')
+          if [ -n "$MATCHES" ]; then
+            echo "$MATCHES"
+            echo "::error::发现疑似硬编码凭据，请改用 Secrets 或环境变量"
+            exit 1
+          fi
+          echo "未发现硬编码凭据"
+
+  review-gate:
+    name: 审核汇总
+    runs-on: ubuntu-latest
+    needs: [backend-build, backend-test, frontend, security]
+    if: always()
+    steps:
+      - name: 检查各阶段结果
+        run: |
+          echo "后端编译: ${{ needs.backend-build.result }}"
+          echo "后端自检: ${{ needs.backend-test.result }}"
+          echo "前端检查: ${{ needs.frontend.result }}"
+          echo "安全扫描: ${{ needs.security.result }}"
+          if [ "${{ needs.backend-build.result }}" != "success" ] || \
+             [ "${{ needs.backend-test.result }}" != "success" ] || \
+             [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.security.result }}" != "success" ]; then
+            echo "::error::审核未通过：存在失败阶段，请修复后重新提交"
+            exit 1
+          fi
+          echo "审核通过：可以合并"

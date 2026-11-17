@@ -344,7 +344,7 @@ class _HomePageViewState extends State<HomePageView> {
   }
 }
 
-class _ModelCard extends StatelessWidget {
+class _ModelCard extends StatefulWidget {
   const _ModelCard({
     required this.model,
     required this.previewUrl,
@@ -360,109 +360,248 @@ class _ModelCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
+  State<_ModelCard> createState() => _ModelCardState();
+}
+
+class _ModelCardState extends State<_ModelCard> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 336,
-      child: GcCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-              child: SizedBox(
-                height: 138,
-                width: double.infinity,
-                child: Container(
-                  color: const Color(0xFF0B1226),
-                  child: model.hasPreview
-                      ? Image.network(
-                          previewUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stack) =>
-                              const _PreviewFallback(),
-                        )
-                      : const _PreviewFallback(),
-                ),
-              ),
+    final model = widget.model;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        width: 336,
+        transform: Matrix4.translationValues(0, _hover ? -3 : 0, 0),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withOpacity(_hover ? 0.42 : 0.22),
+              blurRadius: _hover ? 26 : 14,
+              offset: Offset(0, _hover ? 10 : 6),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 13, 16, 15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
+          ],
+        ),
+        child: GcCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // 封面：图片 + 底部渐变遮罩 + 播放提示 + 版本徽章。
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(13)),
+                child: SizedBox(
+                  height: 152,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          model.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: GcColors.ink,
+                      Container(
+                        color: const Color(0xFF0B1226),
+                        child: model.hasPreview
+                            ? Image.network(
+                                widget.previewUrl,
+                                fit: BoxFit.cover,
+                                // 只按展示尺寸解码，避免大图占用内存、拖慢首帧。
+                                cacheWidth: 672,
+                                errorBuilder: (context, error, stack) =>
+                                    const _PreviewFallback(),
+                              )
+                            : const _PreviewFallback(),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[
+                              Color(0x00000000),
+                              Color(0x22000000),
+                              Color(0xE60A1226),
+                            ],
+                            stops: <double>[0.45, 0.72, 1.0],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        model.metaText,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: GcColors.faint,
+                      Positioned(
+                        left: 14,
+                        right: 14,
+                        bottom: 11,
+                        child: Row(
+                          children: <Widget>[
+                            if (model.version.isNotEmpty)
+                              _CoverPill(
+                                text: 'v${model.version}',
+                                color: GcColors.accent,
+                              ),
+                            if (model.author.isNotEmpty) ...<Widget>[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  model.author,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const Spacer(),
+                            AnimatedOpacity(
+                              opacity: _hover ? 1 : 0,
+                              duration: const Duration(milliseconds: 160),
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: GcColors.accent.withOpacity(0.9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.play_arrow_rounded,
+                                    size: 20, color: Color(0xFF08101F)),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 7),
-                  SizedBox(
-                    height: 34,
-                    child: Text(
-                      model.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: GcColors.muted,
-                        height: 1.4,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 16, 15),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            model.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: GcColors.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          model.sizeText,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: GcColors.faint,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    // 简介：固定两行高度，避免卡片高低不齐。
+                    SizedBox(
+                      height: 34,
+                      child: Text(
+                        model.description.isEmpty
+                            ? T('home.noDescription')
+                            : model.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: model.description.isEmpty
+                              ? GcColors.faint
+                              : GcColors.muted,
+                        ),
                       ),
                     ),
-                  ),
-                  if (model.tags.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 6),
-                    Text(
-                      model.tags.join('  ·  '),
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: GcColors.faint,
+                    if (model.tags.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: <Widget>[
+                          for (final tag in model.tags.take(3))
+                            _CoverPill(
+                              text: tag,
+                              color: GcColors.muted,
+                              subtle: true,
+                            ),
+                        ],
                       ),
+                    ],
+                    const SizedBox(height: 13),
+                    Row(
+                      children: <Widget>[
+                        FilledButton.icon(
+                          onPressed: widget.onLaunch,
+                          icon: const Icon(Icons.play_arrow_rounded, size: 17),
+                          label: Text(T('home.launch')),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: widget.onOpenFolder,
+                          child: Text(T('home.open')),
+                        ),
+                        TextButton(
+                          onPressed: widget.onDelete,
+                          style: TextButton.styleFrom(
+                            foregroundColor: GcColors.danger,
+                          ),
+                          child: Text(T('home.delete')),
+                        ),
+                      ],
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      FilledButton(
-                        onPressed: onLaunch,
-                        child: Text(T('home.launch')),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: onOpenFolder,
-                        child: Text(T('home.open')),
-                      ),
-                      TextButton(
-                        onPressed: onDelete,
-                        style: TextButton.styleFrom(
-                          foregroundColor: GcColors.danger,
-                        ),
-                        child: Text(T('home.delete')),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 封面上的小胶囊标签（版本 / 标签）。
+class _CoverPill extends StatelessWidget {
+  const _CoverPill({
+    required this.text,
+    required this.color,
+    this.subtle = false,
+  });
+
+  final String text;
+  final Color color;
+  final bool subtle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: subtle ? GcColors.surfaceAlt : color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: subtle ? GcColors.line : color.withOpacity(0.35),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          height: 1.1,
+          color: subtle ? GcColors.faint : color,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -473,12 +612,23 @@ class _PreviewFallback extends StatelessWidget {
   const _PreviewFallback();
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[Color(0xFF16233C), Color(0xFF0B1226)],
+        ),
+      ),
+      child: const Center(
         child: Text(
           '◎',
-          style: TextStyle(fontSize: 34, color: Color(0xFF1B2A47)),
+          style: TextStyle(fontSize: 34, color: Color(0xFF24365A)),
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1020,6 +1170,8 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         const SizedBox(height: 18),
         _generalCard(settings),
         const SizedBox(height: 16),
+        _appearanceCard(settings),
+        const SizedBox(height: 16),
         _memoryCard(settings),
         const SizedBox(height: 16),
         _sourcesCard(settings),
@@ -1104,6 +1256,149 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         ],
       ),
     );
+  }
+
+  Widget _appearanceCard(SettingsInfo settings) {
+    final current =
+        GcPalette.parseHex(settings.accentColor) ?? GcPalette.defaultAccent;
+    return GcCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          GcSectionTitle(T('set.appearance')),
+          const SizedBox(height: 8),
+          GcHint(T('set.accent.desc')),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: <Widget>[
+              for (final color in GcPalette.presets)
+                _accentSwatch(color, current),
+              _customAccentChip(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${T('set.accent')}: ${GcPalette.toHex(current)}',
+            style: const TextStyle(fontSize: 11.5, color: GcColors.faint),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _accentSwatch(Color color, Color current) {
+    // ignore: deprecated_member_use
+    final selected = color.value == current.value;
+    return Tooltip(
+      message: GcPalette.toHex(color),
+      child: GestureDetector(
+        onTap: () => _applyAccent(GcPalette.toHex(color)),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? Colors.white : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: color.withOpacity(selected ? 0.55 : 0.18),
+                blurRadius: selected ? 14 : 6,
+              ),
+            ],
+          ),
+          child: selected
+              ? const Icon(Icons.check_rounded,
+                  size: 19, color: Color(0xFF08101F))
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _customAccentChip() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _pickCustomAccent,
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: GcColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: GcColors.line),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.colorize_rounded,
+                  size: 16, color: GcColors.faint),
+              const SizedBox(width: 6),
+              Text(
+                T('set.accent.custom'),
+                style: const TextStyle(fontSize: 11.5, color: GcColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomAccent() async {
+    final controller = TextEditingController(
+      text: GcPalette.toHex(GcPalette.accent.value),
+    );
+    final hex = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GcColors.surfaceAlt,
+        title: Text(T('set.accent.custom')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: GcColors.ink),
+          decoration: InputDecoration(
+            hintText: '#8FB6FF',
+            hintStyle: const TextStyle(color: GcColors.faint),
+            helperText: T('set.accent.hexHint'),
+            helperStyle: const TextStyle(color: GcColors.faint, fontSize: 11),
+          ),
+          onSubmitted: (value) => Navigator.of(context).pop(value),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(T('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: Text(T('common.confirm')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (hex != null) await _applyAccent(hex);
+  }
+
+  Future<void> _applyAccent(String hex) async {
+    final parsed = GcPalette.parseHex(hex);
+    if (parsed == null) {
+      if (mounted) setState(() => _status = T('set.accent.invalid'));
+      return;
+    }
+    final normalized = GcPalette.toHex(parsed);
+    GcPalette.apply(normalized); // 立即预览
+    await widget.controller
+        .saveSettings(SettingsPatch(accentColor: normalized));
+    if (mounted) setState(() => _status = T('common.applied'));
   }
 
   Widget _memoryCard(SettingsInfo settings) {
@@ -1508,7 +1803,7 @@ class _AboutPageViewState extends State<AboutPageView> {
                                 ? null
                                 : NetworkImage(contributor.avatarUrl!),
                             child: contributor.avatarUrl == null
-                                ? const Text('◎',
+                                ? Text('◎',
                                     style: TextStyle(
                                         fontSize: 12, color: GcColors.accent))
                                 : null,
