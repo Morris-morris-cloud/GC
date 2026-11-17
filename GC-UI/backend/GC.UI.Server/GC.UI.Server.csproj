@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    GC-UI 后端：把原来「启动器 = UI + 服务」的一体式结构拆成
+      · 后端（本工程）：模型扫描 / 下载 / 更新 / 设置 / 模型窗口宿主，只暴露本地 HTTP API
+      · 前端（GC-UI/frontend，Flutter）：只做界面，通过 HTTP 调后端
+
+    模型窗口仍然由 .NET 侧承载：模型 dll 返回的是 Avalonia Control，
+    换掉渲染栈等于换掉模型契约，所以「渲染留在 .NET，界面交给 Flutter」是唯一不破坏模型生态的切法。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>GC.UI.Server</RootNamespace>
+    <AssemblyName>GC.UI.Server</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <!-- 后端是本地伴随进程，不需要浏览器启动配置 / 静态文件 -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\GC\src\GC.Core.csproj" />
+    <ProjectReference Include="..\..\..\GC-DOWNLOAD\GC-DOWNLOAD.csproj" />
+  </ItemGroup>
+
+</Project>
