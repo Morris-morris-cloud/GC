@@ -8,7 +8,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 /// <summary>
 /// 比例尺计算器主界面。三栏（已知量 / 可视化标尺 / 三种写法与判读）+ 底部实地尺与练习。

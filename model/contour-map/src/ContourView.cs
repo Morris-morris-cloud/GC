@@ -6,7 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>
 /// 等高线教学画布，左右两块：

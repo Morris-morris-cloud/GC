@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <RootNamespace>NeoRF.ScaleCalculator</RootNamespace>
+    <RootNamespace>GC.ScaleCalculator</RootNamespace>
     <AssemblyName>ScaleCalculatorModel</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>false</IsPackable>

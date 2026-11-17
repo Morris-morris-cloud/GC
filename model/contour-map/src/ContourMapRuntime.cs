@@ -6,7 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using GC.ModelSdk;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>等高线模型入口（清单里的 type 指向这里）。</summary>
 public sealed class ContourMapFactory : IModelFactory

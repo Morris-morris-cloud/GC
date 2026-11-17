@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>地球地理模型的数据文件：全部是经纬度折线，只有轮廓没有填色。</summary>
 public sealed class GeoData

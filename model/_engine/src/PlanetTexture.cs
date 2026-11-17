@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia.Media;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 预烘焙的等经纬度地表贴图：反照率 + 高度 + 冰盖 + 云层 + 夜间灯光。

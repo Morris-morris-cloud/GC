@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 /// <summary>内置全量文案兜底：即使模型包里没有语言包也能完整显示。</summary>
 internal static class DefaultTexts

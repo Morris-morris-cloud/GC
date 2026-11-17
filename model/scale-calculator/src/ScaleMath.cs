@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 /// <summary>三种求解模式：待求的量。</summary>
 public enum SolveMode

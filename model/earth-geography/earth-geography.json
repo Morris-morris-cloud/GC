@@ -9,7 +9,7 @@
     "en": "Climate zones, continent/ocean outlines, plates and borders — clean line art."
   },
   "assembly": "EarthGeographyModel.dll",
-  "type": "NeoRF.EarthModels.GeographyModelFactory",
+  "type": "GC.EarthModels.GeographyModelFactory",
   "author": "Morris GC",
   "tags": [
     "geography",
@@ -25,6 +25,6 @@
     "button": "#9FB4D4",
     "frame": "#0A1524"
   },
-  "build": "3b645c45c2",
-  "updatedAt": "2026-11-14T11:34:35Z"
+  "build": "16eaf4110f",
+  "updatedAt": "2026-11-17T22:53:52Z"
 }

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>内置全量文案兜底：没有语言包也能完整显示。</summary>
 internal static class DefaultTexts

@@ -74,10 +74,10 @@ dll / json 的哈希 —— 本地文件被替换会直接拒绝加载。
   "descriptionI18n": { "zh-CN": "……", "en": "……" },
   "version": "1.6",
   "updatedAt": "2026-11-14T08:00:00Z",
-  "author": "NeoRF",
+  "author": "Morris",
   "tags": ["astronomy", "geography"],
   "assembly": "EarthRotationModel.dll",
-  "type": "NeoRF.EarthModels.RotationModelFactory",
+  "type": "GC.EarthModels.RotationModelFactory",
   "preview": "preview.png",
   "apiVersion": 1,
   "minAppVersion": "1.0.7"

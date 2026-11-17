@@ -6,7 +6,7 @@
     "zh-CN": "地球公转",
     "en": "Earth Revolution"
   },
-  "author": "NeoRF",
+  "author": "Morris",
   "description": "四季更替、黄赤交角与二分二至",
   "descriptionI18n": {
     "zh-CN": "地球绕太阳公转一年：地轴指向不变，太阳直射点南北往返，形成四季。",
@@ -20,7 +20,7 @@
   "entry": "scene.json",
   "license": "MIT",
   "assembly": "EarthRevolutionModel.dll",
-  "type": "NeoRF.EarthModels.RevolutionModelFactory",
+  "type": "GC.EarthModels.RevolutionModelFactory",
   "preview": "preview.png",
   "apiVersion": 1,
   "version": "1.6",
@@ -31,6 +31,6 @@
     "button": "#9FB4D4",
     "frame": "#0A1524"
   },
-  "build": "947efa36bb",
-  "updatedAt": "2026-11-14T11:34:35Z"
+  "build": "bd57e6ed67",
+  "updatedAt": "2026-11-17T22:53:52Z"
 }

@@ -8,7 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using GC.ModelSdk;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 public enum GeoMode { Sphere3D, Flat2D }
 

@@ -4,7 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>&lt;id&gt;.model/land.json —— 简化的大陆轮廓（经纬度多边形）。</summary>
 public sealed class LandData

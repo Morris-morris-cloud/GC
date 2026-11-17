@@ -11,7 +11,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using GC.ModelSdk;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 模型自己的界面：画布 + 触控友好工具栏 + 课堂演示卡 + 节气定格与步进。

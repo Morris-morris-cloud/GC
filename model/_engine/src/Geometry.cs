@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 地理模型的球面几何工具：经纬度 ↔ 单位球坐标、正交投影到屏幕、

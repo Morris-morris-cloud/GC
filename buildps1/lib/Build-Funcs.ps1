@@ -275,7 +275,7 @@ function New-MacAppBundle {
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>GC</string>
 <key>CFBundleDisplayName</key><string>GC</string>
-<key>CFBundleIdentifier</key><string>cn.neorf.GC</string>
+<key>CFBundleIdentifier</key><string>com.xhmcl.GC</string>
 <key>CFBundleVersion</key><string>$script:BuildVersion</string>
 <key>CFBundleShortVersionString</key><string>$script:BuildVersion</string>
 <key>CFBundlePackageType</key><string>APPL</string>

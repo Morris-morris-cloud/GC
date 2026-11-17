@@ -5,7 +5,7 @@ using System.Text.Json;
 using Avalonia.Controls;
 using GC.ModelSdk;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 /// <summary>
 /// 比例尺计算器运行时。Prepare 在后台线程读数据/语言包，CreateView 在 UI 线程构建界面。

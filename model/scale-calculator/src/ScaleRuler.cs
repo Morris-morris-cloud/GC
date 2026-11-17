@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 /// <summary>
 /// 自绘可视化标尺：上条「图上距离」按真实厘米画，下条「实地距离」按同一比例尺压缩，

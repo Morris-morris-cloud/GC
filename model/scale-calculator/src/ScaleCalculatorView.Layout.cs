@@ -5,7 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 
-namespace NeoRF.ScaleCalculator;
+namespace GC.ScaleCalculator;
 
 public sealed partial class ScaleCalculatorView
 {

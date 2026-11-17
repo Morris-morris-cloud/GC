@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 球体像素级渲染：正交投影 + 预烘焙地表纹理 + 地形光照 + 云层 + 夜灯 + 大气边缘光。

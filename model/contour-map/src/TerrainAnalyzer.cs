@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>地形部位识别结果：课本要求学生能在等高线图上认出这五种部位。</summary>
 public enum TerrainFeature
