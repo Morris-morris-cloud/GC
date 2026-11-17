@@ -5,10 +5,11 @@ using System.Linq;
 namespace GC.Services;
 
 /// <summary>
-/// 内置下载源。只允许这两个，不再支持用户自定义源。
+/// 内置下载源。
 ///
-/// 两个源的内容是同一份仓库（同一个 version.json、同一批模型），
-/// 区别只是**托管在哪台服务器**上；启动时探测两者延迟，取快的那个下载。
+/// 目前只启用 Xhmcl；GitCode 的 preset 与下载实现仍保留在代码中，
+/// 但不参与测速 / 下载 / 更新。两个源本来指向同一份仓库内容，
+/// 区别只是托管服务器；恢复双源时把 GitCode 加回 <see cref="All"/>。
 /// </summary>
 public sealed class SourcePreset
 {
@@ -63,17 +64,23 @@ public sealed class SourcePreset
         Branch = "main"
     };
 
-    public static readonly SourcePreset[] All = { Xhmcl, GitCode };
+    /// <summary>
+    /// 当前启用的源：暂时只保留 Xhmcl。GitCode 的定义与实现仍保留在代码里，
+    /// 但不参与测速、下载与更新（需要恢复时把 GitCode 加回这个数组即可）。
+    /// </summary>
+    public static readonly SourcePreset[] All = { Xhmcl };
 
     public static SourcePreset? Find(string? id) =>
         All.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>把任意仓库地址映射到这两个内置源之一（用于兼容旧配置）。</summary>
+    /// <summary>把任意仓库地址映射到启用的内置源（用于兼容旧配置）。</summary>
     public static SourcePreset Detect(string? url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return GitCode;
-        var u = url!.ToLowerInvariant();
-        if (u.Contains("xhmcl.com")) return Xhmcl;
-        return GitCode;
+        if (!string.IsNullOrWhiteSpace(url) &&
+            url!.Contains("xhmcl.com", StringComparison.OrdinalIgnoreCase))
+            return Xhmcl;
+
+        // 旧配置里的 GitCode 地址不再作为下载源，统一落到 Xhmcl。
+        return Xhmcl;
     }
 }

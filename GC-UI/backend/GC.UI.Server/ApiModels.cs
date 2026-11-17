@@ -74,6 +74,7 @@ public sealed record LanguageDto(string Code, string Label);
 public sealed record SettingsDto(
     string Language,
     string Theme,
+    string AccentColor,
     int RenderFps,
     int MemoryMb,
     bool MemoryAuto,
@@ -96,6 +97,7 @@ public sealed record SettingsDto(
 public sealed record SettingsPatch(
     string? Language,
     string? Theme,
+    string? AccentColor,
     int? RenderFps,
     int? MemoryMb,
     bool? MemoryAuto,

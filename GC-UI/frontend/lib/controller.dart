@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
 import 'i18n.dart';
+import 'theme.dart';
 
 /// 外壳状态：后端客户端 + 设置 + 健康状态 + 更新状态条。
 ///
@@ -27,14 +28,22 @@ class ShellController extends ChangeNotifier {
 
   Future<void> bootstrap() async {
     try {
-      health = await api.health();
-      settings = await api.settings();
+      // 健康检查与设置并行请求：两者互不依赖，串行会白白多等一次网络往返。
+      final healthFuture = api.health();
+      final settingsFuture = api.settings();
+      health = await healthFuture;
+      settings = await settingsFuture;
       loadError = null;
-      I18n.setLanguage(settings!.language);
+      _applySettings(settings!);
     } catch (error) {
       loadError = error.toString();
     }
     notifyListeners();
+  }
+
+  void _applySettings(SettingsInfo value) {
+    I18n.setLanguage(value.language);
+    GcPalette.apply(value.accentColor);
   }
 
   void goTo(int value) {
@@ -47,7 +56,7 @@ class ShellController extends ChangeNotifier {
     try {
       settings = await api.settings();
       loadError = null;
-      I18n.setLanguage(settings!.language);
+      _applySettings(settings!);
     } catch (error) {
       loadError = error.toString();
     }
@@ -58,7 +67,7 @@ class ShellController extends ChangeNotifier {
     try {
       settings = await api.saveSettings(patch);
       loadError = null;
-      I18n.setLanguage(settings!.language);
+      _applySettings(settings!);
     } catch (error) {
       loadError = error.toString();
     }

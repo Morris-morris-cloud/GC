@@ -1,0 +1,115 @@
+# ---------------------------------------------------------------------------
+# 每晚预发布（Gitea Actions）
+#
+# 触发：每天 UTC 13:00（北京时间 21:00）定时执行，也可手动触发。
+# 行为：
+#   1. 编译并发布 Linux / Windows 启动器，打成 zip；
+#   2. 先删除仓库里所有旧的 nightly-* 预发布（Release 与 tag）；
+#   3. 创建当天的新 Release：prerelease=true（不会成为 Latest），
+#      tag 形如 nightly-20261117，并上传构建产物。
+#
+# 注意：Gitea Actions 的 cron 按 UTC 计算，故 13:00 UTC = 21:00 Asia/Shanghai。
+# ---------------------------------------------------------------------------
+name: 每晚预发布
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-prerelease
+  cancel-in-progress: false
+
+env:
+  AVALONIA_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+jobs:
+  nightly:
+    name: 构建并发布预发布
+    runs-on: ubuntu-latest
+    env:
+      # 优先用仓库 Secret；未配置时回退到 Actions 内置令牌。
+      GITEA_TOKEN: ${{ secrets.GITEA_TOKEN || github.token }}
+      API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 发布启动器（linux-x64 / win-x64）
+        run: |
+          set -eu
+          mkdir -p dist
+          dotnet publish GC-BOOT/GC-BOOT.csproj -c Release -r linux-x64 \
+            --self-contained true -p:PublishTrimmed=false -p:EnableWindowsTargeting=true \
+            -o dist/nightly/linux-x64
+          dotnet publish GC-BOOT/GC-BOOT.csproj -c Release -r win-x64 \
+            --self-contained true -p:PublishTrimmed=false -p:EnableWindowsTargeting=true \
+            -o dist/nightly/win-x64
+          (cd dist/nightly && zip -qr ../GC-nightly-linux-x64.zip linux-x64)
+          (cd dist/nightly && zip -qr ../GC-nightly-win-x64.zip win-x64)
+          ls -lh dist/*.zip
+
+      - name: 删除旧的 nightly 预发布
+        run: |
+          set -eu
+          echo "读取现有 Release…"
+          RELEASES=$(curl -sf -H "Authorization: token $GITEA_TOKEN" "$API/releases?limit=100" || echo '[]')
+          echo "$RELEASES" | jq -r '.[] | select(.prerelease == true and (.tag_name | startswith("nightly-"))) | "\(.id) \(.tag_name)"' |
+          while read -r id tag; do
+            [ -z "${id:-}" ] && continue
+            echo "删除旧预发布: $tag (id=$id)"
+            curl -sf -X DELETE -H "Authorization: token $GITEA_TOKEN" "$API/releases/$id" || true
+            curl -sf -X DELETE -H "Authorization: token $GITEA_TOKEN" "$API/tags/$tag" || true
+          done
+
+      - name: 创建当天预发布并上传产物
+        run: |
+          set -eu
+          TAG="nightly-$(date -u +%Y%m%d)"
+          NOW="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          BODY="自动构建 · ${NOW}
+          基于提交 ${GITHUB_SHA}
+          产物：Linux x64 / Windows x64 启动器（未签名，仅供测试）"
+          echo "创建预发布 $TAG"
+
+          PAYLOAD=$(jq -n \
+            --arg tag "$TAG" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg name "Nightly ${TAG}" \
+            --arg body "$BODY" \
+            '{tag_name:$tag, target_commitish:$sha, name:$name, body:$body, prerelease:true, draft:false}')
+
+          RESP=$(curl -sf -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$API/releases")
+          ID=$(echo "$RESP" | jq -r '.id')
+          echo "Release id=$ID"
+
+          for f in dist/GC-nightly-*.zip; do
+            [ -e "$f" ] || continue
+            echo "上传 $(basename "$f")"
+            curl -sf -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -F "attachment=@$f" \
+              "$API/releases/$ID/assets?name=$(basename "$f")" || echo "⚠ 上传失败: $f"
+          done
+
+          echo "完成：$TAG 已作为预发布创建（Latest 仍是最近一次正式版）。"
+
+      - name: 保存构建产物（便于排查）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-build
+          path: dist/*.zip
+          if-no-files-found: ignore
+          retention-days: 7

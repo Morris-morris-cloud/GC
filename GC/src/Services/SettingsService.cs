@@ -18,10 +18,11 @@ public sealed class SettingsService
     public void Load()
     {
         Current = Json.Read<AppSettings>(_paths.SettingsFile) ?? new AppSettings();
-        if (Current.UpdateRepository.Contains("gitcode.com/2509_92447106/GC", StringComparison.OrdinalIgnoreCase))
+
+        // 暂时停用 GitCode：旧配置里的 GitCode 仓库地址统一迁到 Xhmcl。
+        if (Current.UpdateRepository.Contains("gitcode.com", StringComparison.OrdinalIgnoreCase))
         {
-            Current.UpdateRepository = Current.UpdateRepository.Replace(
-                "2509_92447106", "Morris_1", StringComparison.OrdinalIgnoreCase);
+            Current.UpdateRepository = SourcePreset.Xhmcl.HomeUrl;
             Save();
         }
         SeedDefaultSource();
@@ -29,12 +30,11 @@ public sealed class SettingsService
     }
 
     /// <summary>
-    /// 只允许两个内置源：Xhmcl 与 GitCode（同一份仓库的两个镜像）。
-    /// 不再支持用户自定义源 —— 每次加载都把 Sources 规整成这两条，
-    /// 老配置里的自定义源会被清理掉。
+    /// 当前只启用 Xhmcl 一个内置源。GitCode 的定义与下载实现保留在代码里，
+    /// 但不再参与测速 / 下载 / 更新；恢复时把 GitCode 加回 <see cref="SourcePreset.All"/> 即可。
     /// </summary>
-    public const string DefaultSourceId = "gitcode";
-    public const string DefaultSourceUrl = "https://gitcode.com/Morris_1/GC";
+    public const string DefaultSourceId = "xhmcl";
+    public const string DefaultSourceUrl = "https://git.xhmcl.com/Morris/GC";
 
     private void SeedDefaultSource()
     {

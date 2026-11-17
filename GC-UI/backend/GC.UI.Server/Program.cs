@@ -53,17 +53,96 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = ar
 builder.Logging.ClearProviders();
 builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
 
+// 本地伴随进程：限制请求体大小、关闭 Server 头、收紧超时，减少被本地恶意页面
+// 或异常客户端拖垮的攻击面。
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = 2 * 1024 * 1024;
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(15);
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+    options.Limits.MaxConcurrentConnections = 64;
+});
+
 // 桌面端（Windows/macOS）走原生 HTTP，不需要 CORS；
 // 这里放开本机回环来源，方便用 `flutter run -d chrome` 调试界面。
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .SetIsOriginAllowed(origin =>
         Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
-        (uri.Host == "127.0.0.1" || uri.Host == "localhost"))
+        (uri.Host == "127.0.0.1" || uri.Host == "localhost" || uri.Host == "::1"))
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
 var app = builder.Build();
 app.UseCors();
+
+// 设置白名单 / 标识校验用到的规则（只在本进程内使用）。
+var allowedLanguages = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    { "auto", "zh-CN", "en" };
+var allowedThemes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    { "light", "dark", "system" };
+var accentHexRegex = new System.Text.RegularExpressions.Regex(
+    "^#(?:[0-9A-Fa-f]{6})$", System.Text.RegularExpressions.RegexOptions.Compiled);
+var safeIdRegex = new System.Text.RegularExpressions.Regex(
+    "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+// 安全响应头 + Host/Origin 校验（抵御 DNS rebinding 与跨站调用）。
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "no-referrer";
+    headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+    headers["Cache-Control"] = "no-store";
+
+    var host = context.Request.Host.Host;
+    if (!string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+
+    var origin = context.Request.Headers.Origin.ToString();
+    if (!string.IsNullOrEmpty(origin) &&
+        !(Uri.TryCreate(origin, UriKind.Absolute, out var parsed) &&
+          (parsed.Host == "127.0.0.1" || parsed.Host == "localhost" || parsed.Host == "::1")))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+
+    await next();
+});
+
+// 写入类接口做简单限流：单 IP 每秒最多 40 次，防止本地脚本刷爆下载/更新。
+var writeBuckets =
+    new System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Count)>();
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsPost(context.Request.Method) ||
+        HttpMethods.IsDelete(context.Request.Method))
+    {
+        var key = context.Connection.RemoteIpAddress?.ToString() ?? "local";
+        var now = Environment.TickCount64;
+        var bucket = writeBuckets.AddOrUpdate(
+            key,
+            _ => (now, 1),
+            (_, old) => now - old.Window > 1000 ? (now, 1) : (old.Window, old.Count + 1));
+
+        if (bucket.Count > 40)
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.Response.WriteAsJsonAsync(
+                new LaunchResultDto(false, "请求过于频繁，请稍后再试"));
+            return;
+        }
+    }
+
+    await next();
+});
 
 // ---- 健康检查 -------------------------------------------------------------
 
@@ -81,6 +160,7 @@ app.MapGet("/api/models", () =>
 
 app.MapGet("/api/models/{id}/preview", (string id) =>
 {
+    if (!IsSafeId(id)) return Results.BadRequest();
     var package = services.Models.Find(id);
     if (package == null || !File.Exists(package.PreviewPath)) return Results.NotFound();
     return Results.File(package.PreviewPath, "image/png");
@@ -88,6 +168,7 @@ app.MapGet("/api/models/{id}/preview", (string id) =>
 
 app.MapPost("/api/models/{id}/launch", async (string id) =>
 {
+    if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "模型标识无效"));
     var package = services.Models.Find(id);
     if (package == null) return Results.NotFound(new LaunchResultDto(false, $"没有找到模型 {id}"));
 
@@ -99,12 +180,15 @@ app.MapPost("/api/models/{id}/launch", async (string id) =>
     }
     catch (Exception ex)
     {
-        return Results.Json(new LaunchResultDto(false, ex.Message), statusCode: 503);
+        // 细节只写日志，不回显给调用方，避免泄漏本机路径等内部信息。
+        Console.Error.WriteLine($"[launch] 启动模型 {id} 失败: {ex}");
+        return Results.Json(new LaunchResultDto(false, "模型启动失败，请查看后端日志"), statusCode: 503);
     }
 });
 
 app.MapDelete("/api/models/{id}", (string id) =>
 {
+    if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "模型标识无效"));
     var ok = services.Models.Delete(id);
     if (ok) services.Models.NotifyChanged();
     return ok
@@ -120,10 +204,21 @@ app.MapPost("/api/settings", (SettingsPatch? patch) =>
 {
     if (patch == null) return Results.BadRequest(new LaunchResultDto(false, "缺少设置内容"));
 
+    // 白名单校验：设置项会写进磁盘并被前端直接使用，不接受任意字符串。
+    if (patch.Language != null && !allowedLanguages.Contains(patch.Language))
+        return Results.BadRequest(new LaunchResultDto(false, "不支持的界面语言"));
+    if (patch.Theme != null && !allowedThemes.Contains(patch.Theme))
+        return Results.BadRequest(new LaunchResultDto(false, "不支持的主题"));
+    if (patch.AccentColor != null && !accentHexRegex.IsMatch(patch.AccentColor))
+        return Results.BadRequest(new LaunchResultDto(false, "主题色需为 #RRGGBB"));
+    if (patch.UpdateRepository != null && !IsAllowedRepository(patch.UpdateRepository))
+        return Results.BadRequest(new LaunchResultDto(false, "更新仓库地址不受信任"));
+
     services.Settings.Apply(s =>
     {
         if (patch.Language != null) s.Language = patch.Language;
         if (patch.Theme != null) s.Theme = patch.Theme;
+        if (patch.AccentColor != null) s.AccentColor = patch.AccentColor.ToUpperInvariant();
         if (patch.RenderFps.HasValue) s.RenderFps = Math.Clamp(patch.RenderFps.Value, 12, 120);
         if (patch.MemoryMb.HasValue) s.MemoryMb = Math.Clamp(patch.MemoryMb.Value, 256, 16384);
         if (patch.MemoryAuto.HasValue) s.MemoryAuto = patch.MemoryAuto.Value;
@@ -159,7 +254,8 @@ app.MapPost("/api/sources/select", async (ForceRequest? request) =>
     }
     catch (Exception ex)
     {
-        return Results.Json(new LaunchResultDto(false, ex.Message), statusCode: 503);
+        Console.Error.WriteLine($"[sources] 切换模型源失败: {ex}");
+        return Results.Json(new LaunchResultDto(false, "模型源切换失败"), statusCode: 503);
     }
 });
 
@@ -326,11 +422,15 @@ app.MapPost("/api/shell/open-folder", (PathRequest? request) =>
 app.MapPost("/api/shell/open-url", (UrlRequest? request) =>
 {
     var url = request?.Url;
-    if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+    if (string.IsNullOrWhiteSpace(url) || url.Length > 2048 ||
+        !Uri.TryCreate(url, UriKind.Absolute, out var uri))
         return Results.BadRequest(new LaunchResultDto(false, "URL 无效"));
 
     if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
         return Results.BadRequest(new LaunchResultDto(false, "只允许 http/https 链接"));
+
+    if (!string.IsNullOrEmpty(uri.UserInfo))
+        return Results.BadRequest(new LaunchResultDto(false, "URL 不允许携带账号密码"));
 
     Shell.OpenUrl(url!);
     return Results.Ok(new LaunchResultDto(true, "已打开链接"));
@@ -416,6 +516,7 @@ SourceDto ToSourceDto(ModelSource source) => new(
 SettingsDto ToSettingsDto() => new(
     services.Settings.Current.Language,
     services.Settings.Current.Theme,
+    services.Settings.Current.AccentColor,
     services.Settings.Current.RenderFps,
     services.Settings.Current.MemoryMb,
     services.Settings.Current.MemoryAuto,
@@ -464,6 +565,7 @@ ModelSource? ResolveSource(string? sourceId)
 
 IResult ActOnJob(string id, Action<IDownloadJob> action)
 {
+    if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "任务标识无效"));
     var job = services.Downloads.Jobs.FirstOrDefault(j =>
         j.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
     if (job == null) return Results.NotFound(new LaunchResultDto(false, $"没有找到任务 {id}"));
@@ -500,4 +602,33 @@ bool IsInsideKnownRoot(string path)
     }
 
     return false;
+}
+
+// 路由标识：只允许字母数字开头，后接字母数字/点/下划线/短横线，长度上限 64。
+// 用于模型 id、任务 id，杜绝 `../` 之类的路径穿越尝试。
+bool IsSafeId(string? id) => !string.IsNullOrEmpty(id) && safeIdRegex.IsMatch(id);
+
+// 更新仓库地址：必须是 https、不带账号密码、不是回环/内网 IP。
+// 防止把本地后端当成 SSRF 跳板去访问内网服务。
+bool IsAllowedRepository(string value)
+{
+    if (string.IsNullOrWhiteSpace(value)) return false;
+    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return false;
+    if (uri.Scheme != Uri.UriSchemeHttps) return false;
+    if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+    if (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)) return false;
+    if (System.Net.IPAddress.TryParse(uri.Host, out var ip) &&
+        (System.Net.IPAddress.IsLoopback(ip) || IsPrivateAddress(ip)))
+        return false;
+    return true;
+}
+
+static bool IsPrivateAddress(System.Net.IPAddress ip)
+{
+    var bytes = ip.GetAddressBytes();
+    if (bytes.Length != 4) return false;
+    return bytes[0] == 10
+        || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+        || (bytes[0] == 192 && bytes[1] == 168)
+        || (bytes[0] == 169 && bytes[1] == 254);
 }
