@@ -1,0 +1,397 @@
+# GC-UI 夜间 alpha 构建（Gitea Actions）
+#
+# 触发：每天 21:00（Asia/Shanghai）自动跑一次，产出 Windows 与 macOS 的 Flutter 前端产物，
+#       发布为一个「预览版（prerelease）」Release —— 不占用 latest。
+# 手动：Actions 页面点 Run workflow（Gitea 的 workflow_dispatch），用于验证 runner 是否就绪；
+#       也可以从命令行调 POST /api/v1/repos/{owner}/{repo}/actions/workflows/{file}/dispatches。
+#
+# 为什么是 .gitea/workflows/：本仓库是自建 Gitea，不是 GitHub。Gitea Actions 语法与
+# GitHub Actions 基本一致，但工作流目录是 .gitea/workflows/，API 前缀是 /api/v1，
+# runner 标签必须与 act_runner 上注册的 label 一致（见 GC-UI/CI.md）。
+#
+# 为什么 alpha 不会变成 latest：Gitea 的 /releases/latest 按定义只返回「最近一个既非草稿
+# 也非 prerelease」的发布，所以 prerelease=true 的版本永远不会被当成 latest。
+# publish 任务最后还会主动断言一次，确认 latest 没有指向本次 tag。
+
+name: GC-UI Alpha
+
+on:
+  schedule:
+    # 每天晚上 21:00，北京时间。
+    # Gitea 1.23 起 Actions 的 cron 默认按 UTC 解释，这里显式带 TZ= 前缀（robfig/cron 支持的
+    # 时区前缀语法），这样不依赖服务器自身时区设置。
+    # 如果所在实例不认 TZ= 前缀，改用等效的 UTC 写法 '0 13 * * *'。
+    - cron: 'TZ=Asia/Shanghai 0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      note:
+        description: '额外写进 Release 说明的备注（可留空）'
+        required: false
+        default: ''
+
+# 用 github.token 往本仓库建 Release / 传附件，需要 contents 写权限
+permissions:
+  contents: write
+
+env:
+  GITEA_API: ${{ github.server_url }}/api/v1
+  REPO: ${{ github.repository }}
+  FRONTEND_DIR: GC-UI/frontend
+  # runner 上没预装 Flutter 时，按这个版本自举（需 >= 3.5.4，与 pubspec.yaml 的 sdk 约束对齐）
+  FLUTTER_VERSION: 3.24.5
+
+jobs:
+  # ---------------------------------------------------------------- 1. 版本与草稿
+  prepare:
+    name: 计算 alpha 版本并创建预览版草稿
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      base_version: ${{ steps.meta.outputs.base_version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      build_number: ${{ steps.meta.outputs.build_number }}
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 计算版本号
+        id: meta
+        run: |
+          set -euo pipefail
+          # 基础版本取自 version.json 的 launcher.version（例如 1.0.7），与启动器保持一致；
+          # alpha 后缀只表示构建通道，写在 tag / Release 标题里。
+          BASE=$(python3 -c "import json;print(json.load(open('version.json'))['launcher']['version'])")
+          if [ -z "${BASE:-}" ]; then
+            echo "::error::无法从 version.json 读取 launcher.version"
+            exit 1
+          fi
+
+          # 北京时间当天日期，让产物名和 tag 与「每晚 9 点」对得上
+          DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+          # 同一天重跑时用 run_number 区分，tag 不重复
+          VERSION="${BASE}-alpha.${DATE}.${{ github.run_number }}"
+
+          # 传给 flutter 的版本号必须是纯数字分段：
+          #   --build-name   → macOS CFBundleShortVersionString，只能是 a.b.c
+          #   --build-number → CFBundleVersion / 文件版本号，只能是数字
+          # 所以 alpha 的日期与序号放在 build-number 里，不放进 build-name。
+          BUILD_NUMBER="${DATE}$(printf '%02d' "${{ github.run_number }}")"
+
+          {
+            echo "version=$VERSION"
+            echo "base_version=$BASE"
+            echo "tag=v$VERSION"
+            echo "build_number=$BUILD_NUMBER"
+          } >> "$GITHUB_OUTPUT"
+          echo "alpha 版本: $VERSION（build-name=$BASE, build-number=$BUILD_NUMBER）"
+
+      - name: 创建预览版草稿
+        id: release
+        env:
+          # 优先用仓库 Secrets 里的 RELEASE_TOKEN；没配就退回 Gitea 自动注入的 github.token。
+          # 某些实例上自动 token 没有 releases 写权限，那时只需在
+          # Settings → Actions → Secrets 加一个 RELEASE_TOKEN，不用改本文件。
+          TOKEN_OVERRIDE: ${{ secrets.RELEASE_TOKEN }}
+          TOKEN_DEFAULT: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          TOKEN="${TOKEN_OVERRIDE:-$TOKEN_DEFAULT}"
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::拿不到 Gitea token，无法创建 Release"
+            exit 1
+          fi
+          api="$GITEA_API/repos/$REPO"
+          auth=(-H "Authorization: token $TOKEN")
+
+          # 可重跑：同 tag 的旧发布先删掉（只会是同一天重跑留下的）
+          code=$(curl -sS -o /tmp/existing.json -w '%{http_code}' "${auth[@]}" "$api/releases/tags/$TAG")
+          if [ "$code" = "200" ]; then
+            old_id=$(python3 -c "import json;print(json.load(open('/tmp/existing.json'))['id'])")
+            echo "已存在同 tag 发布 id=$old_id，先删除"
+            curl -sS -X DELETE "${auth[@]}" "$api/releases/$old_id" >/dev/null
+          fi
+
+          # draft=true + prerelease=true：
+          #   prerelease → 永不成为 latest
+          #   draft      → 两个平台都构建成功前不对外可见，由 publish 任务翻成 false
+          payload=$(python3 - "$TAG" "$VERSION" "${{ github.sha }}" "${{ github.server_url }}" <<'PY'
+          import json, sys
+          tag, version, sha, server = sys.argv[1:5]
+          short = sha[:7]
+          body = (
+              "GC-UI 夜间 alpha 构建（自动生成，**预览版 / prerelease**）。\n\n"
+              "- 版本：`%s`\n"
+              "- 提交：`%s`\n"
+              "- 构建来源：%s/commit/%s\n"
+              "- 通道：alpha —— 每晚 21:00（Asia/Shanghai）自动构建\n\n"
+              "产物说明：\n\n"
+              "| 文件 | 平台 | 内容 |\n"
+              "|---|---|---|\n"
+              "| `gc-ui-alpha-windows-x64.zip` | Windows x64 | Flutter 前端 release 目录 |\n"
+              "| `gc-ui-alpha-macos-<arch>.zip` | macOS | `gc_ui.app` 应用包 |\n\n"
+              "这是前端产物，运行时需要配合 `GC-UI/backend/GC.UI.Server` 后端（默认 `127.0.0.1:17890`）。\n"
+              "未做代码签名，首次运行系统可能会提示。\n\n"
+              "> 本发布不是 latest：prerelease 的版本不会出现在「最新版本」里。\n"
+          ) % (version, short, server, sha)
+          print(json.dumps({
+              "tag_name": tag,
+              "target_commitish": sha,
+              "name": "GC-UI Alpha " + version,
+              "body": body,
+              "draft": True,
+              "prerelease": True,
+          }))
+          PY
+          )
+
+          resp=$(curl -sS -X POST "${auth[@]}" -H 'Content-Type: application/json' -d "$payload" "$api/releases")
+          rid=$(printf '%s' "$resp" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+          if [ -z "$rid" ]; then
+            echo "::error::创建 Release 失败: $resp"
+            exit 1
+          fi
+          echo "release_id=$rid" >> "$GITHUB_OUTPUT"
+          echo "已创建预览版草稿 id=$rid tag=$TAG"
+
+  # ---------------------------------------------------------------- 2. Windows
+  windows:
+    name: 构建 Windows 前端
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Flutter SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Command flutter -ErrorAction SilentlyContinue) {
+            Write-Host 'runner 已自带 Flutter：'
+            flutter --version
+          } else {
+            Write-Host "runner 上没有 Flutter，按官方 SDK $env:FLUTTER_VERSION 自举"
+            $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$env:FLUTTER_VERSION-stable.zip"
+            $zip = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+            curl.exe -sSL --retry 3 -o $zip $url
+            if ($LASTEXITCODE -ne 0) { Write-Error "下载 Flutter SDK 失败: $url"; exit 1 }
+            Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+            $flutterBin = Join-Path $env:RUNNER_TEMP 'flutter\bin'
+            $flutterBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            $env:PATH = "$flutterBin;$env:PATH"
+            flutter --version
+          }
+          # Windows 桌面构建依赖 VS Build Tools 的「使用 C++ 的桌面开发」工作负载
+          $doctor = flutter doctor -v 2>&1 | Out-String
+          if ($doctor -notmatch 'Visual Studio') {
+            Write-Host '::warning::flutter doctor 没看到 Visual Studio，Windows 构建很可能失败'
+          }
+          Write-Host "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+
+      - name: 构建前端（release）
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.base_version }}
+          BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter config --no-analytics 2>&1 | Out-Null
+          Set-Location $env:FRONTEND_DIR
+          flutter pub get
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          flutter build windows --release --build-name=$env:VERSION --build-number=$env:BUILD_NUMBER
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: 打包
+        id: pack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # x64 / arm64 的产物都在 build\windows\<arch>\runner\Release，直接找实际存在的那个
+          $out = Get-ChildItem "$env:FRONTEND_DIR\build\windows" -Directory -ErrorAction SilentlyContinue |
+                 ForEach-Object { Join-Path $_.FullName 'runner\Release' } |
+                 Where-Object { Test-Path $_ } |
+                 Select-Object -First 1
+          if (-not $out) {
+            Write-Error "没有找到 Windows 产物目录（$env:FRONTEND_DIR\build\windows\*\runner\Release）"
+            exit 1
+          }
+          $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+          $name = "gc-ui-alpha-windows-$arch.zip"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $zip = Join-Path (Get-Location) "dist\$name"
+          Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -Force
+          Get-Item $zip | Format-List Name, Length
+          "asset=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "asset_name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: 上传到预览版
+        shell: pwsh
+        env:
+          TOKEN_OVERRIDE: ${{ secrets.RELEASE_TOKEN }}
+          TOKEN_DEFAULT: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          ASSET: ${{ steps.pack.outputs.asset }}
+          ASSET_NAME: ${{ steps.pack.outputs.asset_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $token = if ($env:TOKEN_OVERRIDE) { $env:TOKEN_OVERRIDE } else { $env:TOKEN_DEFAULT }
+          if (-not $token) { Write-Error '拿不到 Gitea token'; exit 1 }
+          $url = "$env:GITEA_API/repos/$env:REPO/releases/$env:RELEASE_ID/assets?name=$env:ASSET_NAME"
+          curl.exe -sS -X POST -H "Authorization: token $token" -H "Content-Type: application/octet-stream" --data-binary "@$env:ASSET" $url
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "`n已上传 $env:ASSET_NAME"
+
+  # ---------------------------------------------------------------- 3. macOS
+  macos:
+    name: 构建 macOS 前端
+    needs: prepare
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Flutter SDK
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            echo "runner 已自带 Flutter："
+            flutter --version
+          else
+            echo "runner 上没有 Flutter，按官方 SDK $FLUTTER_VERSION 自举"
+            case "$(uname -m)" in
+              arm64) SUFFIX="macos_arm64" ;;
+              *)     SUFFIX="macos" ;;
+            esac
+            URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/${SUFFIX}/flutter_${SUFFIX}_${FLUTTER_VERSION}-stable.zip"
+            ZIP="$RUNNER_TEMP/flutter.zip"
+            curl -sSL --retry 3 -o "$ZIP" "$URL"
+            rm -rf "$RUNNER_TEMP/flutter"
+            unzip -q "$ZIP" -d "$RUNNER_TEMP"
+            echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+            export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+            flutter --version
+          fi
+          xcodebuild -version || echo "::warning::没找到 xcodebuild，macOS 构建很可能失败"
+
+      - name: 构建前端（release）
+        env:
+          VERSION: ${{ needs.prepare.outputs.base_version }}
+          BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+        run: |
+          set -euo pipefail
+          flutter config --no-analytics || true
+          cd "$FRONTEND_DIR"
+          flutter pub get
+          flutter build macos --release --build-name="$VERSION" --build-number="$BUILD_NUMBER"
+
+      - name: 打包
+        id: pack
+        run: |
+          set -euo pipefail
+          APP="$FRONTEND_DIR/build/macos/Build/Products/Release/gc_ui.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::没有找到 macOS 产物: $APP"
+            exit 1
+          fi
+          case "$(uname -m)" in
+            arm64) ARCH=arm64 ;;
+            *)     ARCH=x64 ;;
+          esac
+          NAME="gc-ui-alpha-macos-${ARCH}.zip"
+          mkdir -p dist
+          # 用 ditto 才能保真 .app 内的符号链接与权限，zip -r 会破坏 .app 结构
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "dist/$NAME"
+          ls -lh "dist/$NAME"
+          {
+            echo "asset=dist/$NAME"
+            echo "asset_name=$NAME"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 上传到预览版
+        env:
+          TOKEN_OVERRIDE: ${{ secrets.RELEASE_TOKEN }}
+          TOKEN_DEFAULT: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          TOKEN="${TOKEN_OVERRIDE:-$TOKEN_DEFAULT}"
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::拿不到 Gitea token"
+            exit 1
+          fi
+          curl -sS -X POST \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@${{ steps.pack.outputs.asset }}" \
+            "$GITEA_API/repos/$REPO/releases/$RELEASE_ID/assets?name=${{ steps.pack.outputs.asset_name }}"
+          echo
+          echo "已上传 ${{ steps.pack.outputs.asset_name }}"
+
+  # ---------------------------------------------------------------- 4. 发布预览版
+  publish:
+    name: 发布预览版（保持 prerelease，不占用 latest）
+    needs: [prepare, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 把草稿翻成正式预览版
+        env:
+          TOKEN_OVERRIDE: ${{ secrets.RELEASE_TOKEN }}
+          TOKEN_DEFAULT: ${{ github.token }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          NOTE: ${{ github.event.inputs.note }}
+        run: |
+          set -euo pipefail
+          TOKEN="${TOKEN_OVERRIDE:-$TOKEN_DEFAULT}"
+          api="$GITEA_API/repos/$REPO"
+          auth=(-H "Authorization: token $TOKEN")
+
+          code=$(curl -sS -o /tmp/rel.json -w '%{http_code}' "${auth[@]}" "$api/releases/$RELEASE_ID")
+          if [ "$code" != "200" ]; then
+            echo "::error::读不到 Release $RELEASE_ID (HTTP $code)"
+            exit 1
+          fi
+
+          payload=$(python3 - /tmp/rel.json "${NOTE:-}" <<'PY'
+          import json, sys
+          rel = json.load(open(sys.argv[1]))
+          note = (sys.argv[2] or "").strip()
+          body = rel.get("body") or ""
+          if note:
+              body += "\n---\n\n备注：" + note + "\n"
+          print(json.dumps({
+              "body": body,
+              "draft": False,        # 可见
+              "prerelease": True,    # 关键：永不成为 latest
+          }))
+          PY
+          )
+
+          patched=$(curl -sS -X PATCH "${auth[@]}" -H 'Content-Type: application/json' -d "$payload" "$api/releases/$RELEASE_ID")
+          printf '%s' "$patched" > /tmp/patched.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open('/tmp/patched.json'))
+          print('发布成功:', d.get('html_url'), '| prerelease =', d.get('prerelease'), '| draft =', d.get('draft'))
+          assert d.get('prerelease') is True, 'Release 没有被标记成 prerelease，会顶掉 latest'
+          assert d.get('draft') is False, 'Release 仍是草稿'
+          PY
+
+      - name: 断言 latest 未被占用
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          latest_tag=$(curl -sS "$GITEA_API/repos/$REPO/releases/latest" \
+            | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name') or '')" || true)
+          echo "本次 tag: $TAG"
+          echo "latest 指向: ${latest_tag:-（空）}"
+          if [ "$latest_tag" = "$TAG" ]; then
+            echo "::error::本次 alpha 成了 latest，prerelease 标记失效"
+            exit 1
+          fi
+          echo "OK：alpha 未占用 latest"
