@@ -10,9 +10,9 @@ using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using GC.ModelSdk;
-using NeoRF.EarthModels;
+using GC.EarthModels;
 
-namespace NeoRF.EarthModels.Preview;
+namespace GC.EarthModels.Preview;
 
 /// <summary>
 /// 封面生成工具：给每个模型画一张 preview.png。

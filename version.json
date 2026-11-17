@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-11-14T11:34:35Z",
+  "generated": "2026-11-17T22:53:52Z",
   "repository": "https://gitcode.com/Morris_1/GC",
   "branch": "main",
   "modelDir": "model",
@@ -50,54 +50,47 @@
     {
       "id": "contour-map",
       "version": "1.0",
-      "build": "e4b3f2b87e",
-      "manifestSha256": "ee0897d46ee85126fbfd0d07f5ca3111950d0c36f9b8a80e4eb6ae85d226da4f",
-      "filesSha256": "b1f323fb41dec4f45992a30ff8726f3307f83b564127aff99bcb3d044c79d2bd",
+      "build": "43dcb6dc63",
+      "manifestSha256": "f7896a85d5f9e9f10e021c07931dee51f0ef86151a6a89e2ed39e37cb7f996a6",
+      "filesSha256": "a6bdf9b4273aabee50c3c94ceab4d0abee15f0df1af90c58bdbb796e0d2d5699",
       "files": 5,
       "dir": "model/contour-map"
     },
     {
       "id": "earth-geography",
       "version": "1.8",
-      "build": "3b645c45c2",
-      "manifestSha256": "a9f30fd4a1dd0aeccb88c892579c93bf32a92379d7b3f545b28f6cac612f9871",
-      "filesSha256": "0e55d2f9bacc3e0ff42f5c45d9e7c265864df9784b1609c09dcb32d21b4addfc",
+      "build": "16eaf4110f",
+      "manifestSha256": "0b8dd41e8535284576873956ed1db8755097649fe801d887b65ca5ac369f267c",
+      "filesSha256": "c018ba481831e23d3183a38ac47251f19754c7464baa5d85b47cea7a49fcfa95",
       "files": 11,
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
       "version": "1.6",
-      "build": "947efa36bb",
-      "manifestSha256": "feb715cde8ad5da9ecfb48785a95e6fc82930cc92c668514b328915366c2f57a",
-      "filesSha256": "a37e0b493c78bb0a04a276512b612be3f8e7a178ed1a7fc72acb5353aa57f7c5",
+      "build": "bd57e6ed67",
+      "manifestSha256": "2d05234ea0d4de5ac55b7a076085ccfbb94ed107cce2b2d40e56d45bc3b37f3e",
+      "filesSha256": "4cd45b0324a77574a0da3a939c2a6faebc785c5a24cb50136d62a78a6ea2e9b1",
       "files": 7,
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
       "version": "1.6",
-      "build": "a803d9c020",
-      "manifestSha256": "56ed397cbc008bd9ec8bea0ee34a94a28ab29ce39a8b096b0629e529883b4dff",
-      "filesSha256": "4e4428812d18d15a99105e73c027b99f3197033f0138d643ba69c15fabc9d8f6",
+      "build": "a79f660ec2",
+      "manifestSha256": "cb4ec5f310e7f05235042180dfdb1d8904c37b2d67b06a174f55589eed1652b9",
+      "filesSha256": "594b005a6a9f36cd0b5d4e4a7a0b1ab42d53c8032832545b71c3915493d56c8e",
       "files": 7,
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
       "version": "1.5",
-      "build": "02a555272a",
-      "manifestSha256": "d00034888d9b9da03338b7f394d1bdf33f73b1fbdd7e8f154d85b9080318ab13",
-      "filesSha256": "4a5fbf898df1d98eddf68b5d3929ae7b25cd7bcdfdfa36b5ad0ed72d9941d049",
+      "build": "ec6119e3f4",
+      "manifestSha256": "54cf496553d11b704abfa06588ffccfed3f881a3b919d0e2304c18e157fd1f0a",
+      "filesSha256": "732dd26406e0f1e836970499d7ea644def332ce909d7f8aa0a403bbe7337e604",
       "files": 6,
       "dir": "model/scale-calculator"
     }
-  ],
-  "signature": {
-    "alg": "ECDSA-P256-SHA256",
-    "keyId": "gc-2026-11",
-    "value": "LHaF2bw+IZeWUw2qLQM1IQHoNXsHNko38dyjP45Jy41KtlyhvJhhFaNh+THKhAU+6jSzV1eFHgbwasboYBOa5w==",
-    "contentSha256": "749055593bf9839837428d900d523b3363486556970cbf4e2daa25001ab174c8",
-    "signedAt": "2026-11-14T11:36:03Z"
-  }
+  ]
 }

@@ -284,7 +284,7 @@ package_mac_app() {
 <dict>
   <key>CFBundleName</key><string>GC</string>
   <key>CFBundleDisplayName</key><string>GC</string>
-  <key>CFBundleIdentifier</key><string>cn.neorf.GC</string>
+  <key>CFBundleIdentifier</key><string>com.xhmcl.GC</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>

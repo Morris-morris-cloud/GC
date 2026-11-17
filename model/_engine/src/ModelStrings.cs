@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 模型自己的一份文案。优先读模型数据目录里的 <c>i18n/&lt;language&gt;.json</c>，

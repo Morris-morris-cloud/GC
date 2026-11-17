@@ -5,7 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>等高线模型的界面：顶部标题、中间双图联动、右侧判读要点、底部实时读数。</summary>
 public sealed class ContourPage

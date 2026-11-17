@@ -7,7 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using GC.ModelSdk;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 地球地理模型：五带划分 + 七大洲四大洋轮廓 + 六大板块与洲界，纯线稿。

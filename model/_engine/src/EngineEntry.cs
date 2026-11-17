@@ -2,7 +2,7 @@ using System;
 using Avalonia.Controls;
 using GC.ModelSdk;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 地球模型共享运行时：读自己目录下的 scene.json / land.json / i18n，

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>&lt;id&gt;.model/scene.json —— 模型数据（可视化场景描述）。</summary>
 public sealed class SceneDefinition

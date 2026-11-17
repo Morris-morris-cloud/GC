@@ -5,7 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <RootNamespace>NeoRF.EarthModels</RootNamespace>
+    <RootNamespace>GC.EarthModels</RootNamespace>
     <AssemblyName>EarthModelPreview</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

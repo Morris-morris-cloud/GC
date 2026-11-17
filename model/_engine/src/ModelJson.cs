@@ -3,7 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>模型自己的 JSON 读写（不依赖启动器）。</summary>
 public static class ModelJson

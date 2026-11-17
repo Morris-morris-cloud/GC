@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Avalonia.Media;
 
-namespace NeoRF.EarthModels;
+namespace GC.EarthModels;
 
 /// <summary>
 /// 模型自己的场景运行时：场景描述 + 预烘焙地表纹理 + 调色板。

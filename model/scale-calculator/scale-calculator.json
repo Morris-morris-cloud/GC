@@ -21,7 +21,7 @@
   "entry": "scales.json",
   "license": "MIT",
   "assembly": "ScaleCalculatorModel.dll",
-  "type": "NeoRF.ScaleCalculator.ScaleCalculatorFactory",
+  "type": "GC.ScaleCalculator.ScaleCalculatorFactory",
   "preview": "preview.png",
   "apiVersion": 1,
   "version": "1.5",
@@ -32,6 +32,6 @@
     "button": "#5B6A86",
     "frame": "#F4F6FB"
   },
-  "build": "02a555272a",
-  "updatedAt": "2026-11-14T11:34:35Z"
+  "build": "ec6119e3f4",
+  "updatedAt": "2026-11-17T22:53:52Z"
 }

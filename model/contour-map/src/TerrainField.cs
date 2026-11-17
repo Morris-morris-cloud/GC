@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeoRF.ContourMap;
+namespace GC.ContourMap;
 
 /// <summary>五种基本地形类型（教科书分类）。</summary>
 public enum TerrainKind
