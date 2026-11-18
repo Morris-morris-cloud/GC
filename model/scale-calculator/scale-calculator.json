@@ -24,7 +24,7 @@
   "type": "GC.ScaleCalculator.ScaleCalculatorFactory",
   "preview": "preview.png",
   "apiVersion": 1,
-  "version": "1.5",
+  "version": "1.6",
   "chrome": {
     "titleBar": "#FFFFFF",
     "titleBorder": "#E3E8F3",
@@ -32,6 +32,6 @@
     "button": "#5B6A86",
     "frame": "#F4F6FB"
   },
-  "build": "ec6119e3f4",
-  "updatedAt": "2026-11-17T22:53:52Z"
+  "build": "105653737d",
+  "updatedAt": "2026-11-18T04:35:15Z"
 }

@@ -23,7 +23,7 @@
   "type": "GC.EarthModels.RotationModelFactory",
   "preview": "preview.png",
   "apiVersion": 1,
-  "version": "1.6",
+  "version": "1.7",
   "chrome": {
     "titleBar": "#0C1828",
     "titleBorder": "#1B2740",
@@ -31,6 +31,6 @@
     "button": "#9FB4D4",
     "frame": "#0A1524"
   },
-  "build": "a79f660ec2",
-  "updatedAt": "2026-11-17T22:53:52Z"
+  "build": "ecd52665f9",
+  "updatedAt": "2026-11-18T04:35:15Z"
 }

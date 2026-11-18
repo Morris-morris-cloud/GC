@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.morris.gc" "\0"
-            VALUE "FileDescription", "gc_ui" "\0"
+            VALUE "CompanyName", "Morris" "\0"
+            VALUE "FileDescription", "GC UI" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "gc_ui" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.morris.gc. All rights reserved." "\0"
-            VALUE "OriginalFilename", "gc_ui.exe" "\0"
-            VALUE "ProductName", "gc_ui" "\0"
+            VALUE "InternalName", "GC-UI" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Morris. All rights reserved." "\0"
+            VALUE "OriginalFilename", "GC-UI.exe" "\0"
+            VALUE "ProductName", "Morris GC" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
