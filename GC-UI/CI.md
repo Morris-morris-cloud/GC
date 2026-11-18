@@ -64,9 +64,55 @@ Windows 还需要 **VS Build Tools 的「使用 C++ 的桌面开发」工作负�
 ## 本地构建（不经 CI）
 
 ```bash
-# macOS
+# Linux / macOS：三平台一次出齐。Windows 前端用 mingw-w64 + wine 交叉编译，
+# 不需要 Windows 机器。
+./build.sh build
+
+# 只编 macOS 前端
 ./GC-UI/build-ui.sh macos
 
-# Windows
+# Windows 主机原生构建
 GC-UI\build-ui.cmd
 ```
+
+### Windows 前端交叉编译
+
+Flutter 官方不支持在非 Windows 主机上 `flutter build windows`，但 Windows 嵌入层
+（`windows/runner/*.cpp` + `cpp_client_wrapper`）是纯 Win32 + 标准 C++，只通过 C ABI
+调用 `flutter_windows.dll`，所以 mingw-w64 就能编译。整条链路上唯一必须执行的
+Windows 二进制是 AOT 快照生成器 `gen_snapshot.exe`，交给 wine 跑即可。
+
+```bash
+# 依赖
+sudo apt install mingw-w64 cmake ninja-build wine          # Linux
+brew install mingw-w64 cmake ninja                          # macOS
+brew install --cask wine-stable                             # macOS 的 wine
+
+# 单独构建（默认输出到 GC-UI/frontend/build/windows/x64/runner/Release）
+./buildsh/cross/build-ui-win-cross.sh [输出目录]
+```
+
+产物与官方 toolchain 完全一致，可直接拷到 Windows 运行：
+
+```
+GC-UI.exe   flutter_windows.dll   data/{icudtl.dat, app.so, flutter_assets/}
+```
+
+实现分三层：
+
+| 文件 | 职责 |
+|---|---|
+| `buildsh/cross/toolchain-mingw.cmake` | CMake 交叉工具链（posix 线程模型，静态链接 libstdc++，产物只依赖系统 DLL） |
+| `buildsh/cross/CMakeLists.txt` | 只编 C++ 外壳；绕开 `tool_backend.bat` 与 MSVC 专用参数 |
+| `buildsh/cross/build-ui-win-cross.sh` | 拉引擎产物、装 `gen_snapshot` 的 wine 包装、生成 AOT 快照、组装 |
+
+两个容易踩的坑，脚本里已处理：
+
+- `flutter_tools` 会 exec 路径为 `.../windows-x64-release/gen_snapshot`（**没有 `.exe`**）
+  的文件，所以脚本在原 `.exe` 旁边放一个同名 shell 脚本转调 wine。
+- `Runner.rc` 在 windres 下有两处不兼容：图标用反斜杠相对路径、`VERSION_AS_STRING`
+  依赖命令行传 `-D` 的转义字符串。脚本生成一份路径与宏都已规整的 rc 副本再编译。
+
+`.gitea/workflows` 里的 `windows` 任务仍然跑在 `windows-latest` 上；若手头只有 macOS/Linux
+构建机，可以把该任务的 `runs-on` 换成对应标签，直接复用这套交叉编译脚本，
+不再需要 VS Build Tools。

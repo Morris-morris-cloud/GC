@@ -190,10 +190,9 @@ publish_backend() {
     -o "$ROOT_DIR/$OUT" || return 1
 }
 
-# 构建 Flutter 前端并把桌面产物放进平台目录。
-# Flutter 桌面只能在对应宿主平台上构建：Windows 产物必须在 Windows 上编，
-# macOS 产物必须在 macOS 上编。交叉构建时这里只警告，包内不含前端，
-# 启动器会自动回退到内置 Avalonia 界面。
+# 当前主机原生构建 Flutter 前端（Windows 主机编 Windows，macOS 主机编 macOS）。
+# macOS 版 Flutter 桌面只能在 macOS 上编；Windows 版则由 build_flutter_ui_cross
+# 在 Linux/macOS 上交叉编译。
 build_flutter_ui() {
   PLAT="$1"; DEST="$2"
   UI_SRC="$ROOT_DIR/GC-UI/frontend"
@@ -220,6 +219,34 @@ build_flutter_ui() {
       ;;
   esac
   echo "    -> $DEST（Flutter ${PLAT}）"
+}
+
+# 在 Linux / macOS 上交叉编译 Windows 前端：mingw-w64 编 C++ 外壳，
+# wine 跑 Windows 版 gen_snapshot 生成 AOT 快照，无需 Windows 机器。
+# 产物布局与官方 toolchain 完全一致（GC-UI.exe + flutter_windows.dll + data/）。
+build_flutter_ui_cross() {
+  DEST="$1"
+  UI_SRC="$ROOT_DIR/GC-UI/frontend"
+  [ -d "$UI_SRC" ] || return 0
+
+  FLUTTER_BIN="${FLUTTER_BIN:-flutter}"
+  if ! command -v "$FLUTTER_BIN" >/dev/null 2>&1; then
+    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定），本次包内不含 Flutter 界面"
+    return 0
+  fi
+
+  mkdir -p "$ROOT_DIR/build/logs"
+  echo "==> 交叉编译 Windows 前端（mingw-w64 + wine）"
+  if ! FLUTTER_BIN="$FLUTTER_BIN" bash "$ROOT_DIR/buildsh/cross/build-ui-win-cross.sh" \
+       "$UI_SRC/build/windows/x64/runner/Release" \
+       >"$ROOT_DIR/build/logs/flutter-win-cross.log" 2>&1; then
+    echo "!! 交叉编译失败，本次包内不含 Flutter 界面（日志：build/logs/flutter-win-cross.log）"
+    return 0
+  fi
+
+  mkdir -p "$ROOT_DIR/$DEST"
+  cp -R "$UI_SRC/build/windows/x64/runner/Release/." "$ROOT_DIR/$DEST/"
+  echo "    -> $DEST（Flutter windows，交叉编译）"
 }
 
 pack_launcher() {
