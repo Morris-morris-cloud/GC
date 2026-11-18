@@ -64,9 +64,15 @@ Windows 还需要 **VS Build Tools 的「使用 C++ 的桌面开发」工作负�
 ## 本地构建（不经 CI）
 
 ```bash
-# Linux / macOS：三平台一次出齐。Windows 前端用 mingw-w64 + wine 交叉编译，
-# 不需要 Windows 机器。
+# 按构建主机自动选目标，每条产物都带 Flutter 前端：
+#   macOS 主机 → mac-arm64（原生）+ win-amd64 / win-arm64（mingw 交叉）
+#   Linux 主机 → linux-amd64（原生）+ win-amd64 / win-arm64（mingw 交叉）
+#   Windows 主机 → win-amd64 / win-arm64（原生）
 ./build.sh build
+
+# 前端是必需项：flutter 缺失或编译失败会直接中断，
+# 确需降级成只有 Avalonia 回退界面的包时才用：
+./build.sh build --allow-no-ui
 
 # 只编 macOS 前端
 ./GC-UI/build-ui.sh macos
@@ -74,6 +80,20 @@ Windows 还需要 **VS Build Tools 的「使用 C++ 的桌面开发」工作负�
 # Windows 主机原生构建
 GC-UI\build-ui.cmd
 ```
+
+### Linux 前端（原生）
+
+Flutter 的 Linux 桌面端只能在 Linux 上编，需要 GTK3 开发库与 C++ 工具链：
+
+```bash
+sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-14-dev
+```
+
+`libstdc++-14-dev` 容易漏：clang 18 会去 `/usr/lib/gcc/x86_64-linux-gnu/14/` 找
+`-lstdc++`，系统只装了 gcc-13 的开发包时链接会失败，报 `cannot find -lstdc++`。
+
+产物布局：`GC-UI` + `lib/libflutter_linux_gtk.so` + `data/`，与官方 `flutter build
+linux` 的 bundle 一致，直接铺进 `dist/linux-amd64/`。
 
 ### Windows 前端交叉编译
 

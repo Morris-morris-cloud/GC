@@ -3,6 +3,7 @@
 # GC 构建入口（薄封装）
 #
 #   ./build.sh build       完整发布（原 publish），带 apt 风格进度条
+#                          默认要求每个平台都带 Flutter 前端；--allow-no-ui 允许降级
 #   ./build.sh check       验证：编译 + 自检 + 离屏渲染 + 产物
 #   ./build.sh models      编译模型 dll + 封面 + 版本戳
 #   ./build.sh stamp       重新生成 version.json
@@ -33,11 +34,12 @@ VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props |
 TASK="${1:-build}"
 shift 2>/dev/null || true
 
-# 解析 -version=<版本号>（也接受 --version=）
+# 解析 -version=<版本号>（也接受 --version=）与 --allow-no-ui
 CLI_VERSION=""
 for arg in "$@"; do
   case "$arg" in
     -version=*|--version=*) CLI_VERSION="${arg#*=}" ;;
+    -allow-no-ui|--allow-no-ui) export GC_ALLOW_NO_UI=1 ;;
   esac
 done
 if [ -n "$CLI_VERSION" ]; then
