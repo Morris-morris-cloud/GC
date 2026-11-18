@@ -21,8 +21,8 @@ namespace GC;
 /// </summary>
 internal static class FlutterShell
 {
-    /// <summary>与 GC-UI/frontend 的默认 baseUrl 保持一致，前端不需要额外配置。</summary>
-    private const int Port = 17890;
+    /// <summary>与前端、后端共用的默认端口（定义在 GC.Services.GcUiContract）。</summary>
+    private const int Port = Services.GcUiContract.DefaultPort;
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(1.5) };
     private static Process? _backend;
@@ -35,23 +35,36 @@ internal static class FlutterShell
         if (backendPath == null || uiPath == null) return false;
 
         // 用户可能重复启动：已有后端在跑就直接复用，退出时也不要关掉别人的进程。
-        var reused = IsHealthy();
-        if (!reused)
-        {
-            _backend = Start(backendPath, $"--port {Port}", dir);
-            if (_backend == null) return false;
+        var port = Port;
 
-            if (!WaitHealthy(TimeSpan.FromSeconds(25)))
+        if (!IsHealthy(port))
+        {
+            // 端口可能被别的程序占用：17890 起向后试几个，选第一个能起来且健康的。
+            var start = Environment.GetEnvironmentVariable(Services.GcUiContract.PortEnvVar) is { Length: > 0 }
+                ? Services.GcUiContract.PortFromEnvironment()
+                : Port;
+
+            for (var candidate = start; candidate < start + Services.GcUiContract.PortScanRange; candidate++)
             {
-                Stop(_backend);
-                _backend = null;
-                return false;
+                var process = Start(backendPath, $"--port {candidate}", dir);
+                if (process == null) continue;
+
+                if (WaitHealthy(candidate, process, TimeSpan.FromSeconds(25)))
+                {
+                    port = candidate;
+                    _backend = process;
+                    break;
+                }
+
+                Stop(process);
             }
+
+            if (_backend == null) return false;
         }
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Stop(_backend);
 
-        var ui = Start(uiPath, null, dir);
+        var ui = Start(uiPath, null, dir, port);
         if (ui == null)
         {
             Stop(_backend);
@@ -102,7 +115,7 @@ internal static class FlutterShell
 
     // ---------------------------------------------------------------- 进程管理
 
-    private static Process? Start(string fileName, string? arguments, string workingDirectory)
+    private static Process? Start(string fileName, string? arguments, string workingDirectory, int port = 0)
     {
         try
         {
@@ -113,6 +126,11 @@ internal static class FlutterShell
                 CreateNoWindow = true,
             };
             if (!string.IsNullOrEmpty(arguments)) info.Arguments = arguments;
+
+            // 把实际端口传给子进程：后端读它监听，前端读它拼 baseUrl。
+            // 这样换端口不需要重新编译前端。
+            if (port > 0)
+                info.Environment[Services.GcUiContract.PortEnvVar] = port.ToString();
 
             // macOS .app 内的二进制也需要可执行位；发布包由 zip 解开时可能丢失。
             if (!OperatingSystem.IsWindows())
@@ -149,11 +167,11 @@ internal static class FlutterShell
 
     // ---------------------------------------------------------------- 健康检查
 
-    private static bool IsHealthy()
+    private static bool IsHealthy(int port)
     {
         try
         {
-            using var response = Http.GetAsync($"http://127.0.0.1:{Port}/api/health")
+            using var response = Http.GetAsync($"http://127.0.0.1:{port}/api/health")
                 .GetAwaiter().GetResult();
             return response.IsSuccessStatusCode;
         }
@@ -163,15 +181,15 @@ internal static class FlutterShell
         }
     }
 
-    private static bool WaitHealthy(TimeSpan timeout)
+    private static bool WaitHealthy(int port, Process backend, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             // 后端进程已经退出就没必要再等：端口被占、依赖缺失都会走这里。
-            if (_backend is { HasExited: true }) return false;
+            if (backend.HasExited) return false;
 
-            if (IsHealthy()) return true;
+            if (IsHealthy(port)) return true;
             Thread.Sleep(250);
         }
         return false;

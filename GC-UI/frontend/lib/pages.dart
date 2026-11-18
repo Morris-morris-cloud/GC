@@ -28,10 +28,14 @@ class _HomePageViewState extends State<HomePageView> {
   bool _loading = true;
   String? _error;
   String? _notice;
+  int _lastRevision = 0;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_onControllerChanged);
+    _lastRevision = widget.controller.modelsRevision;
+
     final preset = widget.initialModels;
     if (preset != null) {
       _models = preset;
@@ -39,6 +43,22 @@ class _HomePageViewState extends State<HomePageView> {
     } else {
       _load();
     }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  /// 下载完成 / 删除模型后重新拉列表：页面被 Offstage 保活，不会自己重建。
+  void _onControllerChanged() {
+    if (!mounted) return;
+    final revision = widget.controller.modelsRevision;
+    if (revision == _lastRevision) return;
+    _lastRevision = revision;
+    if (widget.initialModels != null) return; // 截图 / 测试用的预置数据
+    _load();
   }
 
   Future<void> _load() async {
@@ -128,7 +148,7 @@ class _HomePageViewState extends State<HomePageView> {
               Expanded(
                 child: Text(
                   T('home.installed'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: GcColors.ink,
@@ -151,7 +171,7 @@ class _HomePageViewState extends State<HomePageView> {
               padding: const EdgeInsets.all(12),
               child: Text(
                 _notice!,
-                style: const TextStyle(fontSize: 12, color: GcColors.warn),
+                style: TextStyle(fontSize: 12, color: GcColors.warn),
               ),
             ),
           ],
@@ -167,7 +187,7 @@ class _HomePageViewState extends State<HomePageView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(T('common.error'),
-                      style: const TextStyle(color: GcColors.danger)),
+                      style: TextStyle(color: GcColors.danger)),
                   const SizedBox(height: 8),
                   GcHint(_error!),
                 ],
@@ -314,7 +334,7 @@ class _HomePageViewState extends State<HomePageView> {
         children: <Widget>[
           Text(
             T('home.empty'),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: GcColors.ink,
@@ -326,7 +346,7 @@ class _HomePageViewState extends State<HomePageView> {
             child: Text(
               T('home.emptyHint'),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: GcColors.faint,
                 height: 1.5,
@@ -488,7 +508,7 @@ class _ModelCardState extends State<_ModelCard> {
                           child: Text(
                             model.name,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w700,
                               color: GcColors.ink,
@@ -498,7 +518,7 @@ class _ModelCardState extends State<_ModelCard> {
                         const SizedBox(width: 8),
                         Text(
                           model.sizeText,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10.5,
                             color: GcColors.faint,
                           ),
@@ -664,6 +684,12 @@ class _DownloadPageViewState extends State<DownloadPageView> {
   String? _error;
   Timer? _poll;
 
+  /// 页面是否可见（被切走后仍保活，但没必要继续请求后端）。
+  bool _visible = true;
+
+  /// 上一次轮询时是否有活跃任务，用来判断「刚刚全部结束」。
+  bool _hadActive = false;
+
   @override
   void initState() {
     super.initState();
@@ -677,13 +703,49 @@ class _DownloadPageViewState extends State<DownloadPageView> {
       return;
     }
     _load();
-    _poll = Timer.periodic(const Duration(seconds: 1), (_) => _refreshJobs());
+    _schedulePoll(const Duration(seconds: 2));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TickerMode 由外壳的 Offstage 控制：切到别的页时变 false。
+    _visible = TickerMode.of(context);
   }
 
   @override
   void dispose() {
     _poll?.cancel();
     super.dispose();
+  }
+
+  /// 单次 Timer 链：有活跃任务时 1 秒一次，空闲时降到 5 秒，不可见时 10 秒。
+  ///
+  /// 以前是 `Timer.periodic(1s)` 且永不停止 —— 只要进过下载页，之后每秒都
+  /// 在请求 `/api/download/jobs`，哪怕没有任何任务、页面也早就切走了。
+  void _schedulePoll(Duration delay) {
+    _poll?.cancel();
+    _poll = Timer(delay, _pollOnce);
+  }
+
+  Future<void> _pollOnce() async {
+    if (!mounted) return;
+
+    if (!_visible) {
+      _schedulePoll(const Duration(seconds: 10));
+      return;
+    }
+
+    _hadActive = _jobs.any((job) => job.isActive);
+    await _refreshJobs();
+    if (!mounted) return;
+
+    final active = _jobs.any((job) => job.isActive);
+    // 活跃 → 空闲：这一轮里下载结束了，首页的模型列表已经过期。
+    if (_hadActive && !active) widget.controller.modelsChanged();
+    _hadActive = active;
+
+    _schedulePoll(Duration(seconds: active ? 1 : 5));
   }
 
   Future<void> _load() async {
@@ -818,7 +880,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                             Expanded(
                               child: Text(
                                 source.name,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
                                   color: GcColors.ink,
@@ -826,7 +888,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                               ),
                             ),
                             if (!source.enabled)
-                              const Text(
+                              Text(
                                 'off',
                                 style: TextStyle(
                                     fontSize: 10, color: GcColors.faint),
@@ -836,7 +898,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                         const SizedBox(height: 2),
                         Text(
                           source.host,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 10.5, color: GcColors.faint),
                         ),
                       ],
@@ -867,7 +929,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
             Expanded(
               child: Text(
                 T('dl.available'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: GcColors.ink,
@@ -896,7 +958,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(T('common.error'),
-                          style: const TextStyle(color: GcColors.danger)),
+                          style: TextStyle(color: GcColors.danger)),
                       const SizedBox(height: 8),
                       GcHint(_error!),
                     ],
@@ -908,7 +970,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(T('dl.empty'),
-                          style: const TextStyle(color: GcColors.ink)),
+                          style: TextStyle(color: GcColors.ink)),
                       const SizedBox(height: 8),
                       GcHint(T('dl.emptyHint')),
                     ],
@@ -930,7 +992,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                                   children: <Widget>[
                                     Text(
                                       model.name,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: GcColors.ink,
@@ -939,7 +1001,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                                     const SizedBox(width: 8),
                                     Text(
                                       'v${model.version}  ·  ${model.sizeText}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 10.5,
                                           color: GcColors.faint),
                                     ),
@@ -956,7 +1018,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                                         ),
                                         child: Text(
                                           T('dl.installed'),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                               fontSize: 10,
                                               color: GcColors.ok),
                                         ),
@@ -969,7 +1031,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                                   model.description,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11.5,
                                     color: GcColors.muted,
                                     height: 1.4,
@@ -1032,7 +1094,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                         Expanded(
                           child: Text(
                             '${job.name}  v${job.version}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
                               color: GcColors.ink,
@@ -1079,7 +1141,7 @@ class _DownloadPageViewState extends State<DownloadPageView> {
                     const SizedBox(height: 4),
                     Text(
                       job.error ?? job.detailText,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 10.5, color: GcColors.faint),
                     ),
                   ],
@@ -1127,7 +1189,11 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   int _fps = 120;
   bool _autoUpdate = true;
   String _language = 'auto';
-  bool _synced = false;
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  /// 上一次同步所用的设置对象。以前用的是 `bool _synced` —— 只同步一次，
+  /// 之后外部（更新状态条、其它页面）改了设置，本页仍显示旧值。
+  SettingsInfo? _syncedFrom;
   String? _status;
 
   @override
@@ -1137,13 +1203,14 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   }
 
   void _syncFrom(SettingsInfo settings) {
-    if (_synced) return;
+    if (identical(_syncedFrom, settings)) return;
+    _syncedFrom = settings;
     _memory = settings.memoryMb.toDouble();
     _memoryAuto = settings.memoryAuto;
     _fps = settings.renderFps;
     _autoUpdate = settings.autoUpdateOnStartup;
     _language = settings.language;
-    _synced = true;
+    _themeMode = GcPalette.parseMode(settings.theme);
   }
 
   @override
@@ -1159,7 +1226,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
       children: <Widget>[
         Text(
           T('set.title'),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: GcColors.ink,
@@ -1199,7 +1266,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
           Row(
             children: <Widget>[
               SizedBox(width: 160, child: Text(T('set.language'),
-                  style: const TextStyle(fontSize: 12.5, color: GcColors.muted))),
+                  style: TextStyle(fontSize: 12.5, color: GcColors.muted))),
               DropdownButton<String>(
                 value: _language,
                 dropdownColor: GcColors.surfaceAlt,
@@ -1228,7 +1295,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
           Row(
             children: <Widget>[
               SizedBox(width: 160, child: Text(T('set.fps'),
-                  style: const TextStyle(fontSize: 12.5, color: GcColors.muted))),
+                  style: TextStyle(fontSize: 12.5, color: GcColors.muted))),
               Expanded(
                 child: Slider(
                   value: _fps.toDouble(),
@@ -1247,7 +1314,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               SizedBox(
                 width: 46,
                 child: Text('$_fps',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12.5, color: GcColors.ink)),
               ),
             ],
@@ -1267,6 +1334,38 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         children: <Widget>[
           GcSectionTitle(T('set.appearance')),
           const SizedBox(height: 8),
+          GcHint(T('set.theme.desc')),
+          const SizedBox(height: 10),
+          SegmentedButton<ThemeMode>(
+            segments: <ButtonSegment<ThemeMode>>[
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.dark,
+                label: Text(T('set.theme.dark')),
+                icon: const Icon(Icons.dark_mode_outlined, size: 15),
+              ),
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.light,
+                label: Text(T('set.theme.light')),
+                icon: const Icon(Icons.light_mode_outlined, size: 15),
+              ),
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.system,
+                label: Text(T('set.theme.system')),
+                icon: const Icon(Icons.brightness_auto_outlined, size: 15),
+              ),
+            ],
+            selected: <ThemeMode>{_themeMode},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) async {
+              final mode = selection.first;
+              setState(() => _themeMode = mode);
+              GcPalette.mode.value = mode; // 立即预览
+              await widget.controller
+                  .saveSettings(SettingsPatch(theme: GcPalette.modeToName(mode)));
+              if (mounted) setState(() => _status = T('common.applied'));
+            },
+          ),
+          const SizedBox(height: 16),
           GcHint(T('set.accent.desc')),
           const SizedBox(height: 14),
           Wrap(
@@ -1281,7 +1380,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
           const SizedBox(height: 12),
           Text(
             '${T('set.accent')}: ${GcPalette.toHex(current)}',
-            style: const TextStyle(fontSize: 11.5, color: GcColors.faint),
+            style: TextStyle(fontSize: 11.5, color: GcColors.faint),
           ),
         ],
       ),
@@ -1337,12 +1436,12 @@ class _SettingsPageViewState extends State<SettingsPageView> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(Icons.colorize_rounded,
+              Icon(Icons.colorize_rounded,
                   size: 16, color: GcColors.faint),
               const SizedBox(width: 6),
               Text(
                 T('set.accent.custom'),
-                style: const TextStyle(fontSize: 11.5, color: GcColors.muted),
+                style: TextStyle(fontSize: 11.5, color: GcColors.muted),
               ),
             ],
           ),
@@ -1363,12 +1462,12 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: GcColors.ink),
+          style: TextStyle(color: GcColors.ink),
           decoration: InputDecoration(
             hintText: '#8FB6FF',
-            hintStyle: const TextStyle(color: GcColors.faint),
+            hintStyle: TextStyle(color: GcColors.faint),
             helperText: T('set.accent.hexHint'),
-            helperStyle: const TextStyle(color: GcColors.faint, fontSize: 11),
+            helperStyle: TextStyle(color: GcColors.faint, fontSize: 11),
           ),
           onSubmitted: (value) => Navigator.of(context).pop(value),
         ),
@@ -1424,7 +1523,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               Expanded(
                 child: Text(
                   T('set.memory.auto'),
-                  style: const TextStyle(fontSize: 12.5, color: GcColors.muted),
+                  style: TextStyle(fontSize: 12.5, color: GcColors.muted),
                 ),
               ),
             ],
@@ -1453,7 +1552,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                 width: 96,
                 child: Text(
                   '${_memory.round()} MB',
-                  style: const TextStyle(fontSize: 12.5, color: GcColors.ink),
+                  style: TextStyle(fontSize: 12.5, color: GcColors.ink),
                 ),
               ),
             ],
@@ -1463,7 +1562,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
             children: <Widget>[
               Text(
                 '${T('set.memory.current')}: ${settings.memoryUsageText}',
-                style: const TextStyle(fontSize: 11.5, color: GcColors.faint),
+                style: TextStyle(fontSize: 11.5, color: GcColors.faint),
               ),
             ],
           ),
@@ -1494,7 +1593,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                       children: <Widget>[
                         Text(
                           source.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: GcColors.ink,
@@ -1503,7 +1602,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                         const SizedBox(height: 2),
                         Text(
                           source.url,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 10.5, color: GcColors.faint),
                         ),
                       ],
@@ -1511,7 +1610,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
                   ),
                   Text(
                     source.enabled ? T('set.sourceEnabled') : '—',
-                    style: const TextStyle(fontSize: 11, color: GcColors.faint),
+                    style: TextStyle(fontSize: 11, color: GcColors.faint),
                   ),
                 ],
               ),
@@ -1566,12 +1665,12 @@ class _SettingsPageViewState extends State<SettingsPageView> {
         SizedBox(
           width: 160,
           child: Text(label,
-              style: const TextStyle(fontSize: 12.5, color: GcColors.muted)),
+              style: TextStyle(fontSize: 12.5, color: GcColors.muted)),
         ),
         Expanded(
           child: SelectableText(
             value,
-            style: const TextStyle(fontSize: 11.5, color: GcColors.faint),
+            style: TextStyle(fontSize: 11.5, color: GcColors.faint),
           ),
         ),
       ],
@@ -1601,7 +1700,7 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               Expanded(
                 child: Text(
                   T('update.auto'),
-                  style: const TextStyle(fontSize: 12.5, color: GcColors.muted),
+                  style: TextStyle(fontSize: 12.5, color: GcColors.muted),
                 ),
               ),
             ],
@@ -1709,7 +1808,7 @@ class _AboutPageViewState extends State<AboutPageView> {
       children: <Widget>[
         Text(
           T('nav.about'),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: GcColors.ink,
@@ -1727,7 +1826,7 @@ class _AboutPageViewState extends State<AboutPageView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(T('common.error'),
-                    style: const TextStyle(color: GcColors.danger)),
+                    style: TextStyle(color: GcColors.danger)),
                 const SizedBox(height: 8),
                 GcHint(_error!),
                 const SizedBox(height: 12),
@@ -1745,7 +1844,7 @@ class _AboutPageViewState extends State<AboutPageView> {
               children: <Widget>[
                 Text(
                   _about?.appName ?? 'Morris GC',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: GcColors.ink,
@@ -1815,7 +1914,7 @@ class _AboutPageViewState extends State<AboutPageView> {
                           Expanded(
                             child: Text(
                               contributor.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
                                 color: GcColors.ink,
@@ -1825,7 +1924,7 @@ class _AboutPageViewState extends State<AboutPageView> {
                           Text(
                             T('about.contributions',
                                 <Object?>[contributor.contributions]),
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 11, color: GcColors.faint),
                           ),
                         ],
@@ -1846,12 +1945,12 @@ class _AboutPageViewState extends State<AboutPageView> {
         SizedBox(
           width: 160,
           child: Text(label,
-              style: const TextStyle(fontSize: 12.5, color: GcColors.muted)),
+              style: TextStyle(fontSize: 12.5, color: GcColors.muted)),
         ),
         Expanded(
           child: SelectableText(
             value,
-            style: const TextStyle(fontSize: 12, color: GcColors.ink),
+            style: TextStyle(fontSize: 12, color: GcColors.ink),
           ),
         ),
       ],

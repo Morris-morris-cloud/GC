@@ -380,7 +380,7 @@ pack_launcher() {
 
 # 删除 publish 过程中的中间目录：平台目录里只留最终 zip
 strip_intermediate_dirs() {
-  for d in win-amd64 win-x64 win-arm64 mac-arm64; do
+  for d in win-amd64 win-x64 win-arm64 mac-arm64 linux-amd64 linux-x64; do
     [ -d "$ROOT_DIR/dist/$d" ] || continue
     find "$ROOT_DIR/dist/$d" -mindepth 1 -maxdepth 1 \
       ! -name "GC-${VERSION}-*.zip" -exec rm -rf {} + 2>/dev/null || true

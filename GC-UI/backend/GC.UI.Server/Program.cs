@@ -127,6 +127,17 @@ app.Use(async (context, next) =>
     {
         var key = context.Connection.RemoteIpAddress?.ToString() ?? "local";
         var now = Environment.TickCount64;
+
+        // 定期丢弃过期窗口：本机连接数不多，但长时间运行后桶只增不减会缓慢泄漏。
+        if (writeBuckets.Count > 256)
+        {
+            foreach (var entry in writeBuckets)
+            {
+                if (now - entry.Value.Window > 60_000)
+                    writeBuckets.TryRemove(entry.Key, out _);
+            }
+        }
+
         var bucket = writeBuckets.AddOrUpdate(
             key,
             _ => (now, 1),
@@ -135,8 +146,7 @@ app.Use(async (context, next) =>
         if (bucket.Count > 40)
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await context.Response.WriteAsJsonAsync(
-                new LaunchResultDto(false, "请求过于频繁，请稍后再试"));
+            await context.Response.WriteAsJsonAsync(ErrorDto.Of("请求过于频繁，请稍后再试"));
             return;
         }
     }
@@ -158,12 +168,16 @@ app.MapGet("/api/health", () => Results.Ok(new HealthDto(
 app.MapGet("/api/models", () =>
     Results.Ok(services.Models.Scan().Select(ToModelDto).ToList()));
 
-app.MapGet("/api/models/{id}/preview", (string id) =>
+app.MapGet("/api/models/{id}/preview", (string id, HttpResponse response) =>
 {
-    if (!IsSafeId(id)) return Results.BadRequest();
+    if (!IsSafeId(id)) return Results.BadRequest(ErrorDto.Of("模型标识无效"));
     var package = services.Models.Find(id);
     if (package == null || !File.Exists(package.PreviewPath)) return Results.NotFound();
-    return Results.File(package.PreviewPath, "image/png");
+
+    // 封面是静态图，允许前端缓存：默认全局中间件写的 no-store 会让每次滚动都重新请求。
+    // 按扩展名给准确的 MIME —— 统一写 image/png 时，WebP / JPEG 封面在部分平台显示不出来。
+    response.Headers.CacheControl = "private, max-age=300";
+    return Results.File(package.PreviewPath, GuessImageContentType(package.PreviewPath));
 });
 
 app.MapPost("/api/models/{id}/launch", async (string id) =>
@@ -188,12 +202,12 @@ app.MapPost("/api/models/{id}/launch", async (string id) =>
 
 app.MapDelete("/api/models/{id}", (string id) =>
 {
-    if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "模型标识无效"));
+    if (!IsSafeId(id)) return Results.BadRequest(ErrorDto.Of("模型标识无效"));
     var ok = services.Models.Delete(id);
     if (ok) services.Models.NotifyChanged();
     return ok
         ? Results.Ok(new LaunchResultDto(true, $"已删除模型 {id}"))
-        : Results.NotFound(new LaunchResultDto(false, $"没有找到模型 {id}"));
+        : Results.NotFound(ErrorDto.Of($"没有找到模型 {id}"));
 });
 
 // ---- 设置 -----------------------------------------------------------------
@@ -202,17 +216,17 @@ app.MapGet("/api/settings", () => Results.Ok(ToSettingsDto()));
 
 app.MapPost("/api/settings", (SettingsPatch? patch) =>
 {
-    if (patch == null) return Results.BadRequest(new LaunchResultDto(false, "缺少设置内容"));
+    if (patch == null) return Results.BadRequest(ErrorDto.Of("缺少设置内容"));
 
     // 白名单校验：设置项会写进磁盘并被前端直接使用，不接受任意字符串。
     if (patch.Language != null && !allowedLanguages.Contains(patch.Language))
-        return Results.BadRequest(new LaunchResultDto(false, "不支持的界面语言"));
+        return Results.BadRequest(ErrorDto.Of("不支持的界面语言"));
     if (patch.Theme != null && !allowedThemes.Contains(patch.Theme))
-        return Results.BadRequest(new LaunchResultDto(false, "不支持的主题"));
+        return Results.BadRequest(ErrorDto.Of("不支持的主题"));
     if (patch.AccentColor != null && !accentHexRegex.IsMatch(patch.AccentColor))
-        return Results.BadRequest(new LaunchResultDto(false, "主题色需为 #RRGGBB"));
+        return Results.BadRequest(ErrorDto.Of("主题色需为 #RRGGBB"));
     if (patch.UpdateRepository != null && !IsAllowedRepository(patch.UpdateRepository))
-        return Results.BadRequest(new LaunchResultDto(false, "更新仓库地址不受信任"));
+        return Results.BadRequest(ErrorDto.Of("更新仓库地址不受信任"));
 
     services.Settings.Apply(s =>
     {
@@ -255,14 +269,14 @@ app.MapPost("/api/sources/select", async (ForceRequest? request) =>
     catch (Exception ex)
     {
         Console.Error.WriteLine($"[sources] 切换模型源失败: {ex}");
-        return Results.Json(new LaunchResultDto(false, "模型源切换失败"), statusCode: 503);
+        return Results.Json(ErrorDto.Of("模型源切换失败"), statusCode: 503);
     }
 });
 
 app.MapGet("/api/remote/models", async (string? sourceId, bool force) =>
 {
     var source = ResolveSource(sourceId);
-    if (source == null) return Results.NotFound(new LaunchResultDto(false, "没有可用的模型源"));
+    if (source == null) return Results.NotFound(ErrorDto.Of("没有可用的模型源"));
 
     var index = await services.Sources.FetchAsync(source, force, null, CancellationToken.None);
     var installed = services.Models.Scan()
@@ -291,16 +305,16 @@ app.MapGet("/api/remote/models", async (string? sourceId, bool force) =>
 app.MapPost("/api/download", async (DownloadRequest? request) =>
 {
     if (request == null || string.IsNullOrWhiteSpace(request.ModelId))
-        return Results.BadRequest(new LaunchResultDto(false, "缺少 modelId"));
+        return Results.BadRequest(ErrorDto.Of("缺少 modelId"));
 
     var source = ResolveSource(request.SourceId);
-    if (source == null) return Results.NotFound(new LaunchResultDto(false, "没有可用的模型源"));
+    if (source == null) return Results.NotFound(ErrorDto.Of("没有可用的模型源"));
 
     var index = await services.Sources.FetchAsync(source, false, null, CancellationToken.None);
     var model = index.Models.FirstOrDefault(m =>
         m.Id.Equals(request.ModelId, StringComparison.OrdinalIgnoreCase));
     if (model == null)
-        return Results.NotFound(new LaunchResultDto(false, $"源里没有模型 {request.ModelId}"));
+        return Results.NotFound(ErrorDto.Of($"源里没有模型 {request.ModelId}"));
 
     var job = services.Downloads.Enqueue(model);
     return Results.Ok(ToJobDto(job));
@@ -409,11 +423,11 @@ app.MapPost("/api/shell/open-folder", (PathRequest? request) =>
 {
     var path = request?.Path;
     if (string.IsNullOrWhiteSpace(path))
-        return Results.BadRequest(new LaunchResultDto(false, "缺少 path"));
+        return Results.BadRequest(ErrorDto.Of("缺少 path"));
 
     // 只允许打开启动器自己的目录，避免前端被当成任意路径执行器
     if (!IsInsideKnownRoot(path!))
-        return Results.BadRequest(new LaunchResultDto(false, "只允许打开启动器自己的目录"));
+        return Results.BadRequest(ErrorDto.Of("只允许打开启动器自己的目录"));
 
     Shell.OpenFolder(path!);
     return Results.Ok(new LaunchResultDto(true, "已打开目录"));
@@ -424,13 +438,13 @@ app.MapPost("/api/shell/open-url", (UrlRequest? request) =>
     var url = request?.Url;
     if (string.IsNullOrWhiteSpace(url) || url.Length > 2048 ||
         !Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        return Results.BadRequest(new LaunchResultDto(false, "URL 无效"));
+        return Results.BadRequest(ErrorDto.Of("URL 无效"));
 
     if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-        return Results.BadRequest(new LaunchResultDto(false, "只允许 http/https 链接"));
+        return Results.BadRequest(ErrorDto.Of("只允许 http/https 链接"));
 
     if (!string.IsNullOrEmpty(uri.UserInfo))
-        return Results.BadRequest(new LaunchResultDto(false, "URL 不允许携带账号密码"));
+        return Results.BadRequest(ErrorDto.Of("URL 不允许携带账号密码"));
 
     Shell.OpenUrl(url!);
     return Results.Ok(new LaunchResultDto(true, "已打开链接"));
@@ -450,7 +464,8 @@ app.Run();
 
 static int ResolvePort(string[] args)
 {
-    var env = Environment.GetEnvironmentVariable("GC_UI_PORT");
+    // 优先用启动器传来的端口（GC_UI_PORT），保证前端拼出来的 baseUrl 和这里一致。
+    var env = Environment.GetEnvironmentVariable(GcUiContract.PortEnvVar);
     if (int.TryParse(env, out var fromEnv) && fromEnv > 0 && fromEnv < 65536) return fromEnv;
 
     for (var i = 0; i < args.Length; i++)
@@ -465,7 +480,7 @@ static int ResolvePort(string[] args)
             return inline;
     }
 
-    return 17890;
+    return GcUiContract.DefaultPort;
 }
 
 static void WriteEndpointFile(AppServices services, int port)
@@ -491,8 +506,18 @@ static void WriteEndpointFile(AppServices services, int port)
     }
 }
 
-ModelDto ToModelDto(ModelPackage package) => new(
-    package.Id,
+/// <summary>按扩展名推断图片 MIME；模型封面允许 png / jpg / webp / gif。</summary>
+static string GuessImageContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+{
+    ".jpg" or ".jpeg" => "image/jpeg",
+    ".webp" => "image/webp",
+    ".gif" => "image/gif",
+    ".bmp" => "image/bmp",
+    ".svg" => "image/svg+xml",
+    _ => "image/png"
+};
+
+ModelDto ToModelDto(ModelPackage package) => new(    package.Id,
     package.LocalizedName,
     package.LocalizedDescription,
     package.Manifest.Version,
@@ -565,10 +590,10 @@ ModelSource? ResolveSource(string? sourceId)
 
 IResult ActOnJob(string id, Action<IDownloadJob> action)
 {
-    if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "任务标识无效"));
+    if (!IsSafeId(id)) return Results.BadRequest(ErrorDto.Of("任务标识无效"));
     var job = services.Downloads.Jobs.FirstOrDefault(j =>
         j.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-    if (job == null) return Results.NotFound(new LaunchResultDto(false, $"没有找到任务 {id}"));
+    if (job == null) return Results.NotFound(ErrorDto.Of($"没有找到任务 {id}"));
 
     action(job);
     return Results.Ok(ToJobDto(job));

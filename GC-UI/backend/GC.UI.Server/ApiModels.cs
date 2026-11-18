@@ -133,6 +133,15 @@ public sealed record AboutDto(
 
 public sealed record LaunchResultDto(bool Ok, string Message);
 
+/// <summary>
+/// 通用错误响应。限流 / 参数校验这类与具体业务无关的失败用它，
+/// 不要复用 <see cref="LaunchResultDto"/> —— 那会让前端误以为「启动模型」有结果。
+/// </summary>
+public sealed record ErrorDto(bool Ok, string Message)
+{
+    public static ErrorDto Of(string message) => new(false, message);
+}
+
 public sealed record DownloadRequest(string SourceId, string ModelId);
 
 public sealed record PathRequest(string Path);

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -334,16 +335,65 @@ List<String> _stringList(dynamic value) =>
 
 /// GC-UI 后端客户端。
 ///
-/// 后端是本地伴随进程，默认监听 127.0.0.1:17890；端口可用
-/// `--dart-define=GC_UI_BASE_URL=http://127.0.0.1:12345` 覆盖。
+/// 后端是本地伴随进程，端口由启动器（GC-BOOT）选定后通过 `GC_UI_PORT`
+/// 环境变量传进来 —— 这样端口被占用时换端口不用重新编译前端。
+/// 也可用 `--dart-define=GC_UI_BASE_URL=http://127.0.0.1:12345` 强制指定。
 class GcApi {
   GcApi({String? baseUrl})
       : baseUrl = baseUrl ?? defaultBaseUrl;
 
-  static const String defaultBaseUrl = String.fromEnvironment(
-    'GC_UI_BASE_URL',
-    defaultValue: 'http://127.0.0.1:17890',
-  );
+  /// 复用同一个 HTTP 连接：轮询（下载任务每秒一次）时每次都新建连接
+  /// 会不断握手，桌面端也能明显看到延迟抖动。
+  static final http.Client _client = http.Client();
+
+  /// 兜底默认端口，与后端 GC.Services.GcUiContract.DefaultPort 保持一致。
+  static const int fallbackPort = 17890;
+
+  static String get defaultBaseUrl {
+    const fromDefine = String.fromEnvironment('GC_UI_BASE_URL');
+    if (fromDefine.isNotEmpty) return fromDefine;
+
+    final fromEnvUrl = Platform.environment['GC_UI_BASE_URL'];
+    if (fromEnvUrl != null && fromEnvUrl.isNotEmpty) return fromEnvUrl;
+
+    // 启动器通过 GC_UI_PORT 传端口（主路径）。
+    final port = int.tryParse(Platform.environment['GC_UI_PORT'] ?? '');
+    if (port != null) return 'http://127.0.0.1:$port';
+
+    // 手动起后端 / 前端调试时没有环境变量：读后端写的 .GC/ui-backend.json。
+    final discovered = _endpointFileUrl();
+    if (discovered != null) return discovered;
+
+    return 'http://127.0.0.1:$fallbackPort';
+  }
+
+  /// 从运行目录下的 `.GC/ui-backend.json` 发现后端地址。
+  ///
+  /// 后端每次启动都会写这个文件（port / pid / url）。只认 24 小时内的记录：
+  /// 更早的多半是上次遗留的，连过去只会得到一个「无法连接」。
+  static String? _endpointFileUrl() {
+    try {
+      final file = File('${Directory.current.path}/.GC/ui-backend.json');
+      if (!file.existsSync()) return null;
+
+      final age = DateTime.now().difference(file.lastModifiedSync());
+      if (age.inHours >= 24) return null;
+
+      final decoded = jsonDecode(file.readAsStringSync());
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final url = decoded['url'];
+      if (url is String && url.startsWith('http://127.0.0.1:')) return url;
+
+      final port = (decoded['port'] as num?)?.toInt();
+      if (port != null && port > 0 && port < 65536) {
+        return 'http://127.0.0.1:$port';
+      }
+    } catch (_) {
+      // 文件损坏 / 无权限：退回默认端口即可
+    }
+    return null;
+  }
 
   final String baseUrl;
 
@@ -357,17 +407,17 @@ class GcApi {
     try {
       switch (method) {
         case 'GET':
-          response = await http.get(uri).timeout(const Duration(seconds: 30));
+          response = await _client.get(uri).timeout(const Duration(seconds: 30));
           break;
         case 'POST':
-          response = await http
+          response = await _client
               .post(uri,
                   headers: const {'Content-Type': 'application/json'},
                   body: body == null ? null : jsonEncode(body))
               .timeout(const Duration(seconds: 120));
           break;
         case 'DELETE':
-          response = await http.delete(uri).timeout(const Duration(seconds: 30));
+          response = await _client.delete(uri).timeout(const Duration(seconds: 30));
           break;
         default:
           throw ApiException('不支持的方法 $method');

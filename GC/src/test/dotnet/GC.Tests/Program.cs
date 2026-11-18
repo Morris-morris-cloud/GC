@@ -193,7 +193,9 @@ internal static class Program
         Console.WriteLine($"当前平台: {rid}，启动器版本: {LauncherRuntimeInfo.CurrentLauncherVersion}");
         var stage = Path.Combine(tmp, "launcher-stage");
         Directory.CreateDirectory(stage);
-        File.WriteAllText(Path.Combine(stage, "GC-9.9.9-" + LauncherUpdater.PlatformLabel + ".exe"),
+        // Linux 的启动器没有扩展名，测试包名要跟着平台走
+        var launcherExt = OperatingSystem.IsWindows() ? ".exe" : "";
+        File.WriteAllText(Path.Combine(stage, "GC-9.9.9-" + LauncherUpdater.PlatformLabel + launcherExt),
             "new launcher");
         var zip = Path.Combine(tmp, "GC-" + rid + ".zip");
         ZipFile.CreateFromDirectory(stage, zip);
@@ -207,7 +209,7 @@ internal static class Program
         WriteSigned(remoteManifest, rv, signer);
 
         // 造一个旧版在当前目录
-        var oldName = "GC-1.0.0-" + LauncherUpdater.PlatformLabel + ".exe";
+        var oldName = "GC-1.0.0-" + LauncherUpdater.PlatformLabel + launcherExt;
         File.WriteAllText(Path.Combine(paths.InstallDirectory, oldName), "old launcher");
 
         var dl = Task.Run(() => LauncherUpdater.DownloadAsync(paths, updater.Remote, null))
@@ -227,7 +229,8 @@ internal static class Program
         // 5) 校验标记文件与替换脚本（相对路径，无绝对路径）
         var marker = Path.Combine(paths.UpdateRoot, "update.txt");
         Check(File.Exists(marker), "写出更新标记 update.txt");
-        var scheduled = LauncherUpdater.ScheduleApply(paths, dl.PackageName ?? "");
+        // 只验证脚本内容，不真的执行（否则脚本会在临时目录被删掉后搬文件、刷错误）
+        var scheduled = LauncherUpdater.ScheduleApply(paths, dl.PackageName ?? "", execute: false);
         var scriptPath = Path.Combine(paths.UpdateRoot,
             OperatingSystem.IsWindows() ? "apply.bat" : "apply.sh");
         Check(scheduled && File.Exists(scriptPath), "替换脚本可生成");

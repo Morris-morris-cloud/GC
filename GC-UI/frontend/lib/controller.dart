@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
@@ -24,31 +26,86 @@ class ShellController extends ChangeNotifier {
   String updateDetail = '';
   String launcherNotice = '';
 
+  /// 模型库版本号：安装 / 删除 / 下载完成后自增，首页据此重新拉列表。
+  ///
+  /// 首页被 `Offstage` 保活，切走再切回不会重建；没有这个信号时，
+  /// 下载完模型回到首页仍然显示旧的空列表。
+  int modelsRevision = 0;
+
+  Timer? _retryTimer;
+  int _retryAttempt = 0;
+
   bool get backendReady => settings != null;
 
   Future<void> bootstrap() async {
-    try {
-      // 健康检查与设置并行请求：两者互不依赖，串行会白白多等一次网络往返。
-      final healthFuture = api.health();
-      final settingsFuture = api.settings();
-      health = await healthFuture;
-      settings = await settingsFuture;
-      loadError = null;
-      _applySettings(settings!);
-    } catch (error) {
-      loadError = error.toString();
+    _retryTimer?.cancel();
+
+    HealthInfo? healthResult;
+    SettingsInfo? settingsResult;
+    Object? firstError;
+
+    // 两个请求互不依赖，并行发；各自捕获异常，避免一方失败时
+    // 另一个的 Future 抛成未处理异常（Flutter 会在控制台打出恶性警告）。
+    await Future.wait<void>(<Future<void>>[
+      () async {
+        try {
+          healthResult = await api.health();
+        } catch (error) {
+          firstError ??= error;
+        }
+      }(),
+      () async {
+        try {
+          settingsResult = await api.settings();
+        } catch (error) {
+          firstError ??= error;
+        }
+      }(),
+    ]);
+
+    if (healthResult != null) health = healthResult;
+    if (settingsResult != null) {
+      settings = settingsResult;
+      _applySettings(settingsResult!);
     }
+
+    if (firstError != null && settingsResult == null) {
+      loadError = firstError.toString();
+      _scheduleRetry();
+    } else {
+      loadError = null;
+      _retryAttempt = 0;
+    }
+
     notifyListeners();
+  }
+
+  /// 后端没起来时自动重试（2s、4s、8s…最多 5 次），不必让用户手动点。
+  void _scheduleRetry() {
+    if (_retryAttempt >= 5) return;
+    final seconds = 1 << _retryAttempt; // 1,2,4,8,16
+    _retryAttempt++;
+    _retryTimer?.cancel();
+    _retryTimer = Timer(Duration(seconds: seconds), () {
+      if (settings == null) bootstrap();
+    });
   }
 
   void _applySettings(SettingsInfo value) {
     I18n.setLanguage(value.language);
     GcPalette.apply(value.accentColor);
+    GcPalette.applyTheme(value.theme);
   }
 
   void goTo(int value) {
     if (index == value) return;
     index = value;
+    notifyListeners();
+  }
+
+  /// 模型库有变化（安装 / 删除 / 下载完成）：通知首页刷新。
+  void modelsChanged() {
+    modelsRevision++;
     notifyListeners();
   }
 
@@ -112,6 +169,7 @@ class ShellController extends ChangeNotifier {
         detail: result.error ?? '',
         notice: result.launcherMessage ?? '',
       );
+      if (result.updatedModels > 0) modelsChanged();
     } catch (error) {
       setUpdateStatus(
         busy: false,
@@ -119,5 +177,11 @@ class ShellController extends ChangeNotifier {
         detail: error.toString(),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
   }
 }

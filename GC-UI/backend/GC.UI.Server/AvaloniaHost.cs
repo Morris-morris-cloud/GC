@@ -28,7 +28,7 @@ public sealed class AvaloniaHost
 {
     private readonly AppServices _services;
     private readonly object _gate = new();
-    private readonly List<PlayerWindow> _windows = new();
+    private readonly Dictionary<string, PlayerWindow> _windows = new(StringComparer.OrdinalIgnoreCase);
     private Task<bool>? _startTask;
 
     public AvaloniaHost(AppServices services) => _services = services;
@@ -98,6 +98,27 @@ public sealed class AvaloniaHost
 
         return await Dispatcher.UIThread.InvokeAsync<string>(async () =>
         {
+            // 同一个模型已经在运行：把已有窗口提到前台，不再加载第二份实例
+            // （连点「启动模型」会各占一份内存与显存，低配机器直接卡死）。
+            lock (_gate)
+            {
+                if (_windows.TryGetValue(package.Id, out var existing))
+                {
+                    try
+                    {
+                        if (existing.WindowState == WindowState.Minimized)
+                            existing.WindowState = WindowState.Normal;
+                        existing.Activate();
+                        return $"模型 {package.Id} 已在运行";
+                    }
+                    catch
+                    {
+                        // 窗口已失效：清掉记录，按新窗口重新打开
+                        _windows.Remove(package.Id);
+                    }
+                }
+            }
+
             PlayerWindow? window = null;
             LoadedModel? loaded = null;
             try
@@ -111,13 +132,18 @@ public sealed class AvaloniaHost
 
                 window = new PlayerWindow(package, loaded);
                 var captured = loaded;
+                var id = package.Id;
                 window.Closed += (_, _) =>
                 {
                     try { captured.Dispose(); } catch { /* 释放失败不影响退出 */ }
-                    lock (_gate) _windows.Remove(window!);
+                    lock (_gate)
+                    {
+                        if (_windows.TryGetValue(id, out var current) && ReferenceEquals(current, window))
+                            _windows.Remove(id);
+                    }
                 };
 
-                lock (_gate) _windows.Add(window);
+                lock (_gate) _windows[id] = window;
                 window.Show();
                 return $"已启动模型 {package.Id}";
             }

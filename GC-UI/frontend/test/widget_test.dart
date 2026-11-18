@@ -73,7 +73,7 @@ void main() {
     testWidgets('renders a card with its child', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          theme: buildGcTheme(),
+          theme: buildGcTheme(Brightness.dark),
           home: const Scaffold(
             body: GcCard(child: Text('hello')),
           ),

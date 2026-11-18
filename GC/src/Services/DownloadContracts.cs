@@ -115,7 +115,6 @@ public static class DownloadModuleHost
 public static class LauncherRuntimeInfo
 {
     private static string? _versionOverride;
-
     public static string CurrentLauncherVersion
     {
         get
@@ -154,4 +153,31 @@ public static class LauncherRuntimeInfo
     }
 
     public static void OverrideLauncherVersion(string? version) => _versionOverride = version;
+}
+
+/// <summary>
+/// 界面（Flutter）与后端（GC.UI.Server）之间的约定：端口、环境变量名。
+///
+/// 之前这个端口在 GC-BOOT、后端、Flutter 前端各写了一遍 17890，改一处就断链；
+/// 现在统一由这里定义，启动器选好端口后通过环境变量传给另外两边。
+/// </summary>
+public static class GcUiContract
+{
+    /// <summary>默认端口（与历史版本保持一致，便于复用已在运行的后端）。</summary>
+    public const int DefaultPort = 17890;
+
+    /// <summary>端口被占用时最多向后尝试几个。</summary>
+    public const int PortScanRange = 10;
+
+    /// <summary>传给后端与前端的环境变量名。</summary>
+    public const string PortEnvVar = "GC_UI_PORT";
+
+    /// <summary>读取环境变量里指定的端口；非法或未设置时返回 <see cref="DefaultPort"/>。</summary>
+    public static int PortFromEnvironment()
+    {
+        var value = Environment.GetEnvironmentVariable(PortEnvVar);
+        return int.TryParse(value, out var port) && port > 0 && port < 65536
+            ? port
+            : DefaultPort;
+    }
 }

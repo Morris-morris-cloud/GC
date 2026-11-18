@@ -123,17 +123,21 @@ void main() {
       'uiAvailable': true,
     });
 
-  Future<void> shoot(WidgetTester tester, String name, Widget page) async {
+  Future<void> shoot(WidgetTester tester, String name, Widget page,
+      {Brightness brightness = Brightness.dark}) async {
     tester.view.physicalSize = const Size(1280, 820);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
+
+    // GcColors 是静态取值，截图前先按目标亮度绑定，否则浅色截图仍是深色配色。
+    GcColors.bind(brightness);
 
     final key = GlobalKey();
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: buildGcTheme().copyWith(
-          textTheme: buildGcTheme().textTheme.apply(
+        theme: buildGcTheme(brightness).copyWith(
+          textTheme: buildGcTheme(brightness).textTheme.apply(
                 fontFamily: 'Noto Sans CJK SC',
               ),
         ),
@@ -289,5 +293,25 @@ void main() {
   testWidgets('shell', (tester) async {
     I18n.language.value = 'zh-CN';
     await shoot(tester, 'shell', ShellPage(controller: sampleController()));
+  });
+
+  testWidgets('home-light', (tester) async {
+    I18n.language.value = 'zh-CN';
+    await shoot(
+      tester,
+      'home-light',
+      HomePageView(controller: sampleController(), initialModels: sampleModels()),
+      brightness: Brightness.light,
+    );
+  });
+
+  testWidgets('settings-light', (tester) async {
+    I18n.language.value = 'zh-CN';
+    await shoot(
+      tester,
+      'settings-light',
+      SettingsPageView(controller: sampleController()),
+      brightness: Brightness.light,
+    );
   });
 }

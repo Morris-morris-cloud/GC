@@ -40,7 +40,8 @@ public sealed class SourceSelector : ISourceSelector
 
     /// <summary>
     /// 探测两个源并返回最快的。force=true 时忽略缓存。
-    /// 两个都失败时返回 GitCode（默认源）。
+    /// 两个都失败时退回主源（Xhmcl）：GitCode 镜像已停更，用它兜底只会拿到过期的
+    /// version.json —— 反而让人以为「没有更新」。
     /// </summary>
     public async Task<SourcePreset> PickFastestAsync(bool force = false, CancellationToken ct = default)
     {
@@ -64,12 +65,20 @@ public sealed class SourceSelector : ISourceSelector
         LastLatency = latencies;
 
         var usable = results.Where(r => r.Ok).OrderBy(r => r.Ms).ToList();
-        var chosen = usable.Count > 0 ? usable[0].Preset : SourcePreset.GitCode;
+        // 全部探测失败时退回主源（SourcePreset.All 的第一项 = Xhmcl），
+        // 不要退回已停更的 GitCode 镜像。
+        var fallback = SourcePreset.All.Length > 0 ? SourcePreset.All[0] : SourcePreset.Xhmcl;
+        var chosen = usable.Count > 0 ? usable[0].Preset : fallback;
+
+        if (usable.Count == 0)
+            Console.WriteLine($"[selector] 所有源探测失败，退回主源 {chosen.Name}（稍后由实际请求再判定）");
 
         lock (_lock)
         {
             _cached = chosen;
-            _cachedAt = DateTime.UtcNow;
+            // 全部探测失败的结果不缓存：网络刚恢复时应该立刻重新测速，
+            // 而不是被一次失败的探测锁住 3 分钟。
+            _cachedAt = usable.Count > 0 ? DateTime.UtcNow : DateTime.MinValue;
         }
 
         Console.WriteLine("[selector] 测速：" + string.Join("  ",
