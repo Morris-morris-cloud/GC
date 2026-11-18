@@ -28,7 +28,7 @@
               <TextBlock Classes="faint" Text="{Binding PlatformText}" />
             </StackPanel>
 
-            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto">
               <TextBlock Classes="h3" Text="版本" />
               <TextBlock Grid.Column="1" Classes="muted" Text="{Binding VersionText}"
                          FontWeight="SemiBold" />
@@ -38,6 +38,10 @@
                       HorizontalAlignment="Left" Padding="0"
                       Command="{Binding OpenRepositoryCommand}"
                       Content="{Binding RepositoryText}" />
+
+              <TextBlock Grid.Row="2" Classes="h3" Text="Git 服务" Margin="0,8,0,0" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Classes="muted" Text="itxiaohui"
+                         FontWeight="SemiBold" Margin="0,8,0,0" />
             </Grid>
           </StackPanel>
         </Grid>
@@ -73,6 +77,22 @@
                 <StackPanel VerticalAlignment="Center" Spacing="1">
                   <TextBlock Text="地理洪老师" FontSize="12.5" FontWeight="SemiBold" />
                   <TextBlock Classes="faint" Text="地理学科内容指导" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource SurfaceAlt}"
+                    BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                    CornerRadius="12" Padding="12,10" MinWidth="190">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Width="34" Height="34" CornerRadius="17"
+                        Background="{DynamicResource AccentSoft}">
+                  <TextBlock Text="◉" FontSize="15" Foreground="{DynamicResource Accent}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Text="itxiaohui" FontSize="12.5" FontWeight="SemiBold" />
+                  <TextBlock Classes="faint" Text="Git 服务与部署支持" />
                 </StackPanel>
               </StackPanel>
             </Border>

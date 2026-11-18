@@ -61,6 +61,9 @@ public static class ContributorsService
         ["2509_92447106"] = "Morris",
         ["chenmoyuan1214@qq.com"] = "Morris",
         ["morris@xhmcl.com"] = "Morris",
+        // 早期提交用的是 xhgit 这个账号，展示名统一成 itxiaohui
+        ["xhgit"] = "itxiaohui",
+        ["itxiaohui"] = "itxiaohui",
     };
 
     /// <summary>自动化提交（CI / 助手账号），不计入开发者。</summary>

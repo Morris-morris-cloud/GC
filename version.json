@@ -5,42 +5,42 @@
   "branch": "main",
   "modelDir": "model",
   "launcher": {
-    "version": "1.0.11",
+    "version": "1.1.0",
     "revision": "",
     "packages": {
       "win-x64": {
-        "path": "dist/win-amd64/GCL-1.0.11-win-amd64.zip",
+        "path": "dist/win-amd64/GCL-1.1.0-win-amd64.zip",
         "dir": "dist/win-amd64",
-        "name": "GCL-1.0.11-win-amd64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.11/GCL-1.0.11-win-amd64.zip",
-        "sha256": "55f1d5eb0dfdfc243656e6705c3d276dd83611561f913fe5ca9e6e5d2f2dd658",
-        "size": 74973271
+        "name": "GCL-1.1.0-win-amd64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.1.0/GCL-1.1.0-win-amd64.zip",
+        "sha256": "adfdca03bd84ad1a831da4925795dd4ee5b9f79f654a7a8208abcb6f3dbc4f3b",
+        "size": 74984771
       },
       "win-arm64": {
-        "path": "dist/win-arm64/GCL-1.0.11-win-arm64.zip",
+        "path": "dist/win-arm64/GCL-1.1.0-win-arm64.zip",
         "dir": "dist/win-arm64",
-        "name": "GCL-1.0.11-win-arm64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.11/GCL-1.0.11-win-arm64.zip",
-        "sha256": "9ce48381fcca18e7d6789364e1c43f7e616ceae529c0c1167b099ed762f5808f",
-        "size": 72515856
+        "name": "GCL-1.1.0-win-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.1.0/GCL-1.1.0-win-arm64.zip",
+        "sha256": "2ef3f657a4ff61d9cc62100daed8d399ad0635f120c5f38589a4efd3a8e76d9a",
+        "size": 72527477
       },
       "osx-arm64": {
-        "path": "dist/mac-arm64/GCL-1.0.11-mac-arm64.zip",
+        "path": "dist/mac-arm64/GCL-1.1.0-mac-arm64.zip",
         "dir": "dist/mac-arm64",
-        "name": "GCL-1.0.11-mac-arm64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.11/GCL-1.0.11-mac-arm64.zip"
+        "name": "GCL-1.1.0-mac-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.1.0/GCL-1.1.0-mac-arm64.zip"
       },
       "osx-x64": {
-        "path": "dist/mac-x64/GCL-1.0.11-mac-x64.zip",
+        "path": "dist/mac-x64/GCL-1.1.0-mac-x64.zip",
         "dir": "dist/mac-x64",
-        "name": "GCL-1.0.11-mac-x64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.11/GCL-1.0.11-mac-x64.zip"
+        "name": "GCL-1.1.0-mac-x64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.1.0/GCL-1.1.0-mac-x64.zip"
       },
       "linux-arm64": {
-        "path": "dist/linux-arm64/GCL-1.0.11-linux-arm64.zip",
+        "path": "dist/linux-arm64/GCL-1.1.0-linux-arm64.zip",
         "dir": "dist/linux-arm64",
-        "name": "GCL-1.0.11-linux-arm64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.11/GCL-1.0.11-linux-arm64.zip"
+        "name": "GCL-1.1.0-linux-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.1.0/GCL-1.1.0-linux-arm64.zip"
       }
     }
   },
@@ -94,8 +94,8 @@
   "signature": {
     "alg": "ECDSA-P256-SHA256",
     "keyId": "gc-2026-12",
-    "value": "6i/y23uDD4qa3docjAeeUIHHEV+hSrEGEV6vxQ54a3tyUzxc5lbxBth15gnmxgac7kL3ULULb3G4dI59R6MHxg==",
-    "contentSha256": "86290d84dce5ae9619f5f25e7151480d916aab6177449955366f87b74fbce71c",
-    "signedAt": "2026-11-18T13:06:34Z"
+    "value": "A/A7GQ2muXgqhtG+HVKkAvs0cAX90TXDgXOtxWCr8VTQW10FPUUroUSdmp4x5FUT7KNnrs1wIoz4/YSJspv9oQ==",
+    "contentSha256": "84488b35a9f45f44c3b6c21c400f6c0d0a26b5f0f045a696afd889cf5af6f2f1",
+    "signedAt": "2026-11-18T14:46:36Z"
   }
 }
