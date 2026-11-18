@@ -20,12 +20,21 @@ public static class SignatureKeyring
 
     private static readonly List<KeyEntry> KeysInternal = new()
     {
-        // 生产密钥（2026-11 生成）。指纹 b41b1dd6259ea9ed
+        // 生产密钥（2026-12 换发）。指纹 ee6083be47a87907
+        // 上一代 gc-2026-11 的私钥没有留存，无法再签出可通过校验的清单，
+        // 因此新增这一把；旧公钥保留一个版本周期，方便过渡期排查。
+        new KeyEntry(
+            "gc-2026-12",
+            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4R+R2Pvinsu/xdaUu5mATPyYoEpL6" +
+            "cyugSVKAVMz6yY15SjkgEvdosfWuQJBbrPOOgGulE6Jht6v7FZx1dQguQ==",
+            "GC 主发布密钥"),
+
+        // 已停用（私钥遗失）：保留仅为兼容历史诊断输出，不能用于验签新清单。
         new KeyEntry(
             "gc-2026-11",
             "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEny5YKVBZUzOyRcSiuutlGmBb4+xm" +
             "PrNDGshilBlpmFyWu5Atq+FGP2tn+8Or8V7OH+/7lhCmXu8jZuC5/5CWSw==",
-            "GC 主发布密钥")
+            "已停用：私钥遗失")
     };
 
     static SignatureKeyring() => LoadFromEnvironment();
