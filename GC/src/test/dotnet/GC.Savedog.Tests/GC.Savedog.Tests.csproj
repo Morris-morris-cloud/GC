@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    应用器测试：只引用 GC-SAVEDOG。
+
+    不并入 GC.Tests 的原因见 ApplierTests.cs 顶部注释 —— 守护进程把 GC/src/Security
+    以源码链接编进了自己，与启动器程序集存在同名类型，同一工程内同时引用会撞类型。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <RootNamespace>GC.Savedog.Tests</RootNamespace>
+    <AssemblyName>GC.Savedog.Tests</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../../../GC-SAVEDOG/GC-SAVEDOG.csproj" />
+  </ItemGroup>
+
+</Project>

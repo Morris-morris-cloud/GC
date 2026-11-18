@@ -71,7 +71,9 @@ bs_build() {
   fi
 
   progress_step "版本戳"; progress_tick 100
-  stamp_versions
+  # 末次签名：这里只生成清单不签名，等 pack_launcher 打完 zip、刷新完包信息后统一签一次。
+  # 避免 ECDSA 随机签名 + 时间戳导致清单在中间反复变化。
+  stamp_versions --no-sign
 
   # 每个 publish 用后台任务包裹，边跑边按「已用时/预估用时」推进当前步骤进度
   _run_publish() {

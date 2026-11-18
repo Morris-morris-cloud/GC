@@ -51,7 +51,9 @@ internal static class Program
         RenderPages(services);
 
         Console.WriteLine("截图输出: " + Path.GetFullPath(_outDir));
-        return 0;
+
+        // 日志模块的用例放在渲染之后：它会切换 GcLog 的输出目录
+        return LogTests.Run() == 0 ? 0 : 1;
     }
 
     /// <summary>
