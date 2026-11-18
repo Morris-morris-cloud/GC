@@ -14,11 +14,30 @@ class _NavItem {
 }
 
 const List<_NavItem> _navItems = <_NavItem>[
-  _NavItem(Icons.grid_view_rounded, 'nav.home'),
+  _NavItem(Icons.dashboard_rounded, 'nav.home'),
   _NavItem(Icons.download_rounded, 'nav.download'),
   _NavItem(Icons.tune_rounded, 'nav.settings'),
   _NavItem(Icons.info_outline_rounded, 'nav.about'),
 ];
+
+/// 桌面端滚动行为：去掉移动端的拉伸回弹和边缘光晕，滚轮更跟手。
+class GcScrollBehavior extends MaterialScrollBehavior {
+  const GcScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
 
 /// 应用外壳：左侧导航 + 右侧内容 + 底部更新状态条。
 class ShellPage extends StatefulWidget {
@@ -52,6 +71,7 @@ class _ShellPageState extends State<ShellPage> {
           body: Row(
             children: <Widget>[
               _Sidebar(controller: controller),
+              Container(width: 1, color: GcColors.line),
               Expanded(
                 child: Column(
                   children: <Widget>[
@@ -75,9 +95,9 @@ class _ShellPageState extends State<ShellPage> {
       }
       return const Center(
         child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2.4),
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       );
     }
@@ -124,52 +144,25 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = controller.settings;
     return Container(
-      width: 236,
+      width: GcSize.sidebar,
       color: GcColors.sideBg,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+      padding: const EdgeInsets.fromLTRB(
+          GcSpace.xl, GcSpace.xxl, GcSpace.lg, GcSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: GcColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '◎',
-                  style: TextStyle(fontSize: 14, color: GcColors.accent),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Morris GC',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: GcColors.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          GcHint(T('app.tagline')),
-          const SizedBox(height: 26),
+          _brand(),
+          const SizedBox(height: GcSpace.xxxl),
           const Padding(
-            padding: EdgeInsets.only(left: 14, bottom: 6),
+            padding: EdgeInsets.only(left: 10, bottom: GcSpace.sm),
             child: Text(
               'MENU',
               style: TextStyle(
-                fontSize: 9.5,
-                letterSpacing: 1.2,
+                fontSize: 11,
+                height: 1.2,
+                letterSpacing: 1.4,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF4C5F80),
+                color: Color(0xFF5C6A80),
               ),
             ),
           ),
@@ -181,23 +174,89 @@ class _Sidebar extends StatelessWidget {
             ),
           const Spacer(),
           Container(height: 1, color: GcColors.line),
-          const SizedBox(height: 10),
+          const SizedBox(height: GcSpace.md),
           Padding(
-            padding: const EdgeInsets.only(left: 14),
-            child: Text(
-              'v${settings?.version ?? '—'}',
-              style: TextStyle(fontSize: 10.5, color: GcColors.faint),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 14, top: 2),
-            child: Text(
-              settings?.platform ?? '—',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF4F6080)),
+            padding: const EdgeInsets.only(left: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'v${settings?.version ?? '—'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: GcColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  settings?.platform ?? '—',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: GcColors.ghost,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// 品牌区：一个渐变圆角标 + 名称 + 一句定位。
+  Widget _brand() {
+    return Row(
+      children: <Widget>[
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: GcColors.accentSoft,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: Color.alphaBlend(
+                  GcColors.accent.withOpacity(0.35), GcColors.sideBg),
+            ),
+          ),
+          child: Text(
+            '◎',
+            style: TextStyle(fontSize: 16, height: 1.1, color: GcColors.accent),
+          ),
+        ),
+        const SizedBox(width: GcSpace.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                'Morris GC',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.3,
+                  fontWeight: FontWeight.w600,
+                  color: GcColors.ink,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                'SCIENCE · CLASSROOM',
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.3,
+                  letterSpacing: 0.9,
+                  fontWeight: FontWeight.w600,
+                  color: GcColors.ghost,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -216,29 +275,34 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: GcSpace.xs),
       child: Material(
-        color: active ? GcColors.surfaceAlt : Colors.transparent,
-        borderRadius: BorderRadius.circular(9),
+        color: active ? GcColors.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(GcRadius.control),
         child: InkWell(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(GcRadius.control),
           onTap: onTap,
+          hoverColor: GcColors.surfaceHover,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+              horizontal: GcSpace.md,
+              vertical: 11,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(
                   item.icon,
-                  size: 16,
+                  size: 17,
                   color: active ? GcColors.accent : GcColors.faint,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: GcSpace.md),
                 Text(
                   T(item.labelKey),
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13.5,
+                    height: 1.2,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                    color: active ? GcColors.ink : GcColors.muted,
+                    color: active ? GcColors.accent : GcColors.muted,
                   ),
                 ),
               ],
@@ -262,20 +326,28 @@ class _UpdateBar extends StatelessWidget {
         color: GcColors.surface,
         border: Border(top: BorderSide(color: GcColors.line)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+      padding: const EdgeInsets.symmetric(
+        horizontal: GcSpace.xxl,
+        vertical: GcSpace.md,
+      ),
       child: Row(
         children: <Widget>[
-          Text('⟳',
-              style: TextStyle(fontSize: 16, color: GcColors.accent)),
-          const SizedBox(width: 12),
+          Icon(
+            Icons.sync_rounded,
+            size: 18,
+            color: GcColors.accent,
+          ),
+          const SizedBox(width: GcSpace.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
                   controller.updateStatus,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13,
+                    height: 1.35,
                     fontWeight: FontWeight.w600,
                     color: GcColors.ink,
                   ),
@@ -284,23 +356,41 @@ class _UpdateBar extends StatelessWidget {
                 if (controller.updateDetail.isNotEmpty)
                   Text(
                     controller.updateDetail,
-                    style: TextStyle(fontSize: 11, color: GcColors.faint),
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: GcColors.faint,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 if (controller.launcherNotice.isNotEmpty)
                   Text(
                     controller.launcherNotice,
-                    style: TextStyle(fontSize: 11, color: GcColors.warn),
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: GcColors.warn,
+                    ),
                   ),
               ],
             ),
           ),
-          if (controller.updateBusy)
-            const SizedBox(
-              width: 130,
-              child: LinearProgressIndicator(minHeight: 4),
+          if (controller.updateBusy) ...<Widget>[
+            const SizedBox(width: GcSpace.lg),
+            SizedBox(
+              width: 140,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: controller.updateProgress > 0
+                      ? controller.updateProgress.clamp(0, 1).toDouble()
+                      : null,
+                  minHeight: 4,
+                ),
+              ),
             ),
-          const SizedBox(width: 14),
+          ],
+          const SizedBox(width: GcSpace.lg),
           TextButton(
             onPressed: controller.updateBusy
                 ? null
@@ -324,24 +414,32 @@ class _BackendDown extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: GcCard(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(GcSpace.xxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                T('common.error'),
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: GcColors.ink,
-                ),
+              Row(
+                children: <Widget>[
+                  Icon(Icons.error_outline_rounded,
+                      size: 20, color: GcColors.danger),
+                  const SizedBox(width: GcSpace.sm),
+                  Text(
+                    T('common.error'),
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: GcColors.ink,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: GcSpace.md),
               GcHint(controller.loadError ?? ''),
-              const SizedBox(height: 6),
-              GcHint('后端地址：${controller.api.baseUrl}'),
-              const SizedBox(height: 16),
+              const SizedBox(height: GcSpace.xs),
+              GcHint('${T('set.backend')}: ${controller.api.baseUrl}'),
+              const SizedBox(height: GcSpace.lg),
               FilledButton(
                 onPressed: controller.bootstrap,
                 child: Text(T('common.retry')),

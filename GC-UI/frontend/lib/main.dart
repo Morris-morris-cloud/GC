@@ -42,6 +42,8 @@ class _GcUiAppState extends State<GcUiApp> {
                 return MaterialApp(
                   title: 'Morris GC',
                   debugShowCheckedModeBanner: false,
+                  // 桌面端不要移动端那套拉伸回弹和边缘光晕。
+                  scrollBehavior: const GcScrollBehavior(),
                   theme: buildGcTheme(Brightness.light),
                   darkTheme: buildGcTheme(Brightness.dark),
                   themeMode: mode,

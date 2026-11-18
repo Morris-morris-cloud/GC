@@ -137,6 +137,25 @@ GC-UI.exe   flutter_windows.dll   data/{icudtl.dat, app.so, flutter_assets/}
 - `Runner.rc` 在 windres 下有两处不兼容：图标用反斜杠相对路径、`VERSION_AS_STRING`
   依赖命令行传 `-D` 的转义字符串。脚本生成一份路径与宏都已规整的 rc 副本再编译。
 
+### 交叉编译必须自己嵌 DPI 清单
+
+`windows/runner/CMakeLists.txt` 把 `runner.exe.manifest` 当**源文件**列进 target，
+Visual Studio 生成器会把它交给链接器（`/MANIFESTINPUT`）自动嵌入 exe；
+但 `buildsh/cross/CMakeLists.txt` 只用 windres 编 `Runner.rc`，CMake 不会做这一步。
+结果就是交叉编出来的 `GC-UI.exe` **完全没有清单**：Windows 认为它「DPI 不感知」，
+在 125% / 150% 缩放的屏幕上把整块窗口当位图拉伸 —— 界面整体发虚，中文小字最明显。
+
+现在两处都已加固，改这块代码时不要拆掉任何一处：
+
+| 位置 | 做法 |
+|---|---|
+| `buildsh/cross/CMakeLists.txt` | 往 `Runner.cross.rc` 追加 `1 24 "<abs>/runner.exe.manifest"`（id 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID，type 24 = RT_MANIFEST） |
+| `windows/runner/main.cpp` | 建窗之前调 `SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2)`，失败依次退到 `SetProcessDpiAwareness` / `SetProcessDPIAware` |
+
+`main.cpp` 那层是兜底：即使清单因为工具链原因没嵌进去，程序自己也会声明 DPI 感知。
+验证办法（Windows）：`GC-UI.exe` 属性 →「兼容性」里不该出现「替代高 DPI 缩放行为」，
+或在 125% 缩放下截图，文字边缘应是锐利的 1.25 倍像素，而不是模糊的插值。
+
 `.gitea/workflows` 里的 `windows` 任务仍然跑在 `windows-latest` 上；若手头只有 macOS/Linux
 构建机，可以把该任务的 `runs-on` 换成对应标签，直接复用这套交叉编译脚本，
 不再需要 VS Build Tools。
