@@ -2034,6 +2034,8 @@ class _AboutPageViewState extends State<AboutPageView> {
           _versionCard(),
           const SizedBox(height: GcSpace.lg),
           _contributorsCard(),
+          const SizedBox(height: GcSpace.lg),
+          _thanksCard(),
         ],
       ],
     );
@@ -2135,6 +2137,10 @@ class _AboutPageViewState extends State<AboutPageView> {
         GcFieldRow(
           label: T('about.frontend'),
           value: about?.frontend ?? 'Flutter',
+        ),
+        GcFieldRow(
+          label: T('about.gitService'),
+          value: 'itxiaohui',
         ),
         GcFieldRow(
           label: T('set.license'),
@@ -2246,6 +2252,80 @@ class _AboutPageViewState extends State<AboutPageView> {
                   ),
               ],
             ),
+        ],
+      ),
+    );
+  }
+
+  /// 特别感谢：与「开发者」分开列 —— 提供 Git 服务不等于往仓库提交代码，
+  /// 混进贡献者列表会让提交数失去意义。
+  Widget _thanksCard() {
+    return GcCard(
+      padding: const EdgeInsets.all(GcSpace.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          GcSectionTitle(
+            T('about.thanks'),
+            subtitle: T('about.thanksHint'),
+          ),
+          const SizedBox(height: GcSpace.lg),
+          Wrap(
+            spacing: GcSpace.xl,
+            runSpacing: GcSpace.md,
+            children: <Widget>[
+              _creditTile('地理洪老师', 'about.thanksGeo'),
+              _creditTile('itxiaohui', 'about.thanksGit'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _creditTile(String name, String roleKey) {
+    return SizedBox(
+      width: 220,
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: GcColors.surfaceAlt,
+            child: Text(
+              '◎',
+              style: TextStyle(fontSize: 14, color: GcColors.accent),
+            ),
+          ),
+          const SizedBox(width: GcSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: GcColors.ink,
+                  ),
+                ),
+                Text(
+                  T(roleKey),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: GcColors.faint,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -138,6 +138,11 @@ class I18n {
       'about.architectureValue': 'Flutter 前端 + .NET 后端（本地 HTTP）',
       'about.sourceLanguage': '源码语言',
       'about.frontend': '前端',
+      'about.gitService': 'Git 服务',
+      'about.thanks': '感谢',
+      'about.thanksHint': '特别感谢以下朋友的支持',
+      'about.thanksGit': 'Git 服务与部署支持',
+      'about.thanksGeo': '地理学科内容指导',
     },
     'en': <String, String>{
       'app.name': 'Morris GC',
@@ -268,6 +273,11 @@ class I18n {
       'about.architectureValue': 'Flutter frontend + .NET backend (local HTTP)',
       'about.sourceLanguage': 'Source language',
       'about.frontend': 'Frontend',
+      'about.gitService': 'Git hosting',
+      'about.thanks': 'Thanks',
+      'about.thanksHint': 'Special thanks to',
+      'about.thanksGit': 'Git hosting and deployment',
+      'about.thanksGeo': 'Geography content guidance',
     },
   };
 
