@@ -32,7 +32,7 @@ function Invoke-ManifestSign {
 }
 
 function Invoke-VersionStamp {
-    param([switch]$LauncherOnly)
+    param([switch]$LauncherOnly, [switch]$NoSign)
     if ($LauncherOnly) {
         Write-Host '==> 刷新启动器包信息（sha256 / 体积 / dist 路径）'
         Invoke-LoggedDotNet -Name 'stamp' -Arguments @(
@@ -47,7 +47,14 @@ function Invoke-VersionStamp {
             $script:BuildRoot, $script:BuildVersion
         )
     }
-    Invoke-ManifestSign
+    # 完整 build 末尾 Pack-Launcher 会统一签一次（末次签名）；中间这次是浪费的。
+    # 单独的 stamp / models 工具没有后续打包，仍走默认签名。
+    if ($NoSign) {
+        Write-Host '    （跳过签名，打包结束后统一签一次）'
+    }
+    else {
+        Invoke-ManifestSign
+    }
 }
 
 function Build-Models {
@@ -385,7 +392,8 @@ function Invoke-FullBuild {
         New-Item -ItemType Directory -Force -Path (Join-Path $script:BuildRoot 'dist') | Out-Null
         Complete-BuildStep
 
-        Start-BuildStep '版本戳'; Invoke-VersionStamp; Complete-BuildStep
+        # 末次签名：这里只生成清单不签名，Pack-Launcher 打完包后统一签一次
+        Start-BuildStep '版本戳'; Invoke-VersionStamp -NoSign; Complete-BuildStep
         # 与 buildsh 一致：启动器与守护进程都发布为压缩单文件，非本体文件在打包时收进 .GC/bin
         Start-BuildStep '编译 Mac'; Publish-Rid 'osx-arm64' 'dist/mac-arm64' $true; Complete-BuildStep
         Start-BuildStep '编译 Win-x64'; Publish-Rid 'win-x64' 'dist/win-amd64' $true; Complete-BuildStep

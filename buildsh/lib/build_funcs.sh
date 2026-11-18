@@ -6,10 +6,17 @@
 if ! type step >/dev/null 2>&1; then step() { echo "==> $1"; }; fi
 if ! type progress >/dev/null 2>&1; then progress() { :; }; fi
 
+# $1=--no-sign 时只生成清单、不签名。
+# 完整 build 会在 pack_launcher 末尾统一签一次（末次签名），中间这次签名是浪费的：
+# ECDSA 用随机 nonce + signedAt 时间戳，每次签名字节都不同，白白多一次全量签名，
+# 也让中间产物反复抖动。单独的 stamp / models 工具没有后续打包，仍走默认签名。
 stamp_versions() {
   echo "==> 自动计算模型版本并生成 version.json"
   dotnet run --project "$STAMP_PROJ" -c Release -- "$ROOT_DIR" "$VERSION"
-  sign_manifest
+  case "${1:-}" in
+    --no-sign) echo "    （跳过签名，打包结束后统一签一次）" ;;
+    *)         sign_manifest ;;
+  esac
 }
 
 # 打完 zip 之后刷新 launcher.packages（写入 path / dir / name / sha256 / size）。
@@ -168,7 +175,7 @@ pack_models() {
   ZIP="$ROOT_DIR/dist/models-$VERSION.zip"
   rm -f "$ZIP"
   echo "==> 打包模型数据 -> dist/models-$VERSION.zip"
-  ( cd "$ROOT_DIR" && zip -qr "$ZIP" model \
+  ( cd "$ROOT_DIR" && zip -qrX "$ZIP" model \
       -x "*.DS_Store" "*/bin/*" "*/obj/*" "*.user" )
   du -sh "$ZIP"
 }
@@ -188,24 +195,6 @@ pack_models() {
 # macOS:   .app 必须打成 zip 才能作为单文件分发；文件名用 .app.zip，
 #          这样 macOS 双击会用归档工具解压出可运行的 .app。
 #          若直接命名 .app，系统会把 zip 当成应用包解析 => 报「已损坏/打不开」。
-# 发布本地 UI 后端（GC.UI.Server）。启动器会拉起它并等待 /api/health，
-# 模型窗口也由它承载，所以必须和启动器放在同一目录。
-publish_backend() {
-  RID="$1"; OUT="$2"
-  echo "==> 编译 UI 后端 (${RID}) -> ${OUT}"
-  dotnet publish "$ROOT_DIR/GC-UI/backend/GC.UI.Server/GC.UI.Server.csproj" \
-    -c Release \
-    -r "$RID" \
-    --self-contained true \
-    -p:Version="$VERSION" \
-    -p:DebugType=none \
-    -p:PublishSingleFile=true \
-    -p:IncludeNativeLibrariesForSelfExtract=true \
-    -p:EnableCompressionInSingleFile=true \
-    -p:PublishTrimmed=false \
-    -o "$ROOT_DIR/$OUT" || return 1
-}
-
 # 当前主机原生构建 Flutter 前端（Windows 主机编 Windows，macOS 主机编 macOS，
 # Linux 主机编 Linux）。跨平台的 Windows 版由 build_flutter_ui_cross 负责。
 #
@@ -339,7 +328,7 @@ pack_launcher() {
 
     ZIP="$ROOT_DIR/dist/$LABEL/$PKGNAME.zip"
     rm -f "$ZIP"
-    ( cd "$TMP" && zip -qr "$ZIP" "$PKGNAME" )
+    ( cd "$TMP" && zip -qrX "$ZIP" "$PKGNAME" )
     rm -rf "$TMP"
     echo "    -> dist/$LABEL/$PKGNAME.zip"
   done
@@ -367,7 +356,7 @@ pack_launcher() {
     fi
     ZIP="$ROOT_DIR/dist/linux-arm64/$PKGNAME.zip"
     rm -f "$ZIP"
-    ( cd "$TMP" && zip -qry "$ZIP" "$PKGNAME" )
+    ( cd "$TMP" && zip -qryX "$ZIP" "$PKGNAME" )
     rm -rf "$TMP"
     echo "    -> dist/linux-arm64/$PKGNAME.zip"
   fi
@@ -412,10 +401,10 @@ pack_launcher() {
       if command -v ditto >/dev/null 2>&1; then
         ditto -c -k --sequesterRsrc --keepParent "$art" "$ZIP"
       else
-        ( cd "$(dirname "$art")" && zip -qry "$ZIP" "$base" -x "*.DS_Store" )
+        ( cd "$(dirname "$art")" && zip -qryX "$ZIP" "$base" -x "*.DS_Store" )
       fi
     else
-      ( cd "$(dirname "$art")" && zip -q "$ZIP" "$base" )
+      ( cd "$(dirname "$art")" && zip -qX "$ZIP" "$base" )
     fi
     echo "    -> dist/${label}/${name}.zip"
   done
