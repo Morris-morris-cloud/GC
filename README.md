@@ -255,7 +255,7 @@ Repository/
 | `dist/mac-arm64/GCL-<版本>-mac-arm64.zip` | macOS Apple Silicon（单顶层 `GCL-….app`） |
 | `dist/win-amd64/GCL-<版本>-win-amd64.zip` | Windows x64（单顶层 `GCL-…/`，含 Flutter 前端与 `safedog/`） |
 | `dist/win-arm64/GCL-<版本>-win-arm64.zip` | Windows on ARM 同上 |
-| `dist/linux-arm64/GCL-<版本>-linux-arm64.zip` | Linux ARM64 同上（启动器无扩展名，需在 aarch64 主机构建） |
+| `dist/linux-arm64/GCL-<版本>-linux-arm64.zip` | Linux ARM64 同上（启动器无扩展名；默认不构建，需 aarch64 主机 + `GC_BUILD_LINUX=1`） |
 
 平台目录就是「该平台的编译产物目录」：打包完成后只留最终 zip（原始 `.app` / `.exe`
 会被挪到 `build/trash/`，下次构建时移出，不做递归删除）。
