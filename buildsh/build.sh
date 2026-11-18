@@ -39,12 +39,31 @@ bs_build() {
 
   progress_step "编译 Mac"
   _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" false || return 1
+  publish_backend "osx-arm64" "dist/mac-arm64" || return 1
+  # Flutter 的 macOS 产物只能在 macOS 上编；交叉构建时跳过，包内回退内置界面
+  if [ "$(uname -s)" = "Darwin" ]; then
+    build_flutter_ui macos "dist/mac-arm64" || return 1
+  fi
 
   progress_step "编译 Win-x64"
   _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" true || return 1
+  publish_backend "win-x64" "dist/win-amd64" || return 1
 
   progress_step "编译 Win-arm64"
   _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" true || return 1
+  publish_backend "win-arm64" "dist/win-arm64" || return 1
+
+  # Windows 版 Flutter 只能在 Windows 上编；x64 产物同时放进两个 Windows 包
+  # （ARM64 上由系统模拟 x64 进程运行前端）。
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      build_flutter_ui windows "dist/win-flutter" || return 1
+      for label in win-amd64 win-arm64; do
+        cp -R "$ROOT_DIR/dist/win-flutter/." "$ROOT_DIR/dist/$label/"
+      done
+      rm -rf "$ROOT_DIR/dist/win-flutter"
+      ;;
+  esac
 
   progress_step "运行骨架"; progress_tick 100
   package_mac_app

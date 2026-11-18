@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-11-17T22:53:52Z",
+  "generated": "2026-11-18T04:35:15Z",
   "repository": "https://gitcode.com/Morris_1/GC",
   "branch": "main",
   "modelDir": "model",
@@ -13,24 +13,24 @@
         "dir": "dist/win-amd64",
         "name": "GC-1.0.7-win-amd64.zip",
         "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-win-amd64.zip",
-        "sha256": "f90ff51ac6b041ae238cbeb4672622b0d029142a9d8b0705f08e654336512308",
-        "size": 46363183
+        "sha256": "e9e0794206c6a0dfb8449ac30390ed788da72a5661d362af9f9a6e489cad0aad",
+        "size": 102382195
       },
       "win-arm64": {
         "path": "dist/win-arm64/GC-1.0.7-win-arm64.zip",
         "dir": "dist/win-arm64",
         "name": "GC-1.0.7-win-arm64.zip",
         "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-win-arm64.zip",
-        "sha256": "0b2bab2c3ac7e6223d8dd0b0faf9a0994319fa5ad13826addf7b402619b812e0",
-        "size": 44390354
+        "sha256": "11dd6aea480b7eb9d5d0e40c6e8ac7733b83756e37ec924cb98f5e46a531def1",
+        "size": 98435968
       },
       "osx-arm64": {
         "path": "dist/mac-arm64/GC-1.0.7-mac-arm64.zip",
         "dir": "dist/mac-arm64",
         "name": "GC-1.0.7-mac-arm64.zip",
         "url": "https://gitcode.com/Morris_1/GC/releases/download/v1.0.7/GC-1.0.7-mac-arm64.zip",
-        "sha256": "e5fd355bace68dc0794eb3e049cbef63c952a60a765ab3806adaf1199e1b09ab",
-        "size": 9178314
+        "sha256": "b085ffabf764ab57cc69a0192b47069479170f9494fb9f447230e74028794982",
+        "size": 60065859
       },
       "osx-x64": {
         "path": "dist/mac-x64/GC-1.0.7-mac-x64.zip",
@@ -49,45 +49,45 @@
   "models": [
     {
       "id": "contour-map",
-      "version": "1.0",
-      "build": "43dcb6dc63",
-      "manifestSha256": "f7896a85d5f9e9f10e021c07931dee51f0ef86151a6a89e2ed39e37cb7f996a6",
+      "version": "1.1",
+      "build": "773ab2161d",
+      "manifestSha256": "c71ea15b519feb47a4fd33288fb92f2dcd40202fb2ce0a771fa408f9b4fbaf41",
       "filesSha256": "a6bdf9b4273aabee50c3c94ceab4d0abee15f0df1af90c58bdbb796e0d2d5699",
       "files": 5,
       "dir": "model/contour-map"
     },
     {
       "id": "earth-geography",
-      "version": "1.8",
-      "build": "16eaf4110f",
-      "manifestSha256": "0b8dd41e8535284576873956ed1db8755097649fe801d887b65ca5ac369f267c",
+      "version": "1.9",
+      "build": "cc68b8863b",
+      "manifestSha256": "ae64033c7b46c51eb9c5f3dfb70a5491068c6cd608dec953eb34311cb8045d60",
       "filesSha256": "c018ba481831e23d3183a38ac47251f19754c7464baa5d85b47cea7a49fcfa95",
       "files": 11,
       "dir": "model/earth-geography"
     },
     {
       "id": "earth-revolution",
-      "version": "1.6",
-      "build": "bd57e6ed67",
-      "manifestSha256": "2d05234ea0d4de5ac55b7a076085ccfbb94ed107cce2b2d40e56d45bc3b37f3e",
+      "version": "1.7",
+      "build": "53b7a0fbc3",
+      "manifestSha256": "88e6f2f1bd2f7654d169745b96fa85aaea37671b6cdf8ed4fc05f7f259ae90bc",
       "filesSha256": "4cd45b0324a77574a0da3a939c2a6faebc785c5a24cb50136d62a78a6ea2e9b1",
       "files": 7,
       "dir": "model/earth-revolution"
     },
     {
       "id": "earth-rotation",
-      "version": "1.6",
-      "build": "a79f660ec2",
-      "manifestSha256": "cb4ec5f310e7f05235042180dfdb1d8904c37b2d67b06a174f55589eed1652b9",
+      "version": "1.7",
+      "build": "ecd52665f9",
+      "manifestSha256": "9ac0050f65eedc833dd8daa8eb3b18400540269fd1a4b764ef771a357fb1cf0a",
       "filesSha256": "594b005a6a9f36cd0b5d4e4a7a0b1ab42d53c8032832545b71c3915493d56c8e",
       "files": 7,
       "dir": "model/earth-rotation"
     },
     {
       "id": "scale-calculator",
-      "version": "1.5",
-      "build": "ec6119e3f4",
-      "manifestSha256": "54cf496553d11b704abfa06588ffccfed3f881a3b919d0e2304c18e157fd1f0a",
+      "version": "1.6",
+      "build": "105653737d",
+      "manifestSha256": "05dcb4ec0a4a0cda66dbb633b8ea58e4f4f2de47b5c9557799ac317de874f2af",
       "filesSha256": "732dd26406e0f1e836970499d7ea644def332ce909d7f8aa0a403bbe7337e604",
       "files": 6,
       "dir": "model/scale-calculator"

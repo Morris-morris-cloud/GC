@@ -17,7 +17,7 @@
     "atlas"
   ],
   "dataDir": "earth-geography.model",
-  "version": "1.8",
+  "version": "1.9",
   "chrome": {
     "titleBar": "#0C1828",
     "titleBorder": "#1B2740",
@@ -25,6 +25,6 @@
     "button": "#9FB4D4",
     "frame": "#0A1524"
   },
-  "build": "16eaf4110f",
-  "updatedAt": "2026-11-17T22:53:52Z"
+  "build": "cc68b8863b",
+  "updatedAt": "2026-11-18T04:35:15Z"
 }

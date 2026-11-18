@@ -174,32 +174,85 @@ pack_models() {
 # macOS:   .app 必须打成 zip 才能作为单文件分发；文件名用 .app.zip，
 #          这样 macOS 双击会用归档工具解压出可运行的 .app。
 #          若直接命名 .app，系统会把 zip 当成应用包解析 => 报「已损坏/打不开」。
+# 发布本地 UI 后端（GC.UI.Server）。启动器会拉起它并等待 /api/health，
+# 模型窗口也由它承载，所以必须和启动器放在同一目录。
+publish_backend() {
+  RID="$1"; OUT="$2"
+  echo "==> 编译 UI 后端 (${RID}) -> ${OUT}"
+  dotnet publish "$ROOT_DIR/GC-UI/backend/GC.UI.Server/GC.UI.Server.csproj" \
+    -c Release \
+    -r "$RID" \
+    --self-contained true \
+    -p:Version="$VERSION" \
+    -p:DebugType=none \
+    -p:PublishSingleFile=false \
+    -p:PublishTrimmed=false \
+    -o "$ROOT_DIR/$OUT" || return 1
+}
+
+# 构建 Flutter 前端并把桌面产物放进平台目录。
+# Flutter 桌面只能在对应宿主平台上构建：Windows 产物必须在 Windows 上编，
+# macOS 产物必须在 macOS 上编。交叉构建时这里只警告，包内不含前端，
+# 启动器会自动回退到内置 Avalonia 界面。
+build_flutter_ui() {
+  PLAT="$1"; DEST="$2"
+  UI_SRC="$ROOT_DIR/GC-UI/frontend"
+  [ -d "$UI_SRC" ] || return 0
+
+  FLUTTER_BIN="${FLUTTER_BIN:-flutter}"
+  if ! command -v "$FLUTTER_BIN" >/dev/null 2>&1; then
+    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定），本次包内不含 Flutter 界面"
+    return 0
+  fi
+
+  echo "==> 构建 Flutter 前端 (${PLAT})"
+  ( cd "$UI_SRC" && "$FLUTTER_BIN" pub get && "$FLUTTER_BIN" build "$PLAT" --release ) || return 1
+
+  mkdir -p "$ROOT_DIR/$DEST"
+  case "$PLAT" in
+    windows)
+      # Release/ 里含 GC-UI.exe、flutter_windows.dll 和 data/
+      cp -R "$UI_SRC/build/windows/x64/runner/Release/." "$ROOT_DIR/$DEST/"
+      ;;
+    macos)
+      rm -rf "$ROOT_DIR/$DEST/GC-UI.app"
+      cp -R "$UI_SRC/build/macos/Build/Products/Release/GC-UI.app" "$ROOT_DIR/$DEST/"
+      ;;
+  esac
+  echo "    -> $DEST（Flutter ${PLAT}）"
+}
+
 pack_launcher() {
   echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>）"
 
-  # --- Windows：exe 单文件（连同 GC-SAVEDOG.exe 一起打进 zip）---
+  # --- Windows：启动器 + 守护进程 + UI 后端 + Flutter 前端，整目录打包 ---
   for pair in "win-x64:win-amd64" "win-arm64:win-arm64"; do
     RID="${pair%%:*}"; LABEL="${pair##*:}"
     SRC="$ROOT_DIR/dist/$LABEL"
     [ -d "$SRC" ] || SRC="$ROOT_DIR/dist/$RID"      # 兼容旧布局
     [ -d "$SRC" ] || continue
-    # 注意排除守护进程：GC-SAVEDOG.exe 在字典序里排在 GC.exe 前面
-    EXE=$(ls "$SRC"/*.exe 2>/dev/null | grep -v 'GC-SAVEDOG' | head -1)
+
+    # 启动器固定是 GC.exe；后端与前端是可选的随包产物，不能当成启动器。
+    EXE="$SRC/GC.exe"
+    [ -f "$EXE" ] || EXE=$(ls "$SRC"/*.exe 2>/dev/null | grep -v 'GC-SAVEDOG\|GC.UI.Server\|GC-UI' | head -1)
     [ -n "$EXE" ] || continue
 
     TMP="$ROOT_DIR/dist/.winpkg-$LABEL"
     rm -rf "$TMP"; mkdir -p "$TMP"
-    cp "$EXE" "$TMP/GC-${VERSION}-${LABEL}.exe"
+    cp -R "$SRC"/. "$TMP"/
+    rm -f "$TMP"/*.zip
+    mv "$TMP/$(basename "$EXE")" "$TMP/GC-${VERSION}-${LABEL}.exe"
     chmod +x "$TMP/GC-${VERSION}-${LABEL}.exe" 2>/dev/null || true
-    if [ -f "$SRC/GC-SAVEDOG.exe" ]; then
-      cp "$SRC/GC-SAVEDOG.exe" "$TMP/GC-SAVEDOG.exe"
-    else
+    if [ ! -f "$TMP/GC-SAVEDOG.exe" ]; then
       echo "    !! 缺少 GC-SAVEDOG.exe，该平台将退回旧脚本更新"
+    fi
+    if [ ! -f "$TMP/GC-UI.exe" ]; then
+      echo "    !! 包内没有 Flutter 前端，启动器将使用内置 Avalonia 界面"
     fi
 
     ZIP="$ROOT_DIR/dist/$LABEL/GC-${VERSION}-${LABEL}.zip"
     rm -f "$ZIP"
-    ( cd "$TMP" && zip -q "$ZIP" ./* )
+    ( cd "$TMP" && zip -qr "$ZIP" . )
     rm -rf "$TMP"
     echo "    -> dist/$LABEL/GC-${VERSION}-${LABEL}.zip"
   done
