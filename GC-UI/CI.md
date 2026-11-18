@@ -69,7 +69,8 @@ Windows 还需要 **VS Build Tools 的「使用 C++ 的桌面开发」工作负�
 ```bash
 # 按构建主机自动选目标，每条产物都带 Flutter 前端：
 #   macOS 主机 → mac-arm64（原生）+ win-amd64 / win-arm64（mingw 交叉）
-#   Linux 主机 → linux-arm64（仅 aarch64 主机）+ win-amd64 / win-arm64（mingw 交叉）
+#   Linux 主机 → win-amd64 / win-arm64（mingw 交叉）
+#                Linux 产物默认不出：需 aarch64 主机 + GC_BUILD_LINUX=1
 #   Windows 主机 → win-amd64 / win-arm64（原生）
 ./build.sh build
 
