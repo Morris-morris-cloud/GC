@@ -8,12 +8,14 @@ namespace GC.Services;
 /// 运行目录约定（可执行文件旁边，不内置任何模型）：
 /// <code>
 /// &lt;安装目录&gt;/
-///   GC(.exe | .app/...)
+///   GCL(.exe | .app/...)
 ///   .GC/
 ///     settings.json     设置与已安装版本记录
 ///     model/            模型（启动时下载）
 ///     cache/            下载缓存 / 原子替换暂存
 ///     update/           待下次启动应用的启动器更新包
+///     safedog/          更新守护进程（首次启动从安装包复制过来）
+///     logs/             日志，按天分中英两份：gc-YYYYMMDD.log / .en.log
 /// </code>
 /// 开发态同样使用仓库根 .GC/model，并自动同步仓库 model/ 的可分发部分。
 /// EMS_MODELS / EMS_DATA / EMS_HOME 可显式覆盖。
@@ -39,6 +41,12 @@ public sealed class AppPaths
 
     public string CacheRoot => Path.Combine(HomeRoot, "cache");
     public string UpdateRoot => Path.Combine(HomeRoot, "update");
+
+    /// <summary>日志目录：<c>.GC/logs</c>，里面按天放中英两份日志。</summary>
+    public string LogsRoot => Path.Combine(HomeRoot, "logs");
+
+    /// <summary>守护进程目录：<c>.GC/safedog</c>（程序本体与用户数据分开）。</summary>
+    public string SafedogRoot => Path.Combine(HomeRoot, "safedog");
 
     /// <summary>用户配置目录（与可重建的缓存分开，删 cache 不会丢设置）。</summary>
     public string ConfigRoot => Path.Combine(HomeRoot, "config");
@@ -255,6 +263,8 @@ public sealed class AppPaths
         Directory.CreateDirectory(CacheRoot);
         Directory.CreateDirectory(ModelRoot);
         Directory.CreateDirectory(UpdateRoot);
+        Directory.CreateDirectory(LogsRoot);
+        Directory.CreateDirectory(SafedogRoot);
 
         MigrateLegacySettings();
 

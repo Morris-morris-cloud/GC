@@ -31,7 +31,7 @@ internal sealed class Applier
 
     /// <summary>发布包里的启动器文件名：GC-1.0.9-win-amd64.exe。</summary>
     private static readonly Regex VersionedExePattern = new(
-        @"^GC-\d+(?:\.\d+)+-[A-Za-z0-9]+-[A-Za-z0-9]+\.exe$",
+        @"^(?:GC|GCL)-\d+(?:\.\d+)+-[A-Za-z0-9]+-[A-Za-z0-9]+\.exe$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public Applier(ApplyOptions options, Log log)
@@ -46,20 +46,24 @@ internal sealed class Applier
         var requestPath = Path.Combine(updateDir, SavedogFiles.ApplyRequest);
 
         if (!File.Exists(requestPath))
-            return Fail(updateDir, "找不到更新申请 " + SavedogFiles.ApplyRequest, 3);
+            return Fail(updateDir, "找不到更新申请 " + SavedogFiles.ApplyRequest, 3,
+                       "Update request not found: " + SavedogFiles.ApplyRequest);
 
         var request = Json.Read<SavedogRequest>(requestPath);
         if (request == null || string.IsNullOrWhiteSpace(request.Version))
-            return Fail(updateDir, "更新申请内容不完整", 3);
+            return Fail(updateDir, "更新申请内容不完整", 3, "The update request is incomplete");
 
         if (!ValidName(request.PackageName))
-            return Fail(updateDir, "更新包名不合法: " + request.PackageName, 3);
+            return Fail(updateDir, "更新包名不合法: " + request.PackageName, 3,
+                       "Invalid package name: " + request.PackageName);
 
-        _log.Info($"开始应用 v{request.Version}（{request.Rid}，{request.PackageName}）");
+        _log.Info($"开始应用 v{request.Version}（{request.Rid}，{request.PackageName}）",
+                  $"Starting apply of v{request.Version} ({request.Rid}, {request.PackageName})");
 
         // 1. 等旧进程退出（否则 Windows 上文件还被占用）
         if (_options.WaitPid > 0 && !WaitForExit(_options.WaitPid, TimeSpan.FromSeconds(60)))
-            _log.Warn($"等待进程 {_options.WaitPid} 退出超时，继续尝试");
+            _log.Warn($"等待进程 {_options.WaitPid} 退出超时，继续尝试",
+                      $"Timed out waiting for process {_options.WaitPid} to exit; continuing anyway");
 
         // 2. 安装目录定位与安全检查
         var installDir = string.IsNullOrWhiteSpace(_options.InstallDir)
@@ -67,10 +71,12 @@ internal sealed class Applier
             : Path.GetFullPath(_options.InstallDir!);
 
         if (!Directory.Exists(installDir))
-            return Fail(updateDir, "安装目录不存在: " + installDir, 4);
+            return Fail(updateDir, "安装目录不存在: " + installDir, 4,
+                       "Install directory does not exist: " + installDir);
 
         if (!_options.Force && File.Exists(Path.Combine(installDir, "GC.sln")))
-            return Fail(updateDir, "检测到源码目录，拒绝在源码树里替换程序", 4);
+            return Fail(updateDir, "检测到源码目录，拒绝在源码树里替换程序", 4,
+                       "Source tree detected; refusing to replace files inside it");
 
         // 3. 二次验签：不信任「启动器说它验过了」
         var require = request.RequireSignature && SignatureKeyring.Enforced;
@@ -80,40 +86,50 @@ internal sealed class Applier
 
         if (verification.IsRejected)
         {
-            _log.Error($"清单验签失败（{verification.Trust}）：{verification.Error}");
+            _log.Error($"清单验签失败（{verification.Trust}）：{verification.Error}",
+                       $"Manifest signature check failed ({verification.Trust}): {verification.Error}");
             return Refuse(updateDir, request, verification);
         }
         _log.Info($"清单可信度：{verification.Trust}" +
-                  (verification.KeyId != null ? $"（{verification.KeyId}）" : ""));
+                  (verification.KeyId != null ? $"（{verification.KeyId}）" : ""),
+                  $"Manifest trust: {verification.Trust}" +
+                  (verification.KeyId != null ? $" ({verification.KeyId})" : ""));
 
         // 4. 校验更新包
         var zipPath = Path.Combine(updateDir, request.PackageZip);
         if (!File.Exists(zipPath))
-            return Fail(updateDir, "更新包不存在: " + request.PackageZip, 5);
+            return Fail(updateDir, "更新包不存在: " + request.PackageZip, 5,
+                       "Package not found: " + request.PackageZip);
 
         var zipInfo = new FileInfo(zipPath);
         if (request.PackageSize > 0 && zipInfo.Length != request.PackageSize)
-            return Fail(updateDir, $"更新包体积不符（期望 {request.PackageSize}，实际 {zipInfo.Length}）", 5);
+            return Fail(updateDir, $"更新包体积不符（期望 {request.PackageSize}，实际 {zipInfo.Length}）", 5,
+                       $"Package size mismatch (expected {request.PackageSize}, got {zipInfo.Length})");
 
         var actualSha = ContentHash.Sha256File(zipPath);
         if (!string.IsNullOrWhiteSpace(request.PackageSha256) &&
             !string.Equals(actualSha, request.PackageSha256, StringComparison.OrdinalIgnoreCase))
         {
-            return Fail(updateDir, "更新包 sha256 与清单不符，已丢弃", 5);
+            return Fail(updateDir, "更新包 sha256 与清单不符，已丢弃", 5,
+                       "Package sha256 does not match the manifest; discarded");
         }
         if (string.IsNullOrWhiteSpace(request.PackageSha256))
-            _log.Warn("清单没有提供 sha256，仅依赖签名与解压校验");
+            _log.Warn("清单没有提供 sha256，仅依赖签名与解压校验",
+                       "Manifest has no sha256; relying on the signature and extraction checks only");
 
         SafeArchive.Inspection inspection;
         try
         {
             inspection = SafeArchive.Inspect(zipPath);
             _log.Info($"更新包检查通过：{inspection.Entries} 个条目，" +
-                      $"{inspection.UncompressedBytes / 1024 / 1024} MB，压缩比 {inspection.Ratio:0.0}:1");
+                      $"{inspection.UncompressedBytes / 1024 / 1024} MB，压缩比 {inspection.Ratio:0.0}:1",
+                      $"Package inspection passed: {inspection.Entries} entries, " +
+                      $"{inspection.UncompressedBytes / 1024 / 1024} MB, ratio {inspection.Ratio:0.0}:1");
         }
         catch (Exception ex)
         {
-            return Fail(updateDir, "更新包安全性检查失败: " + ex.Message, 5);
+            return Fail(updateDir, "更新包安全性检查失败: " + ex.Message, 5,
+                       "Package safety check failed: " + ex.Message);
         }
 
         // 5. 解压到暂存区（与安装目录同卷，后续 rename 才是原子的）
@@ -127,14 +143,15 @@ internal sealed class Applier
         catch (Exception ex)
         {
             ClearDirectory(stage);
-            return Fail(updateDir, "解压失败: " + ex.Message, 6);
+            return Fail(updateDir, "解压失败: " + ex.Message, 6, "Extraction failed: " + ex.Message);
         }
 
         var artifact = FindArtifact(stage, request.PackageName);
         if (artifact == null)
         {
             ClearDirectory(stage);
-            return Fail(updateDir, "更新包里没有找到新版程序（" + request.PackageName + "）", 6);
+            return Fail(updateDir, "更新包里没有找到新版程序（" + request.PackageName + "）", 6,
+                       "No new launcher found in the package (" + request.PackageName + ")");
         }
 
         // 主程序：优先用清单里的包名，否则按已知名字挑一个（发布包是整目录，
@@ -145,7 +162,9 @@ internal sealed class Applier
         if (_options.DryRun)
         {
             _log.Info($"[dry-run] 校验全部通过，将整目录安装到 {installDir}" +
-                      $"（{Directory.GetFileSystemEntries(stage).Length} 个顶层条目）");
+                      $"（{Directory.GetFileSystemEntries(stage).Length} 个顶层条目）",
+                      $"[dry-run] All checks passed; would install the whole directory to {installDir} " +
+                      $"({Directory.GetFileSystemEntries(stage).Length} top-level entries)");
             ClearDirectory(stage);
             return 0;
         }
@@ -155,7 +174,8 @@ internal sealed class Applier
             (File.Exists(mainTarget) || Directory.Exists(mainTarget)))
         {
             // 同一版本重复下发：当成已安装，避免反复覆盖正在运行的文件
-            _log.Info($"v{request.Version} 已安装且上次启动正常，视为已安装");
+            _log.Info($"v{request.Version} 已安装且上次启动正常，视为已安装",
+                          $"v{request.Version} is already installed and started fine last time; treating as installed");
             ClearDirectory(stage);
             TryDelete(zipPath);
             TryDelete(requestPath);
@@ -177,9 +197,10 @@ internal sealed class Applier
         {
             RestoreFromBackup(installDir, replaced);
             ClearDirectory(stage);
-            return Fail(updateDir, "安装失败: " + replaceError, 7);
+            return Fail(updateDir, "安装失败: " + replaceError, 7, "Installation failed: " + replaceError);
         }
-        _log.Info($"新版已就位：{mainName}（替换 {replaced.Count} 个条目）");
+        _log.Info($"新版已就位：{mainName}（替换 {replaced.Count} 个条目）",
+                  $"New version in place: {mainName} (replaced {replaced.Count} entries)");
 
         // 7. 启动并看护
         StartupHealth.Clear(updateDir);
@@ -192,7 +213,8 @@ internal sealed class Applier
         catch (Exception ex)
         {
             child = null;
-            _log.Error("启动新版失败: " + ex.Message);
+            _log.Error("启动新版失败: " + ex.Message,
+                       "Failed to start the new version: " + ex.Message);
         }
 
         var healthy = child != null && WaitForHealth(updateDir, request.Version, child,
@@ -200,7 +222,8 @@ internal sealed class Applier
 
         if (healthy)
         {
-            _log.Info($"v{request.Version} 启动正常，更新完成");
+            _log.Info($"v{request.Version} 启动正常，更新完成",
+                      $"v{request.Version} started successfully; update complete");
             CleanupBackup(updateDir);
             WriteLastGood(updateDir, request.Version, mainName);
             WriteState(updateDir, new SavedogState
@@ -219,10 +242,12 @@ internal sealed class Applier
         }
 
         // 8. 回滚：撤掉新装的文件，把备份原样搬回
-        _log.Error($"v{request.Version} 启动后未通过健康检查（{_options.TimeoutSeconds}s），开始回滚");
+        _log.Error($"v{request.Version} 启动后未通过健康检查（{_options.TimeoutSeconds}s），开始回滚",
+                   $"v{request.Version} did not pass the health check after {_options.TimeoutSeconds}s; rolling back");
         TryKill(child);
         var restored = RestoreFromBackup(installDir, replaced);
-        _log.Info(restored ? "已还原为更新前的文件" : "部分文件未能还原，请手动重新安装");
+        _log.Info(restored ? "已还原为更新前的文件" : "部分文件未能还原，请手动重新安装",
+                      restored ? "Restored the pre-update files" : "Some files could not be restored; please reinstall manually");
 
         var relaunched = restored && TryLaunchPrevious(installDir, updateDir, previous, request.PlatformLabel);
         WriteState(updateDir, new SavedogState
@@ -330,7 +355,7 @@ internal sealed class Applier
     {
         if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 0;
 
-        // 发布包把启动器改名成 GC-<版本>-<系统>-<架构>.exe，先按这个模式认出来。
+        // 发布包把启动器改名成 GCL-<版本>-<系统>-<架构>.exe（旧包是 GC-），先按这个模式认出来。
         if (VersionedExePattern.IsMatch(fileName)) return 110;
 
         var name = Path.GetFileNameWithoutExtension(fileName);
@@ -413,13 +438,14 @@ internal sealed class Applier
             var health = StartupHealth.Read(updateDir);
             if (health != null && health.Ok && SameVersion(health.Version, version))
             {
-                _log.Info($"收到健康标记（pid {health.Pid}）");
+                _log.Info($"收到健康标记（pid {health.Pid}）", $"Health marker received (pid {health.Pid})");
                 return true;
             }
 
             if (child.HasExited)
             {
-                _log.Error($"新版进程已退出（退出码 {child.ExitCode}）");
+                _log.Error($"新版进程已退出（退出码 {child.ExitCode}）",
+                           $"The new process exited (code {child.ExitCode})");
                 return false;
             }
             Thread.Sleep(250);
@@ -428,7 +454,8 @@ internal sealed class Applier
         // 超时但进程还活着：可能是尚未写入健康标记的旧构建，谨慎放行
         if (!child.HasExited)
         {
-            _log.Warn("未收到健康标记，但进程仍在运行，按成功处理");
+            _log.Warn("未收到健康标记，但进程仍在运行，按成功处理",
+                      "No health marker, but the process is still running; treating as success");
             return true;
         }
         return false;
@@ -495,7 +522,8 @@ internal sealed class Applier
                 {
                     // 例如 GC-SAVEDOG.exe：本进程正在运行，Windows 上无法替换。
                     // 保留旧版守护进程即可，它下次启动会随包里的新版本一起被更新。
-                    _log.Warn($"跳过受保护文件，保留旧版本：{name}");
+                    _log.Warn($"跳过受保护文件，保留旧版本：{name}",
+                              $"Skipping protected file, keeping the old one: {name}");
                     continue;
                 }
                 incoming.Add(entry);
@@ -514,7 +542,7 @@ internal sealed class Applier
                 var target = Path.Combine(backupDir, name);
                 MoveEntry(entry, target);
                 replaced.Add((name, target));
-                _log.Info("旧版残留已备份: " + name);
+                _log.Info("旧版残留已备份: " + name, "Old leftover backed up: " + name);
             }
 
             // 2. 同名条目：旧 → backup，新 → 安装目录
@@ -568,12 +596,12 @@ internal sealed class Applier
                     continue;
 
                 MoveEntry(backup, target);
-                _log.Info("已还原: " + name);
+                _log.Info("已还原: " + name, "Restored: " + name);
             }
             catch (Exception ex)
             {
                 ok = false;
-                _log.Warn($"还原 {name} 失败: {ex.Message}");
+                _log.Warn($"还原 {name} 失败: {ex.Message}", $"Failed to restore {name}: {ex.Message}");
             }
         }
         return ok;
@@ -589,7 +617,7 @@ internal sealed class Applier
         }
         catch (Exception ex)
         {
-            _log.Warn("清理备份失败: " + ex.Message);
+            _log.Warn("清理备份失败: " + ex.Message, "Failed to clean up the backup: " + ex.Message);
         }
     }
 
@@ -674,12 +702,14 @@ internal sealed class Applier
             try
             {
                 Launch(candidate);
-                _log.Info("已回滚启动: " + Path.GetFileName(candidate));
+                _log.Info("已回滚启动: " + Path.GetFileName(candidate),
+                          "Rolled back and started: " + Path.GetFileName(candidate));
                 return true;
             }
             catch (Exception ex)
             {
-                _log.Warn($"回滚启动失败 {Path.GetFileName(candidate)}: {ex.Message}");
+                _log.Warn($"回滚启动失败 {Path.GetFileName(candidate)}: {ex.Message}",
+                          $"Failed to start rollback candidate {Path.GetFileName(candidate)}: {ex.Message}");
             }
         }
         return false;
@@ -690,12 +720,12 @@ internal sealed class Applier
     private void WriteState(string updateDir, SavedogState state)
     {
         try { Json.Write(Path.Combine(updateDir, SavedogFiles.State), state); }
-        catch (Exception ex) { _log.Warn("写状态失败: " + ex.Message); }
+        catch (Exception ex) { _log.Warn("写状态失败: " + ex.Message, "Failed to write state: " + ex.Message); }
     }
 
-    private int Fail(string updateDir, string message, int code)
+    private int Fail(string updateDir, string message, int code, string? messageEn = null)
     {
-        _log.Error(message);
+        _log.Error(message, messageEn ?? message);
         WriteState(updateDir, new SavedogState { Status = "failed", Message = message });
         return code;
     }

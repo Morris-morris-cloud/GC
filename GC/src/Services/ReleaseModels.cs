@@ -21,7 +21,7 @@ public sealed class ReleaseInfo
     public string Version => NormalizeVersion(TagName, Name);
 
     private static readonly string[] VersionPrefixes =
-        { "v", "V", "GC-", "gc-", "release-", "Release-" };
+        { "v", "V", "GCL-", "gcl-", "GC-", "gc-", "release-", "Release-" };
 
     private static readonly string[] PrereleaseTags =
         { "alpha", "beta", "rc", "pre", "dev", "snapshot" };
@@ -31,7 +31,7 @@ public sealed class ReleaseInfo
         var raw = !string.IsNullOrWhiteSpace(tag) ? tag : name;
         if (string.IsNullOrWhiteSpace(raw)) return "";
         raw = raw!.Trim();
-        // "v1.0.1" / "GC-1.0.1" / "release-1.0.1" -> 取第一段像版本号的部分
+        // "v1.0.1" / "GCL-1.0.1" / "GC-1.0.1" / "release-1.0.1" -> 取第一段像版本号的部分
         foreach (var prefix in VersionPrefixes)
             if (raw.StartsWith(prefix, StringComparison.Ordinal)) { raw = raw[prefix.Length..]; break; }
         // 形如 GC-1.0.1-Win-amd64 时只取版本段；但 2.3.0-beta 这类预发布串要保留完整。

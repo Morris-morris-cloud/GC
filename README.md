@@ -59,15 +59,23 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 ## 运行目录（发布包里就长这样）
 
 ```
-<安装目录>/
-  GC.exe | GC.app/
-  GC-SAVEDOG[.exe]        更新守护进程（与主程序同目录，macOS 在 .app/Contents/MacOS 内）
-  .GC/
-    config/settings.json  用户设置（与缓存分开：删 cache 不会丢配置）
-    model/                启动时下载的模型
-    cache/                下载暂存 / 原子替换
-    update/               待应用的启动器更新（apply-request.json + package.zip）
+<解压出来的目录>/                    ← 压缩包里只有这一个文件夹
+  GCL-<版本>-<平台>(.exe | .app/)   启动器
+  GC-UI(.exe)                       Flutter 前端
+  safedog/GC-SAVEDOG[.exe]          更新守护进程（运行时复制到 .GC/safedog）
+  data/ lib/ *.dll                  后端与 Flutter 运行时
+  .GC/                              首次启动自动生成
+    config/settings.json            用户设置（与缓存分开：删 cache 不会丢配置）
+    model/                          启动时下载的模型
+    cache/                          下载暂存 / 原子替换
+    update/                         待应用的启动器更新（apply-request.json + package.zip）
+    safedog/GC-SAVEDOG[.exe]        实际运行的守护进程（不随整目录替换被覆盖）
+    logs/gc-YYYYMMDD.log            日志（中文）
+    logs/gc-YYYYMMDD.en.log         日志（English）
 ```
+
+压缩包内只有一个顶层目录，解压后不会散落一屏 dll；主程序、后端、前端、守护进程都在
+这个目录里。`.GC` 紧挨着主程序，装在哪都便携 —— 整个目录复制走，模型、设置、日志跟着走。
 
 **发布包不含任何模型**。首次启动联网检查后把模型下载到 `.GC/model/` 并立刻显示；
 安装目录不可写时自动退回用户数据目录。`.GC/cache` 与 `.GC/model` 随时可删，程序会重新下载；
@@ -83,7 +91,7 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 启动器更新的完整流程：
 
 ```
-启动器下载 zip -> 校验 sha256 -> 写 apply-request.json -> 启动 GC-SAVEDOG -> 自己退出
+启动器下载 zip -> 校验 sha256 -> 写 apply-request.json -> 启动 .GC/safedog/GC-SAVEDOG -> 自己退出
   GC-SAVEDOG: 二次验签 -> 检查 zip 安全性 -> 解压到 .GC/update/stage
             -> 整目录替换：旧文件搬到 .GC/update/backup，新文件就位（保留 .GC 不动）
             -> 启动新版，等 .GC/update/health.json
@@ -217,8 +225,8 @@ Repository/
 
 | 方式 | 清单字段 | 说明 |
 | --- | --- | --- |
-| Release 附件（推荐） | `url` | `.../releases/download/v<版本>/GC-<版本>-<系统>-<架构>.zip` |
-| 仓库编译产物 | `path` / `dir` / `name` | `dist/<系统>-<架构>/GC-<版本>-<系统>-<架构>.zip` |
+| Release 附件（推荐） | `url` | `.../releases/download/<版本>/GCL-<版本>-<系统>-<架构>.zip` |
+| 仓库编译产物 | `path` / `dir` / `name` | `dist/<系统>-<架构>/GCL-<版本>-<系统>-<架构>.zip` |
 
 下载端按 `url` → `path` → `dist/<系统>-<架构>/` 目录扫描的顺序尝试，
 **每个候选都必须与清单里的 `sha256` 一致**（`sha256` 由签名保护），
@@ -244,14 +252,15 @@ Repository/
 
 | 产物 | 平台 |
 | --- | --- |
-| `dist/mac-arm64/GC-<版本>-mac-arm64.zip` | macOS Apple Silicon 应用包（含 GC-SAVEDOG） |
-| `dist/win-amd64/GC-<版本>-win-amd64.zip` | Windows x64 单文件启动器 + `GC-SAVEDOG.exe` |
-| `dist/win-arm64/GC-<版本>-win-arm64.zip` | Windows on ARM 同上 |
+| `dist/mac-arm64/GCL-<版本>-mac-arm64.zip` | macOS Apple Silicon（单顶层 `GCL-….app`） |
+| `dist/win-amd64/GCL-<版本>-win-amd64.zip` | Windows x64（单顶层 `GCL-…/`，含 Flutter 前端与 `safedog/`） |
+| `dist/win-arm64/GCL-<版本>-win-arm64.zip` | Windows on ARM 同上 |
+| `dist/linux-amd64/GCL-<版本>-linux-amd64.zip` | Linux x64 同上（启动器无扩展名） |
 
 平台目录就是「该平台的编译产物目录」：打包完成后只留最终 zip（原始 `.app` / `.exe`
 会被挪到 `build/trash/`，下次构建时移出，不做递归删除）。
 
-发新版：`./build.sh build -version=1.0.8` → 把 `dist/<平台>/GC-1.0.8-<平台>.zip`
+发新版：`./build.sh build -version=1.0.10` → 把 `dist/<平台>/GCL-1.0.10-<平台>.zip`
 上传到 Gitea Release（tag `v1.0.8`），**或者**直接提交/上传到仓库的
 `dist/<平台>/` 目录 → 提交并推送 `version.json` / `model/version.json`。
 两种都能被客户端识别，客户端下次启动就会看到更新。
