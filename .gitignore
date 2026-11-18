@@ -51,3 +51,6 @@ GC-UI/frontend/**/DebugProfile.entitlements.bak
 GC-UI/frontend/**/*.iml
 GC-UI/frontend/test/shots/
 
+# GC.Tests 离屏渲染输出（dotnet run ... GC.Tests 默认写到仓库根 screenshots/）
+screenshots/
+

@@ -65,7 +65,11 @@ dotnet run --project GC-UI/backend/GC.UI.Server -- --port 17890
 GC_UI_PORT=17890 dotnet run --project GC-UI/backend/GC.UI.Server
 ```
 
-启动后会在 `~/.GC/ui-backend.json` 写入 `{ port, pid, url, version, platform }`，前端可据此发现端口。
+端口约定集中在 `GC.Services.GcUiContract`（`DefaultPort` / `PortEnvVar`）：
+正式启动时由 GC-BOOT 选端口（17890 被占用就往后试 9 个），再通过 `GC_UI_PORT`
+环境变量同时传给后端和前端，所以**不需要为了换端口重新编译前端**。
+启动后后端会在 `~/.GC/ui-backend.json` 写入 `{ port, pid, url, version, platform }`，
+排查问题时可以据此确认实际端口。
 
 ### 2. 启动前端
 

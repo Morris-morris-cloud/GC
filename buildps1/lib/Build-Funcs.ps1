@@ -324,8 +324,8 @@ function Invoke-FullBuild {
 
         Start-BuildStep '版本戳'; Invoke-VersionStamp; Complete-BuildStep
         Start-BuildStep '编译 Mac'; Publish-Rid 'osx-arm64' 'dist/mac-arm64' $false; Complete-BuildStep
-        Start-BuildStep '编译 Win-x64'; Publish-Rid 'win-x64' 'dist/win-amd64' $true; Complete-BuildStep
-        Start-BuildStep '编译 Win-arm64'; Publish-Rid 'win-arm64' 'dist/win-arm64' $true; Complete-BuildStep
+        Start-BuildStep '编译 Win-x64'; Publish-Rid 'win-x64' 'dist/win-amd64' $false; Complete-BuildStep
+        Start-BuildStep '编译 Win-arm64'; Publish-Rid 'win-arm64' 'dist/win-arm64' $false; Complete-BuildStep
 
         Start-BuildStep '运行骨架'
         New-MacAppBundle

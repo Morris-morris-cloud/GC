@@ -367,8 +367,12 @@ public static class LauncherUpdater
             else if (File.Exists(manifestCopy))
                 File.Delete(manifestCopy);
 
-            // 包名：GC-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）
-            var packageName = $"GC-{latest}-{PlatformLabel}" + (OperatingSystem.IsMacOS() ? ".app" : ".exe");
+            // 包名：GC-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）。
+            // Linux 的启动器没有扩展名，别硬加 .exe —— 那会让按包名查找永远落空。
+            var packageName = $"GC-{latest}-{PlatformLabel}" +
+                              (OperatingSystem.IsMacOS() ? ".app"
+                                  : OperatingSystem.IsWindows() ? ".exe"
+                                  : "");
 
             var request = new SavedogRequest
             {
@@ -447,7 +451,8 @@ public static class LauncherUpdater
     ///   找不到 SAVEDOG 时退回旧脚本流程（只用于从老版本升级的过渡）。
     /// 返回 true 表示调用方应立即退出进程。
     /// </summary>
-    public static bool ScheduleApply(AppPaths paths, string packageName)
+    /// <param name="execute">只写脚本不执行（测试用，避免真的搬动文件）。</param>
+    public static bool ScheduleApply(AppPaths paths, string packageName, bool execute = true)
     {
         // 安全阀：绝不在源码目录执行替换（防止误删源码）
         if (File.Exists(Path.Combine(paths.InstallDirectory, "GC.sln")))
@@ -483,6 +488,8 @@ public static class LauncherUpdater
                 }
                 catch { }
             }
+
+            if (!execute) return true;
 
             var psi = isWin
                 ? new System.Diagnostics.ProcessStartInfo("cmd.exe")
@@ -576,7 +583,10 @@ public static class LauncherUpdater
         s.AppendLine();
         s.AppendLine("# delete old GC-* files: SAME platform only, version != latest");
         s.AppendLine("# files of OTHER platforms are NEVER touched");
-        s.AppendLine("for item in \"$DST\"/GC-*.app \"$DST\"/GC-*.exe; do");
+        // Linux 的启动器没有扩展名（GC-1.0.9-linux-amd64），只匹配 *.app/*.exe 会漏掉，
+        // 结果是每次更新都在安装目录里多留一个旧版本。这里统一按 GC- 前缀扫，
+        // 再用「版本号-平台」的形态兜底，避免误删同目录的其它文件。
+        s.AppendLine("for item in \"$DST\"/GC-*; do");
         s.AppendLine("  [ -e \"$item\" ] || continue");
         s.AppendLine("  [ \"$item\" = \"$NEW\" ] && continue");
         s.AppendLine("  base=$(basename \"$item\")");
@@ -584,6 +594,10 @@ public static class LauncherUpdater
         s.AppendLine("  case \"$base\" in");
         s.AppendLine("    *.app) stem=${stem%.app} ;;");
         s.AppendLine("    *.exe) stem=${stem%.exe} ;;");
+        s.AppendLine("  esac");
+        s.AppendLine("  # 只认 <版本>-<系统>-<架构>，其它名字一律不动");
+        s.AppendLine("  case \"$stem\" in");
+        s.AppendLine("    [0-9]*-*-*) ;;");
         s.AppendLine("    *) continue ;;");
         s.AppendLine("  esac");
         s.AppendLine("  ver=${stem%%-*}");
@@ -711,6 +725,16 @@ public static class LauncherUpdater
                     return name;
                 }
                 if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return name;
+
+                // Linux 的启动器没有扩展名（GC-1.0.9-linux-amd64），以前只认 .app/.exe，
+                // 结果解压完判定「没找到新版启动器」，Linux 更新永远失败。
+                // 注意不能用 Path.HasExtension：版本号 9.9.9 里的点会让它误判成有扩展名。
+                if (name.StartsWith("GC-", StringComparison.OrdinalIgnoreCase) &&
+                    name.EndsWith("-" + PlatformLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    TryMarkExecutable(dest);
+                    return name;
+                }
             }
         }
         catch (Exception ex)
@@ -718,6 +742,22 @@ public static class LauncherUpdater
             Console.Error.WriteLine($"安装新版失败: {ex.Message}");
         }
         return null;
+    }
+
+    /// <summary>给 Linux/macOS 上的可执行文件补上执行位（zip 不保留权限）。</summary>
+    private static void TryMarkExecutable(string path)
+    {
+        if (OperatingSystem.IsWindows() || !File.Exists(path)) return;
+        try
+        {
+            var mode = File.GetUnixFileMode(path);
+            File.SetUnixFileMode(path, mode | UnixFileMode.UserExecute |
+                                       UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+        }
+        catch
+        {
+            // 权限设置失败不影响后续流程，用户可手动 chmod
+        }
     }
 
     private static string? ReadMarker(string file, string key)

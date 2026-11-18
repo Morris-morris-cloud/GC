@@ -26,12 +26,13 @@ internal sealed class ApplyOptions
 /// </summary>
 internal sealed class Applier
 {
-    private static readonly Regex ArtifactPattern = new(
-        @"^GC-(?<ver>.+?)-(?<plat>[^\-]+-[^\-]+)\.(app|exe)$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
     private readonly ApplyOptions _options;
     private readonly Log _log;
+
+    /// <summary>发布包里的启动器文件名：GC-1.0.9-win-amd64.exe。</summary>
+    private static readonly Regex VersionedExePattern = new(
+        @"^GC-\d+(?:\.\d+)+-[A-Za-z0-9]+-[A-Za-z0-9]+\.exe$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public Applier(ApplyOptions options, Log log)
     {
@@ -136,20 +137,25 @@ internal sealed class Applier
             return Fail(updateDir, "更新包里没有找到新版程序（" + request.PackageName + "）", 6);
         }
 
-        var target = Path.Combine(installDir, Path.GetFileName(artifact));
-        var alreadyInstalled = File.Exists(target) || Directory.Exists(target);
+        // 主程序：优先用清单里的包名，否则按已知名字挑一个（发布包是整目录，
+        // 里面同时有 GC-UI.exe / GC.UI.Server.exe / GC-SAVEDOG.exe，不能瞎猜第一个）。
+        var mainName = Path.GetFileName(artifact);
+        var mainTarget = Path.Combine(installDir, mainName);
 
         if (_options.DryRun)
         {
-            _log.Info($"[dry-run] 校验全部通过，将安装到 {target}");
+            _log.Info($"[dry-run] 校验全部通过，将整目录安装到 {installDir}" +
+                      $"（{Directory.GetFileSystemEntries(stage).Length} 个顶层条目）");
             ClearDirectory(stage);
             return 0;
         }
 
-        if (alreadyInstalled)
+        var previous = ReadLastGood(updateDir);
+        if (previous != null && SameVersion(previous.Version, request.Version) &&
+            (File.Exists(mainTarget) || Directory.Exists(mainTarget)))
         {
             // 同一版本重复下发：当成已安装，避免反复覆盖正在运行的文件
-            _log.Info("目标版本已存在，视为已安装");
+            _log.Info($"v{request.Version} 已安装且上次启动正常，视为已安装");
             ClearDirectory(stage);
             TryDelete(zipPath);
             TryDelete(requestPath);
@@ -157,35 +163,31 @@ internal sealed class Applier
             {
                 Status = "applied",
                 Version = request.Version,
-                PackageName = Path.GetFileName(artifact),
+                PackageName = mainName,
                 Verified = true,
                 Message = "目标版本已存在，无需替换"
             });
             return 0;
         }
 
-        // 6. 移入安装目录（不覆盖任何已有文件）
-        try
+        // 6. 整目录替换：旧内容先搬到 backup，新内容就位；失败可原样还原。
+        //    只动程序文件，.GC（模型库 / 设置 / 更新目录）永远不碰。
+        var replaced = new List<(string Name, string? BackupPath)>();
+        if (!ReplaceInstallDirectory(stage, installDir, updateDir, replaced, out var replaceError))
         {
-            Directory.CreateDirectory(installDir);
-            if (Directory.Exists(artifact)) Directory.Move(artifact, target);
-            else File.Move(artifact, target);
-            _log.Info("新版已就位: " + Path.GetFileName(target));
-        }
-        catch (Exception ex)
-        {
+            RestoreFromBackup(installDir, replaced);
             ClearDirectory(stage);
-            return Fail(updateDir, "移动到安装目录失败: " + ex.Message, 7);
+            return Fail(updateDir, "安装失败: " + replaceError, 7);
         }
+        _log.Info($"新版已就位：{mainName}（替换 {replaced.Count} 个条目）");
 
         // 7. 启动并看护
-        var previous = ReadLastGood(updateDir);
         StartupHealth.Clear(updateDir);
 
         Process? child;
         try
         {
-            child = Launch(target);
+            child = Launch(mainTarget);
         }
         catch (Exception ex)
         {
@@ -199,14 +201,14 @@ internal sealed class Applier
         if (healthy)
         {
             _log.Info($"v{request.Version} 启动正常，更新完成");
-            CleanupOldVersions(installDir, Path.GetFileName(target), request.PlatformLabel);
-            WriteLastGood(updateDir, request.Version, Path.GetFileName(target));
+            CleanupBackup(updateDir);
+            WriteLastGood(updateDir, request.Version, mainName);
             WriteState(updateDir, new SavedogState
             {
                 Status = "applied",
                 Version = request.Version,
                 PreviousVersion = previous?.Version,
-                PackageName = Path.GetFileName(target),
+                PackageName = mainName,
                 Verified = true,
                 Message = "更新已应用"
             });
@@ -216,21 +218,21 @@ internal sealed class Applier
             return 0;
         }
 
-        // 8. 回滚
+        // 8. 回滚：撤掉新装的文件，把备份原样搬回
         _log.Error($"v{request.Version} 启动后未通过健康检查（{_options.TimeoutSeconds}s），开始回滚");
         TryKill(child);
-        var removed = RemoveNewVersion(target);
-        _log.Info(removed ? "已移除未通过检查的新版" : "新版文件被占用，未能完全移除");
+        var restored = RestoreFromBackup(installDir, replaced);
+        _log.Info(restored ? "已还原为更新前的文件" : "部分文件未能还原，请手动重新安装");
 
-        var restored = TryLaunchPrevious(installDir, updateDir, previous, request.PlatformLabel);
+        var relaunched = restored && TryLaunchPrevious(installDir, updateDir, previous, request.PlatformLabel);
         WriteState(updateDir, new SavedogState
         {
             Status = "rolledback",
             Version = request.Version,
             PreviousVersion = previous?.Version,
-            PackageName = Path.GetFileName(target),
+            PackageName = mainName,
             Verified = true,
-            Message = restored
+            Message = relaunched
                 ? "新版本未通过启动检查，已回滚到上一个版本"
                 : "新版本未通过启动检查，已移除；未找到可回滚的旧版本，请手动重新安装"
         });
@@ -243,11 +245,18 @@ internal sealed class Applier
 
     // ------------------------------------------------------------------ 校验辅助
 
+    /// <summary>
+    /// 包名合法性：只允许「一个文件名」，杜绝 `../` 之类的路径穿越。
+    ///
+    /// 不能只认 .app / .exe —— Linux 的启动器没有扩展名
+    /// （GC-1.0.9-linux-amd64），按旧规则会被直接判成非法包名、更新永远失败。
+    /// </summary>
     private static bool ValidName(string name)
-        => name.Length > 0 && name.Length < 200 &&
-           name.IndexOfAny(new[] { '/', '\\', ':', '\0' }) < 0 &&
-           (name.EndsWith(".app", StringComparison.OrdinalIgnoreCase) ||
-            name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+        => SafeNamePattern.IsMatch(name);
+
+    private static readonly Regex SafeNamePattern = new(
+        @"^[A-Za-z0-9][A-Za-z0-9._-]{0,198}$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static bool WaitForExit(int pid, TimeSpan timeout)
     {
@@ -280,20 +289,62 @@ internal sealed class Applier
         Directory.Move(temp, stage);
     }
 
+    /// <summary>
+    /// 在解压结果里找主程序。
+    ///
+    /// 发布包是「整目录」结构（exe + dll + data/），同一层可能有好几个 exe
+    /// （GC-UI / GC.UI.Server / GC-SAVEDOG / createdump），必须按固定优先级挑，
+    /// 不能取第一个 —— 否则会把守护进程或调试辅助程序当成启动器拉起来。
+    /// </summary>
     private static string? FindArtifact(string stage, string packageName)
     {
-        var direct = Path.Combine(stage, packageName);
-        if (File.Exists(direct) || Directory.Exists(direct)) return direct;
-
-        foreach (var entry in Directory.GetFileSystemEntries(stage))
+        if (!string.IsNullOrWhiteSpace(packageName))
         {
-            var name = Path.GetFileName(entry);
-            if (name.EndsWith(".app", StringComparison.OrdinalIgnoreCase) && Directory.Exists(entry))
-                return entry;
-            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(entry))
+            var named = Path.Combine(stage, packageName);
+            if (File.Exists(named) || Directory.Exists(named)) return named;
+        }
+
+        var entries = Directory.GetFileSystemEntries(stage);
+        var byName = entries
+            .Where(e => File.Exists(e))
+            .OrderByDescending(e => MainExecutablePriority(Path.GetFileName(e)))
+            .ThenBy(e => Path.GetFileName(e), StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var best = byName.FirstOrDefault(e => MainExecutablePriority(Path.GetFileName(e)) > 0);
+        if (best != null) return best;
+
+        // macOS：.app 目录本身就是「可执行单元」
+        foreach (var entry in entries)
+        {
+            if (Directory.Exists(entry) &&
+                Path.GetFileName(entry).EndsWith(".app", StringComparison.OrdinalIgnoreCase))
                 return entry;
         }
+
         return null;
+    }
+
+    /// <summary>主程序优先级：数字越大越优先，0 表示不是主程序。</summary>
+    private static int MainExecutablePriority(string fileName)
+    {
+        if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 0;
+
+        // 发布包把启动器改名成 GC-<版本>-<系统>-<架构>.exe，先按这个模式认出来。
+        if (VersionedExePattern.IsMatch(fileName)) return 110;
+
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        return name switch
+        {
+            "GC-UI" => 100,
+            "GC" => 90,
+            "GC.UI.Server" => 80,
+            // 守护进程 / 调试辅助 / 运行时工具：永远不当主程序
+            "GC-SAVEDOG" => 0,
+            "createdump" => 0,
+            "singlefilehost" => 0,
+            _ => 10
+        };
     }
 
     // ------------------------------------------------------------------ 启动与看护
@@ -410,57 +461,199 @@ internal sealed class Applier
         catch { }
     }
 
-    // ------------------------------------------------------------------ 清理 / 回滚
+    // ------------------------------------------------------------------ 整目录安装 / 回滚
 
-    private void CleanupOldVersions(string installDir, string keepName, string platformLabel)
+    /// <summary>
+    /// 把 <paramref name="stage"/> 的内容替换进 <paramref name="installDir"/>。
+    ///
+    /// 发布包是「整目录」（启动器 + 后端运行时 + Flutter 前端资源），只搬一个 exe 会留下
+    /// 旧后端 / 旧界面，所以这里按目录整体替换：
+    ///   1. 安装目录里「新版没有」的条目 → 移到 backup（旧版本残留，如上一版的旧文件名）；
+    ///   2. 与新版同名的条目 → 先移到 backup，再把新版放进来（覆盖正在被占用的文件会失败，
+    ///      这种情况直接报错并还原，绝不留下半新半旧的目录）；
+    ///   3. `.GC`、更新目录自身、正在运行的 GC-SAVEDOG.exe 一律跳过。
+    ///
+    /// 返回 false 时调用方应调用 <see cref="RestoreFromBackup"/> 还原。
+    /// </summary>
+    private bool ReplaceInstallDirectory(string stage, string installDir, string updateDir,
+        List<(string Name, string? BackupPath)> replaced, out string? error)
     {
-        foreach (var entry in Directory.GetFileSystemEntries(installDir))
-        {
-            var name = Path.GetFileName(entry);
-            if (string.Equals(name, keepName, StringComparison.OrdinalIgnoreCase)) continue;
+        error = null;
+        var backupDir = Path.Combine(updateDir, "backup");
 
-            var match = ArtifactPattern.Match(name);
-            if (!match.Success) continue;
-
-            var platform = match.Groups["plat"].Value;
-            if (!string.Equals(platform, platformLabel, StringComparison.OrdinalIgnoreCase))
-            {
-                _log.Info($"保留其它平台版本: {name}");
-                continue;
-            }
-
-            try
-            {
-                if (Directory.Exists(entry)) Directory.Delete(entry, true);
-                else File.Delete(entry);
-                _log.Info("清理旧版本: " + name);
-            }
-            catch (Exception ex)
-            {
-                _log.Warn($"清理旧版本失败 {name}: {ex.Message}");
-            }
-        }
-    }
-
-    private bool RemoveNewVersion(string target)
-    {
         try
         {
-            if (Directory.Exists(target)) Directory.Delete(target, true);
-            else if (File.Exists(target)) File.Delete(target);
+            Directory.CreateDirectory(installDir);
+            ClearDirectory(backupDir);
+            Directory.CreateDirectory(backupDir);
+
+            var incoming = new List<string>();
+            foreach (var entry in Directory.GetFileSystemEntries(stage))
+            {
+                var name = Path.GetFileName(entry);
+                if (IsProtected(name))
+                {
+                    // 例如 GC-SAVEDOG.exe：本进程正在运行，Windows 上无法替换。
+                    // 保留旧版守护进程即可，它下次启动会随包里的新版本一起被更新。
+                    _log.Warn($"跳过受保护文件，保留旧版本：{name}");
+                    continue;
+                }
+                incoming.Add(entry);
+            }
+            var incomingNames = new HashSet<string>(
+                incoming.Select(e => Path.GetFileName(e)), StringComparer.OrdinalIgnoreCase);
+
+            // 1. 旧版独有的条目先清走（保留在 backup 里以便回滚）
+            foreach (var entry in Directory.GetFileSystemEntries(installDir))
+            {
+                var name = Path.GetFileName(entry);
+                if (incomingNames.Contains(name)) continue;
+                if (IsProtected(name)) continue;
+                if (IsSameOrInside(entry, updateDir)) continue;
+
+                var target = Path.Combine(backupDir, name);
+                MoveEntry(entry, target);
+                replaced.Add((name, target));
+                _log.Info("旧版残留已备份: " + name);
+            }
+
+            // 2. 同名条目：旧 → backup，新 → 安装目录
+            foreach (var entry in incoming)
+            {
+                var name = Path.GetFileName(entry);
+                var target = Path.Combine(installDir, name);
+                var backup = Path.Combine(backupDir, name);
+
+                if (File.Exists(target) || Directory.Exists(target))
+                {
+                    MoveEntry(target, backup);
+                    replaced.Add((name, backup));
+                }
+                else
+                {
+                    // 纯新增：回滚时直接删掉，没有备份可还原
+                    replaced.Add((name, null));
+                }
+
+                MoveEntry(entry, target);
+            }
+
             return true;
         }
         catch (Exception ex)
         {
-            _log.Warn("移除新版失败: " + ex.Message);
+            error = ex.Message;
             return false;
         }
+    }
+
+    /// <summary>
+    /// 把备份里的条目原样搬回安装目录，撤掉新装的内容。
+    /// <paramref name="BackupPath"/> 为 null 表示这一项是新包里独有的（没有旧版本），
+    /// 回滚时只需要删掉。
+    /// </summary>
+    private bool RestoreFromBackup(string installDir, List<(string Name, string? BackupPath)> replaced)
+    {
+        var ok = true;
+        foreach (var (name, backup) in replaced)
+        {
+            var target = Path.Combine(installDir, name);
+            try
+            {
+                // 先撤掉新版（新包里独有的文件也要删干净，否则回滚后目录里新旧混杂）
+                DeleteEntry(target);
+
+                if (string.IsNullOrWhiteSpace(backup) ||
+                    (!File.Exists(backup) && !Directory.Exists(backup)))
+                    continue;
+
+                MoveEntry(backup, target);
+                _log.Info("已还原: " + name);
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                _log.Warn($"还原 {name} 失败: {ex.Message}");
+            }
+        }
+        return ok;
+    }
+
+    /// <summary>更新成功：删掉整份备份，不再占用磁盘。</summary>
+    private void CleanupBackup(string updateDir)
+    {
+        var backupDir = Path.Combine(updateDir, "backup");
+        try
+        {
+            if (Directory.Exists(backupDir)) Directory.Delete(backupDir, true);
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("清理备份失败: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 安装目录里不该被更新碰的东西：
+    ///   · .GC —— 模型库、设置、日志、更新目录本身都在这里；
+    ///   · GC-SAVEDOG.exe —— 本进程正在运行，Windows 上无法替换。
+    /// </summary>
+    private static bool IsProtected(string name)
+    {
+        if (string.Equals(name, ".GC", StringComparison.OrdinalIgnoreCase)) return true;
+        var self = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(self) &&
+            string.Equals(name, Path.GetFileName(self!), StringComparison.OrdinalIgnoreCase))
+            return true;
+        return string.Equals(name, "backup", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSameOrInside(string path, string root)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+            var rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+            return full.Equals(rootFull, StringComparison.OrdinalIgnoreCase) ||
+                   full.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    /// <summary>移动条目；跨卷或目标占用时退回「复制 + 删除」。</summary>
+    private static void MoveEntry(string from, string to)
+    {
+        var parent = Path.GetDirectoryName(to);
+        if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+
+        if (Directory.Exists(from))
+        {
+            Directory.Move(from, to);
+            return;
+        }
+
+        try
+        {
+            File.Move(from, to, overwrite: true);
+        }
+        catch (IOException)
+        {
+            File.Copy(from, to, overwrite: true);
+            File.Delete(from);
+        }
+    }
+
+    /// <summary>删除文件或目录，失败时抛出（由调用方决定是否回滚）。</summary>
+    private static void DeleteEntry(string path)
+    {
+        if (Directory.Exists(path)) Directory.Delete(path, true);
+        else if (File.Exists(path)) File.Delete(path);
     }
 
     private bool TryLaunchPrevious(string installDir, string updateDir, LastGoodVersion? lastGood,
         string platformLabel)
     {
-        // 优先用上次成功的版本；否则挑一个同平台的其它版本
+        // 优先用上次成功启动的主程序；否则按优先级在安装目录里找
         var candidates = new List<string>();
         if (lastGood != null && !string.IsNullOrWhiteSpace(lastGood.PackageName))
             candidates.Add(Path.Combine(installDir, lastGood.PackageName));
@@ -468,14 +661,14 @@ internal sealed class Applier
         foreach (var entry in Directory.GetFileSystemEntries(installDir))
         {
             var name = Path.GetFileName(entry);
-            var match = ArtifactPattern.Match(name);
-            if (!match.Success) continue;
-            if (!string.Equals(match.Groups["plat"].Value, platformLabel, StringComparison.OrdinalIgnoreCase))
-                continue;
-            candidates.Add(entry);
+            if (IsProtected(name)) continue;
+            if (MainExecutablePriority(name) > 0) candidates.Add(entry);
+            else if (Directory.Exists(entry) &&
+                     name.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                candidates.Add(entry);
         }
 
-        foreach (var candidate in candidates)
+        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!File.Exists(candidate) && !Directory.Exists(candidate)) continue;
             try

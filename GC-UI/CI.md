@@ -1,6 +1,9 @@
 # GC-UI 持续集成
 
-夜间 alpha 构建的工作流在 [`.gitea/workflows/gc-ui-alpha.yml`](../.gitea/workflows/gc-ui-alpha.yml)。
+alpha 构建的工作流在 [`.gitea/workflows/gc-ui-alpha.yml`](../.gitea/workflows/gc-ui-alpha.yml)，
+**只支持手动触发**（定时任务已取消：它绕开 build.sh，产出的包没有后端、没有前端，跑起来只是个空壳；
+另外 `cron` 里的 `TZ=` 前缀在部分 Gitea 版本上是非法表达式）。
+PR 审核流水线在 [`.gitea/workflows/pr-check.yml`](../.gitea/workflows/pr-check.yml)。
 本仓库是自建 Gitea（不是 GitHub），所以目录是 `.gitea/workflows/`，语法与 GitHub Actions 基本一致，
 差异集中在 **runner 标签** 和 **API 前缀** 两处。
 

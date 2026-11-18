@@ -11,8 +11,8 @@
 
 - UI：C# + .NET 8（可切 .NET 10）+ Avalonia，跨平台
 - 模型加载：`AssemblyLoadContext` 加载模型自带 dll，契约与 Avalonia 走默认上下文，关窗即卸载
-- 目标平台：**macOS arm64 / Windows x64 / Windows arm64**（Linux 可自行编译，未列入发布矩阵）
-- 更新仓库：<https://gitcode.com/Morris_1/GC>，模型目录 <https://gitcode.com/Morris_1/GC/tree/main/model>
+- 目标平台：**Windows x64 / Windows arm64 / macOS arm64 / Linux x64**
+- 更新仓库：<https://git.xhmcl.com/Morris/GC>，模型目录 <https://git.xhmcl.com/Morris/GC/src/branch/main/model>
 
 ## GC-UI：前后端分离版（Flutter 前端）
 
@@ -85,16 +85,20 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 ```
 启动器下载 zip -> 校验 sha256 -> 写 apply-request.json -> 启动 GC-SAVEDOG -> 自己退出
   GC-SAVEDOG: 二次验签 -> 检查 zip 安全性 -> 解压到 .GC/update/stage
-            -> 移入安装目录（绝不覆盖已有版本）
+            -> 整目录替换：旧文件搬到 .GC/update/backup，新文件就位（保留 .GC 不动）
             -> 启动新版，等 .GC/update/health.json
-            -> 收到：删同平台旧版本，写 last-good.json
-            -> 没收到/进程退出：删新版、重启旧版，写 state.json = rolledback
+            -> 收到：删备份、写 last-good.json
+            -> 没收到/进程退出：撤掉新文件、把备份搬回、重启旧版，写 state.json = rolledback
 ```
+
+发布包是**整目录**（启动器 + 后端运行时 + Flutter 前端资源），所以更新必须整目录替换：
+只替换一个 exe 会留下旧后端 / 旧界面，新前端调不通接口。替换只动程序文件，
+`.GC`（模型库、设置、日志、更新目录）和正在运行的 `GC-SAVEDOG.exe` 一律跳过。
 
 也就是说：**新版本起不来，用户不会被卡死**。找不到 `GC-SAVEDOG` 的旧安装会退回脚本流程（过渡用）。
 
 - 默认更新仓库写在 `.GC/config/settings.json` 的 `updateRepository`：
-  `https://gitcode.com/Morris_1/GC`（也可换成自己的仓库或 `.../tree/main/model` 地址）
+  `https://git.xhmcl.com/Morris/GC`（也可换成自己的仓库或 `.../src/branch/main/model` 地址）
 - 断网、仓库没推 `version.json`、下载失败：**一律保留本地模型，绝不清空模型库**，底部状态条说明原因
 - 首次启动断网且本地无模型：状态条会明确提示「去下载页重试 / 手动放入 `.GC/model/`」，不会白屏干等
 - 离线教室：把仓库（含 `version.json` + `model/`）拷到 U 盘，在 `settings.json` 填
@@ -248,7 +252,7 @@ Repository/
 会被挪到 `build/trash/`，下次构建时移出，不做递归删除）。
 
 发新版：`./build.sh build -version=1.0.8` → 把 `dist/<平台>/GC-1.0.8-<平台>.zip`
-上传到 gitcode Release（tag `v1.0.8`），**或者**直接提交/上传到仓库的
+上传到 Gitea Release（tag `v1.0.8`），**或者**直接提交/上传到仓库的
 `dist/<平台>/` 目录 → 提交并推送 `version.json` / `model/version.json`。
 两种都能被客户端识别，客户端下次启动就会看到更新。
 

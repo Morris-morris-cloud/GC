@@ -1,9 +1,9 @@
-# GC-UI 夜间 alpha 构建（Gitea Actions）
+# GC-UI alpha 构建（Gitea Actions）
 #
-# 触发：每天 21:00（Asia/Shanghai）自动跑一次，产出 Windows 与 macOS 的 Flutter 前端产物，
-#       发布为一个「预览版（prerelease）」Release —— 不占用 latest。
-# 手动：Actions 页面点 Run workflow（Gitea 的 workflow_dispatch），用于验证 runner 是否就绪；
-#       也可以从命令行调 POST /api/v1/repos/{owner}/{repo}/actions/workflows/{file}/dispatches。
+# 触发：**仅手动**。定时任务已取消（不再每天自动构建），需要时在 Actions 页面点
+#       Run workflow，或从命令行调
+#       POST /api/v1/repos/{owner}/{repo}/actions/workflows/{file}/dispatches。
+# 产物：Windows 与 macOS 的 Flutter 前端，发布为一个「预览版（prerelease）」Release —— 不占用 latest。
 #
 # 为什么是 .gitea/workflows/：本仓库是自建 Gitea，不是 GitHub。Gitea Actions 语法与
 # GitHub Actions 基本一致，但工作流目录是 .gitea/workflows/，API 前缀是 /api/v1，
@@ -16,12 +16,8 @@
 name: GC-UI Alpha
 
 on:
-  schedule:
-    # 每天晚上 21:00，北京时间。
-    # Gitea 1.23 起 Actions 的 cron 默认按 UTC 解释，这里显式带 TZ= 前缀（robfig/cron 支持的
-    # 时区前缀语法），这样不依赖服务器自身时区设置。
-    # 如果所在实例不认 TZ= 前缀，改用等效的 UTC 写法 '0 13 * * *'。
-    - cron: 'TZ=Asia/Shanghai 0 21 * * *'
+  # 定时触发已取消：夜间构建会绕开 build.sh，产出不含后端/前端的空壳包，
+  # 且 cron 的 TZ= 前缀在部分 Gitea 版本上非法。需要时手动 dispatch。
   workflow_dispatch:
     inputs:
       note:
@@ -67,7 +63,7 @@ jobs:
             exit 1
           fi
 
-          # 北京时间当天日期，让产物名和 tag 与「每晚 9 点」对得上
+          # 北京时间当天日期，让同一天的多次手动构建落在同一个日期前缀下
           DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
           # 同一天重跑时用 run_number 区分，tag 不重复
           VERSION="${BASE}-alpha.${DATE}.${{ github.run_number }}"
@@ -122,11 +118,11 @@ jobs:
           tag, version, sha, server = sys.argv[1:5]
           short = sha[:7]
           body = (
-              "GC-UI 夜间 alpha 构建（自动生成，**预览版 / prerelease**）。\n\n"
+              "GC-UI alpha 构建（手动触发，**预览版 / prerelease**）。\n\n"
               "- 版本：`%s`\n"
               "- 提交：`%s`\n"
               "- 构建来源：%s/commit/%s\n"
-              "- 通道：alpha —— 每晚 21:00（Asia/Shanghai）自动构建\n\n"
+              "- 通道：alpha —— 手动触发（定时任务已取消）\n\n"
               "产物说明：\n\n"
               "| 文件 | 平台 | 内容 |\n"
               "|---|---|---|\n"

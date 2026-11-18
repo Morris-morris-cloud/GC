@@ -146,7 +146,7 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Morris GC',
                   style: TextStyle(
@@ -186,7 +186,7 @@ class _Sidebar extends StatelessWidget {
             padding: const EdgeInsets.only(left: 14),
             child: Text(
               'v${settings?.version ?? '—'}',
-              style: const TextStyle(fontSize: 10.5, color: GcColors.faint),
+              style: TextStyle(fontSize: 10.5, color: GcColors.faint),
             ),
           ),
           Padding(
@@ -258,7 +258,7 @@ class _UpdateBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: GcColors.surface,
         border: Border(top: BorderSide(color: GcColors.line)),
       ),
@@ -274,7 +274,7 @@ class _UpdateBar extends StatelessWidget {
               children: <Widget>[
                 Text(
                   controller.updateStatus,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: GcColors.ink,
@@ -284,13 +284,13 @@ class _UpdateBar extends StatelessWidget {
                 if (controller.updateDetail.isNotEmpty)
                   Text(
                     controller.updateDetail,
-                    style: const TextStyle(fontSize: 11, color: GcColors.faint),
+                    style: TextStyle(fontSize: 11, color: GcColors.faint),
                     overflow: TextOverflow.ellipsis,
                   ),
                 if (controller.launcherNotice.isNotEmpty)
                   Text(
                     controller.launcherNotice,
-                    style: const TextStyle(fontSize: 11, color: GcColors.warn),
+                    style: TextStyle(fontSize: 11, color: GcColors.warn),
                   ),
               ],
             ),
@@ -331,7 +331,7 @@ class _BackendDown extends StatelessWidget {
             children: <Widget>[
               Text(
                 T('common.error'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
                   color: GcColors.ink,

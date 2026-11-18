@@ -82,11 +82,11 @@ bs_build() {
   fi
 
   progress_step "编译 Win-x64"
-  _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" true || return 1
+  _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" false || return 1
   publish_backend "win-x64" "dist/win-amd64" || return 1
 
   progress_step "编译 Win-arm64"
-  _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" true || return 1
+  _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" false || return 1
   publish_backend "win-arm64" "dist/win-arm64" || return 1
 
   if [ "$BUILD_LINUX" = 1 ]; then
