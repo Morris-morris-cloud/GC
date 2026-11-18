@@ -367,9 +367,9 @@ public static class LauncherUpdater
             else if (File.Exists(manifestCopy))
                 File.Delete(manifestCopy);
 
-            // 包名：GC-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）。
+            // 包名：GCL-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）。
             // Linux 的启动器没有扩展名，别硬加 .exe —— 那会让按包名查找永远落空。
-            var packageName = $"GC-{latest}-{PlatformLabel}" +
+            var packageName = $"GCL-{latest}-{PlatformLabel}" +
                               (OperatingSystem.IsMacOS() ? ".app"
                                   : OperatingSystem.IsWindows() ? ".exe"
                                   : "");

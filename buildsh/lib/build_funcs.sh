@@ -164,10 +164,10 @@ pack_models() {
 # 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
 #
 # 产物落点遵循「仓库 dist/<系统>-<架构>/」布局：
-#   dist/mac-arm64/GC-<版本>-mac-arm64.zip
-#   dist/win-amd64/GC-<版本>-win-amd64.zip
-#   dist/win-arm64/GC-<版本>-win-arm64.zip
-#   dist/linux-arm64/GC-<版本>-linux-arm64.zip
+#   dist/mac-arm64/GCL-<版本>-mac-arm64.zip
+#   dist/win-amd64/GCL-<版本>-win-amd64.zip
+#   dist/win-arm64/GCL-<版本>-win-arm64.zip
+#   dist/linux-arm64/GCL-<版本>-linux-arm64.zip
 # 启动器更新时既可以从 Release 附件下载，也会到这些目录里找编译产物
 # （见 GC-DOWNLOAD/LauncherArtifacts.cs），所以两种发布方式都能用。
 #
@@ -286,7 +286,7 @@ build_flutter_ui_cross() {
 }
 
 pack_launcher() {
-  echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>）"
+  echo "==> 生成启动器产物（GCL-<版本>-<系统>-<架构>）"
 
   # --- Windows：启动器 + 守护进程 + UI 后端 + Flutter 前端，整目录打包 ---
   for pair in "win-x64:win-amd64" "win-arm64:win-arm64"; do
@@ -300,9 +300,9 @@ pack_launcher() {
     [ -f "$EXE" ] || EXE=$(ls "$SRC"/*.exe 2>/dev/null | grep -v 'GC-SAVEDOG\|GC.UI.Server\|GC-UI' | head -1)
     [ -n "$EXE" ] || continue
 
-    # 包内只有一个顶层目录（GC-<版本>-<平台>），解压后不会散落一屏 dll。
+    # 包内只有一个顶层目录（GCL-<版本>-<平台>），解压后不会散落一屏 dll。
     TMP="$ROOT_DIR/dist/.winpkg-$LABEL"
-    PKGNAME="GC-${VERSION}-${LABEL}"
+    PKGNAME="GCL-${VERSION}-${LABEL}"
     PKG="$TMP/$PKGNAME"
     rm -rf "$TMP"; mkdir -p "$PKG"
     cp -R "$SRC"/. "$PKG"/
@@ -331,7 +331,7 @@ pack_launcher() {
   SRC="$ROOT_DIR/dist/linux-arm64"
   if [ -d "$SRC" ]; then
     TMP="$ROOT_DIR/dist/.linuxpkg"
-    PKGNAME="GC-${VERSION}-linux-arm64"
+    PKGNAME="GCL-${VERSION}-linux-arm64"
     PKG="$TMP/$PKGNAME"
     rm -rf "$TMP"; mkdir -p "$PKG"
     cp -R "$SRC"/. "$PKG"/
@@ -357,7 +357,7 @@ pack_launcher() {
   # --- macOS：先得到真实 .app 目录（改名 + 同步 Info.plist）---
   MACAPP="$ROOT_DIR/dist/mac-arm64/GC.app"
   if [ -d "$MACAPP" ]; then
-    FINAL="$ROOT_DIR/dist/GC-${VERSION}-mac-arm64.app"
+    FINAL="$ROOT_DIR/dist/GCL-${VERSION}-mac-arm64.app"
     rm -rf "$FINAL"
     mv "$MACAPP" "$FINAL"
     chmod +x "$FINAL/Contents/MacOS/GC" 2>/dev/null || true
@@ -371,14 +371,14 @@ pack_launcher() {
   fi
 
   # --- 统一压缩：每个产物都打成同名 .zip，放进自己的平台目录 ---
-  #   GC-1.0.3-mac-arm64.app  -> dist/mac-arm64/GC-1.0.3-mac-arm64.zip
+  #   GCL-1.0.3-mac-arm64.app -> dist/mac-arm64/GCL-1.0.3-mac-arm64.zip
   # 客户端下载时按「原名去掉扩展名 + .zip」取包，再解压回原名。
   echo "==> 压缩为 zip"
-  for art in "$ROOT_DIR"/dist/GC-"$VERSION"-*.exe "$ROOT_DIR"/dist/GC-"$VERSION"-*.app; do
+  for art in "$ROOT_DIR"/dist/GCL-"$VERSION"-*.exe "$ROOT_DIR"/dist/GCL-"$VERSION"-*.app; do
     [ -e "$art" ] || continue
     base=$(basename "$art")
     name="${base%.*}"          # 去掉 .exe / .app
-    label="${name#GC-${VERSION}-}"   # mac-arm64 / win-amd64
+    label="${name#GCL-${VERSION}-}"  # mac-arm64 / win-amd64
     ZIP="$ROOT_DIR/dist/${label}/${name}.zip"
     mkdir -p "$ROOT_DIR/dist/${label}"
     rm -f "$ZIP"
@@ -400,7 +400,7 @@ pack_launcher() {
   # 一次性删除又慢又不可逆，先挪走更安全（暂存区在下次构建开始时挪出 dist）。
   TRASH="$ROOT_DIR/build/trash"
   mkdir -p "$TRASH"
-  for leftover in "$ROOT_DIR"/dist/GC-"$VERSION"-*.exe "$ROOT_DIR"/dist/GC-"$VERSION"-*.app; do
+  for leftover in "$ROOT_DIR"/dist/GCL-"$VERSION"-*.exe "$ROOT_DIR"/dist/GCL-"$VERSION"-*.app; do
     [ -e "$leftover" ] || continue
     mv "$leftover" "$TRASH/$(basename "$leftover")-$(date +%s)" 2>/dev/null || true
   done
@@ -409,7 +409,7 @@ pack_launcher() {
   stamp_launcher_only
   echo ""
   echo "==> dist 里可发布的 zip："
-  ls -lh "$ROOT_DIR"/dist/*/GC-"$VERSION"-*.zip 2>/dev/null || true
+  ls -lh "$ROOT_DIR"/dist/*/GCL-"$VERSION"-*.zip 2>/dev/null || true
 }
 
 # 删除 publish 过程中的中间目录：平台目录里只留最终 zip
@@ -417,7 +417,7 @@ strip_intermediate_dirs() {
   for d in win-amd64 win-x64 win-arm64 mac-arm64 linux-arm64 linux-x64; do
     [ -d "$ROOT_DIR/dist/$d" ] || continue
     find "$ROOT_DIR/dist/$d" -mindepth 1 -maxdepth 1 \
-      ! -name "GC-${VERSION}-*.zip" -exec rm -rf {} + 2>/dev/null || true
+      ! -name "GCL-${VERSION}-*.zip" -exec rm -rf {} + 2>/dev/null || true
   done
   find "$ROOT_DIR/dist" -name ".DS_Store" -delete 2>/dev/null || true
 }

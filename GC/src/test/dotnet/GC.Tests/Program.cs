@@ -195,7 +195,7 @@ internal static class Program
         Directory.CreateDirectory(stage);
         // Linux 的启动器没有扩展名，测试包名要跟着平台走
         var launcherExt = OperatingSystem.IsWindows() ? ".exe" : "";
-        File.WriteAllText(Path.Combine(stage, "GC-9.9.9-" + LauncherUpdater.PlatformLabel + launcherExt),
+        File.WriteAllText(Path.Combine(stage, "GCL-9.9.9-" + LauncherUpdater.PlatformLabel + launcherExt),
             "new launcher");
         var zip = Path.Combine(tmp, "GC-" + rid + ".zip");
         ZipFile.CreateFromDirectory(stage, zip);
@@ -245,7 +245,7 @@ internal static class Program
         //     清单不写 url、不写 path，只给 dir + name + sha256，客户端要能自己找过去。
         var distDir = Path.Combine(remote, "dist", LauncherUpdater.PlatformLabel);
         Directory.CreateDirectory(distDir);
-        var distName = "GC-9.9.10-" + LauncherUpdater.PlatformLabel + ".zip";
+        var distName = "GCL-9.9.10-" + LauncherUpdater.PlatformLabel + ".zip";
         var distZip = Path.Combine(distDir, distName);
         File.Copy(zip, distZip, true);
 

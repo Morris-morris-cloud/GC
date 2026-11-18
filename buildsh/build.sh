@@ -142,5 +142,5 @@ bs_build() {
   progress_step "收尾"; progress_tick 100
   progress_done
   echo "==> 完成，产物："
-  ls -lh "$ROOT_DIR"/dist/*/GC-"$VERSION"-*.zip 2>/dev/null || true
+  ls -lh "$ROOT_DIR"/dist/*/GCL-"$VERSION"-*.zip 2>/dev/null || true
 }
