@@ -69,7 +69,8 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 
 就这些，没有一屏 dll。安装目录根只放 GC 本体，非本体文件（守护进程）一律收在 `.GC/bin`。
 macOS 是同一个单文件启动器，只是被放进 `GCL-<版本>-mac-arm64.app/Contents/MacOS/`，
-Flutter 前端作为 `GC-UI.app` 放在同一层。
+Flutter 前端作为 `GC-UI.app` 放在同一层；`.GC` 位置不变，仍在启动器同级
+（`.app/Contents/MacOS/`），守护进程同样收在 `.app/Contents/MacOS/.GC/bin/`。
 
 首次启动后 `.GC` 补齐成：
 
