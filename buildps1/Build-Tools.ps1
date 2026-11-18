@@ -6,7 +6,12 @@ function Invoke-BuildTool {
         'pack-models'  { Build-Models; Pack-Models }
         'pack-launcher'{ Pack-Launcher }
         'run'          { & dotnet run --project $script:AppProject -c Debug; if ($LASTEXITCODE -ne 0) { throw "dotnet run 失败，退出码 $LASTEXITCODE" } }
-        'test'         { & dotnet run --project $script:TestProject -c Debug -- (Join-Path $script:BuildRoot 'build/screenshots'); if ($LASTEXITCODE -ne 0) { throw "测试失败，退出码 $LASTEXITCODE" } }
+        'test'         {
+            & dotnet run --project $script:TestProject -c Debug -- (Join-Path $script:BuildRoot 'build/screenshots')
+            if ($LASTEXITCODE -ne 0) { throw "测试失败，退出码 $LASTEXITCODE" }
+            # 与 pr-check.yml 一致：应用器测试单独跑（它与启动器有同名类型，不能并入 GC.Tests）
+            Invoke-SavedogTests
+        }
         'update-test'  { & dotnet run --project $script:TestProject -c Debug -- --update-test $script:BuildRoot; if ($LASTEXITCODE -ne 0) { throw "更新测试失败，退出码 $LASTEXITCODE" } }
         'clean' {
             Remove-Item (Join-Path $script:BuildRoot 'build'), (Join-Path $script:BuildRoot 'dist') -Recurse -Force -ErrorAction SilentlyContinue

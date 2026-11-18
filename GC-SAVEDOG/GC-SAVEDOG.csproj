@@ -38,6 +38,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- 应用器测试要直接构造 Applier（internal）：只对测试程序集放开可见性 -->
+    <InternalsVisibleTo Include="GC.Savedog.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 与启动器共用同一份安全实现，避免两套逻辑各说各话。
          ManifestLoader 依赖启动器的 RepoVersion 模型，守护进程不需要，排除。 -->
     <Compile Include="..\GC\src\Security\**\*.cs" Exclude="..\GC\src\Security\ManifestLoader.cs" LinkBase="Security" />

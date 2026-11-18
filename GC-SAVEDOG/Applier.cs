@@ -84,11 +84,20 @@ internal sealed class Applier
         var manifestText = File.Exists(manifestPath) ? File.ReadAllText(manifestPath) : null;
         var verification = ManifestSignature.Verify(manifestText, require);
 
-        if (verification.IsRejected)
+        // 签名不对（被改过 / 密钥不认识）永远拒绝；仅「没有签名」在明确不强制时放行。
+        // 之前这里不看 require：即使调用方声明 requireSignature=false（开发态、测试），
+        // 未签名清单也会被当成验签失败直接拒掉。
+        var hostile = verification.Trust == ManifestTrust.Invalid;
+        if (hostile || (verification.IsRejected && require))
         {
             _log.Error($"清单验签失败（{verification.Trust}）：{verification.Error}",
                        $"Manifest signature check failed ({verification.Trust}): {verification.Error}");
             return Refuse(updateDir, request, verification);
+        }
+        if (verification.IsRejected)
+        {
+            _log.Warn($"清单未签名，按调用方要求放行：{verification.Error}",
+                      $"Manifest is unsigned; continuing as requested: {verification.Error}");
         }
         _log.Info($"清单可信度：{verification.Trust}" +
                   (verification.KeyId != null ? $"（{verification.KeyId}）" : ""),

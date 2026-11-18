@@ -57,8 +57,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: 运行 GC.Tests（含离屏渲染 / 清单校验）
+      - name: 运行 GC.Tests（含离屏渲染 / 清单校验 / 日志用例）
         run: dotnet run --project GC/src/test/dotnet/GC.Tests/GC.Tests.csproj -c Release
+
+      - name: 运行应用器测试（整目录替换 / .GC/bin 合并 / 回滚）
+        run: dotnet run --project GC/src/test/dotnet/GC.Savedog.Tests/GC.Savedog.Tests.csproj -c Release
 
   frontend:
     name: 前端检查（Flutter）

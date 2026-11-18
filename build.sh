@@ -59,9 +59,11 @@ mkdir -p "$ROOT_DIR/build/logs"
 . "$ROOT_DIR/buildsh/build.sh"
 . "$ROOT_DIR/buildsh/check.sh"
 . "$ROOT_DIR/buildsh/tools.sh"
+. "$ROOT_DIR/buildsh/release.sh"
 
 case "$TASK" in
-  build)        bs_build "$ROOT_DIR" ;;
-  check)        bs_check "$ROOT_DIR" ;;
+  build)          bs_build "$ROOT_DIR" ;;
+  check)          bs_check "$ROOT_DIR" ;;
+  release-verify) bs_verify_release "$ROOT_DIR" "$@" ;;
   *)            bs_tools "$ROOT_DIR" "$TASK" ;;
 esac
