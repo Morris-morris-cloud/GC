@@ -11,7 +11,7 @@ using GC.Services;
 //       仓库根 version.json 与 model/version.json（内容相同，便于两种源地址读取）。
 
 // 仓库地址（编译产物的 Release 也发在这里）：与启动器默认 updateRepository 保持一致。
-const string Repository = "https://gitcode.com/Morris_1/GC";
+const string Repository = "https://git.xhmcl.com/Morris/GC";
 
 // 位置参数：<仓库根> <启动器版本>；开关：--launcher-only
 // --launcher-only 只刷新 launcher.packages（构建脚本在打完 zip 之后再调一次），
@@ -150,7 +150,7 @@ var packages = new Dictionary<string, Dictionary<string, object>>();
 //   2) 仓库里的编译产物 dist/<系统>-<架构>/GC-<版本>-<系统>-<架构>.zip ——
 //      不发 Release、只提交产物也能更新（用户明确要求支持这种布局）。
 // 两种都写：url 只是「去哪儿找」，真正的完整性凭据是下面的 sha256（受签名保护）。
-var releaseBase = $"{Repository}/releases/download/v{launcherVersion}";
+var releaseBase = $"{Repository}/releases/download/{launcherVersion}";
 foreach (var rid in new[] { "win-x64", "win-arm64", "osx-arm64", "osx-x64", "linux-x64" })
 {
     var label = LauncherArtifacts.LabelOf(rid);
