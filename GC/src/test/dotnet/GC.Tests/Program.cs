@@ -238,7 +238,7 @@ internal static class Program
         {
             var script = File.ReadAllText(scriptPath);
             Check(!script.Contains(tmp), "脚本不含绝对路径");
-            Check(script.Contains("GCL-*") || script.Contains("GC-*"), "脚本按 GCL-*/GC-* 匹配删除");
+            Check(script.Contains("GC-*") || script.Contains("GCL-*"), "脚本按 GC-*/GCL-* 匹配删除");
         }
 
         // 5b) 只发产物、不发 Release：更新包只存在于仓库 dist/<系统>-<架构>/ 目录里。

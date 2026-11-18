@@ -167,6 +167,7 @@ pack_models() {
 #   dist/mac-arm64/GCL-<版本>-mac-arm64.zip
 #   dist/win-amd64/GCL-<版本>-win-amd64.zip
 #   dist/win-arm64/GCL-<版本>-win-arm64.zip
+#   dist/linux-arm64/GCL-<版本>-linux-arm64.zip
 # 启动器更新时既可以从 Release 附件下载，也会到这些目录里找编译产物
 # （见 GC-DOWNLOAD/LauncherArtifacts.cs），所以两种发布方式都能用。
 #
@@ -224,8 +225,28 @@ build_flutter_ui() {
       cp -R "$UI_SRC/build/macos/Build/Products/Release/GC-UI.app" "$ROOT_DIR/$DEST/"
       ;;
     linux)
-      # bundle/ 里是 GC-UI、lib/*.so 与 data/，整体铺到包的根目录
-      cp -R "$UI_SRC/build/linux/x64/release/bundle/." "$ROOT_DIR/$DEST/"
+      # bundle/ 里是 GC-UI、lib/*.so 与 data/，整体铺到包的根目录。
+      # 目录名跟着目标架构走：aarch64 主机在 build/linux/arm64/，x64 在 build/linux/x64/。
+      BUNDLE=""
+      for cand in "$UI_SRC/build/linux/arm64/release/bundle" \
+                  "$UI_SRC/build/linux/x64/release/bundle"; do
+        [ -d "$cand" ] && BUNDLE="$cand" && break
+      done
+      if [ -z "$BUNDLE" ]; then
+        echo "!! 找不到 Flutter Linux bundle（期望 build/linux/{arm64,x64}/release/bundle）"
+        return 1
+      fi
+      # 目标包是 arm64，却只编出 x64 bundle：说明主机架构不对，宁可失败也不出坏包
+      case "$BUNDLE" in
+        */arm64/*) ;;
+        *)
+          if [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "arm64" ]; then
+            echo "!! Linux 包目标为 arm64，但当前主机 $(uname -m) 只能编出 x64 前端"
+            return 1
+          fi
+          ;;
+      esac
+      cp -R "$BUNDLE/." "$ROOT_DIR/$DEST/"
       ;;
     *)
       echo "!! 不支持的 Flutter 目标平台：$PLAT"
@@ -265,7 +286,7 @@ build_flutter_ui_cross() {
 }
 
 pack_launcher() {
-  echo "==> 生成启动器产物（GC-<版本>-<系统>-<架构>）"
+  echo "==> 生成启动器产物（GCL-<版本>-<系统>-<架构>）"
 
   # --- Windows：启动器 + 守护进程 + UI 后端 + Flutter 前端，整目录打包 ---
   for pair in "win-x64:win-amd64" "win-arm64:win-arm64"; do
@@ -307,10 +328,10 @@ pack_launcher() {
   done
 
   # --- Linux：整目录打包（启动器 + 守护 + 后端 + Flutter 前端）---
-  SRC="$ROOT_DIR/dist/linux-amd64"
+  SRC="$ROOT_DIR/dist/linux-arm64"
   if [ -d "$SRC" ]; then
     TMP="$ROOT_DIR/dist/.linuxpkg"
-    PKGNAME="GCL-${VERSION}-linux-amd64"
+    PKGNAME="GCL-${VERSION}-linux-arm64"
     PKG="$TMP/$PKGNAME"
     rm -rf "$TMP"; mkdir -p "$PKG"
     cp -R "$SRC"/. "$PKG"/
@@ -326,11 +347,11 @@ pack_launcher() {
     if [ ! -f "$PKG/GC-UI" ]; then
       echo "    !! 包内没有 Flutter 前端，启动器将使用内置 Avalonia 界面"
     fi
-    ZIP="$ROOT_DIR/dist/linux-amd64/$PKGNAME.zip"
+    ZIP="$ROOT_DIR/dist/linux-arm64/$PKGNAME.zip"
     rm -f "$ZIP"
     ( cd "$TMP" && zip -qry "$ZIP" "$PKGNAME" )
     rm -rf "$TMP"
-    echo "    -> dist/linux-amd64/$PKGNAME.zip"
+    echo "    -> dist/linux-arm64/$PKGNAME.zip"
   fi
 
   # --- macOS：先得到真实 .app 目录（改名 + 同步 Info.plist）---
@@ -393,7 +414,7 @@ pack_launcher() {
 
 # 删除 publish 过程中的中间目录：平台目录里只留最终 zip
 strip_intermediate_dirs() {
-  for d in win-amd64 win-x64 win-arm64 mac-arm64 linux-amd64 linux-x64; do
+  for d in win-amd64 win-x64 win-arm64 mac-arm64 linux-arm64 linux-x64; do
     [ -d "$ROOT_DIR/dist/$d" ] || continue
     find "$ROOT_DIR/dist/$d" -mindepth 1 -maxdepth 1 \
       ! -name "GCL-${VERSION}-*.zip" -exec rm -rf {} + 2>/dev/null || true
