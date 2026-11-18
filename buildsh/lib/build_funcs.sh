@@ -384,6 +384,13 @@ pack_launcher() {
       /usr/libexec/PlistBuddy -c "Set :CFBundleName Morris GC" "$PLIST" 2>/dev/null || true
       /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Morris GC" "$PLIST" 2>/dev/null || true
     fi
+    # 非本体文件收进 .GC/bin（与 Windows 布局一致）：.GC 位置不变，仍在启动器同级
+    # （也就是 .app/Contents/MacOS/），首次启动复制到 .GC/safedog 再运行。
+    if [ -f "$FINAL/Contents/MacOS/GC-SAVEDOG" ]; then
+      mkdir -p "$FINAL/Contents/MacOS/.GC/bin"
+      mv "$FINAL/Contents/MacOS/GC-SAVEDOG" "$FINAL/Contents/MacOS/.GC/bin/"
+      chmod +x "$FINAL/Contents/MacOS/.GC/bin/GC-SAVEDOG" 2>/dev/null || true
+    fi
     xattr -cr "$FINAL" 2>/dev/null || true
     echo "    -> $(basename "$FINAL")/"
   fi
@@ -489,7 +496,8 @@ PLIST
     fi
   fi
 
-  # 发布包不带 .GC 运行骨架（用户首次启动自行创建），避免覆盖用户数据
+  # 清掉模板类 .GC（config / model / cache / update / logs）：首次启动自行创建，
+  # 包里只保留 .GC/bin 这一个由 pack_launcher 补上的非本体文件目录。
   rm -rf "$APP/Contents/MacOS/.GC"
   chmod +x "$APP/Contents/MacOS/GC"
   echo "==> 已打包 $APP"
