@@ -140,7 +140,7 @@ class _Sidebar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
+                child: Text(
                   '◎',
                   style: TextStyle(fontSize: 14, color: GcColors.accent),
                 ),

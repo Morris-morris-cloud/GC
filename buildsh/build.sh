@@ -53,17 +53,19 @@ bs_build() {
   _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" true || return 1
   publish_backend "win-arm64" "dist/win-arm64" || return 1
 
-  # Windows 版 Flutter 只能在 Windows 上编；x64 产物同时放进两个 Windows 包
-  # （ARM64 上由系统模拟 x64 进程运行前端）。
+  # Windows 前端：Windows 主机走官方 toolchain；Linux/macOS 主机用 mingw-w64 +
+  # wine 交叉编译（buildsh/cross）。只产出 x64 一份，两个包共用，
+  # ARM64 上由系统模拟 x64 进程运行前端。
   case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)
-      build_flutter_ui windows "dist/win-flutter" || return 1
-      for label in win-amd64 win-arm64; do
-        cp -R "$ROOT_DIR/dist/win-flutter/." "$ROOT_DIR/dist/$label/"
-      done
-      rm -rf "$ROOT_DIR/dist/win-flutter"
-      ;;
+    MINGW*|MSYS*|CYGWIN*) build_flutter_ui windows "dist/win-flutter" || return 1 ;;
+    *)                    build_flutter_ui_cross "dist/win-flutter" ;;
   esac
+  if [ -d "$ROOT_DIR/dist/win-flutter" ]; then
+    for label in win-amd64 win-arm64; do
+      cp -R "$ROOT_DIR/dist/win-flutter/." "$ROOT_DIR/dist/$label/"
+    done
+    rm -rf "$ROOT_DIR/dist/win-flutter"
+  fi
 
   progress_step "运行骨架"; progress_tick 100
   package_mac_app
