@@ -24,10 +24,14 @@ public static class SavedogLauncher
         var home = Path.Combine(paths.SafedogRoot, name);
         if (File.Exists(home)) return home;
 
+        // 包内 payload：非本体文件统一收在 .GC/bin
+        var payload = Path.Combine(install, ".GC", "bin", name);
+        if (File.Exists(payload)) return payload;
+
         var direct = Path.Combine(install, name);
         if (File.Exists(direct)) return direct;
 
-        // 新包把守护进程放在 safedog/ 子目录
+        // 1.0.10 及更早的包把守护进程放在 safedog/ 子目录
         var packaged = Path.Combine(install, "safedog", name);
         if (File.Exists(packaged)) return packaged;
 

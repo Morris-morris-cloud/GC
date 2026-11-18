@@ -59,23 +59,35 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 ## 运行目录（发布包里就长这样）
 
 ```
-<解压出来的目录>/                    ← 压缩包里只有这一个文件夹
-  GCL-<版本>-<平台>(.exe | .app/)  启动器
-  GC-UI(.exe)                       Flutter 前端
-  safedog/GC-SAVEDOG[.exe]          更新守护进程（运行时复制到 .GC/safedog）
-  data/ lib/ *.dll                  后端与 Flutter 运行时
-  .GC/                              首次启动自动生成
-    config/settings.json            用户设置（与缓存分开：删 cache 不会丢配置）
-    model/                          启动时下载的模型
-    cache/                          下载暂存 / 原子替换
-    update/                         待应用的启动器更新（apply-request.json + package.zip）
-    safedog/GC-SAVEDOG[.exe]        实际运行的守护进程（不随整目录替换被覆盖）
-    logs/gc-YYYYMMDD.log            日志（中文）
-    logs/gc-YYYYMMDD.en.log         日志（English）
+<解压出来的目录>/                     ← 压缩包里只有这一个文件夹
+  GCL-<版本>-<平台>.exe               启动器（单文件：服务层 + 本地后端 + .NET 运行时都在里面）
+  GC-UI.exe                          Flutter 前端
+  flutter_windows.dll                Flutter 引擎（引擎自带，不在 .NET 单文件里）
+  data/app.so, data/flutter_assets/  Flutter 资源与 AOT 快照
+  .GC/bin/GC-SAVEDOG[.exe]           非本体文件：更新守护进程
 ```
 
-压缩包内只有一个顶层目录，解压后不会散落一屏 dll；主程序、后端、前端、守护进程都在
-这个目录里。`.GC` 紧挨着主程序，装在哪都便携 —— 整个目录复制走，模型、设置、日志跟着走。
+就这些，没有一屏 dll。安装目录根只放 GC 本体，非本体文件（守护进程）一律收在 `.GC/bin`。
+macOS 是同一个单文件启动器，只是被放进 `GCL-<版本>-mac-arm64.app/Contents/MacOS/`，
+Flutter 前端作为 `GC-UI.app` 放在同一层。
+
+首次启动后 `.GC` 补齐成：
+
+```
+  .GC/
+    bin/                           非本体文件（随包分发，更新时按文件替换）
+    config/settings.json           用户设置（与缓存分开：删 cache 不会丢配置）
+    model/                         启动时下载的模型
+    cache/                         下载暂存 / 原子替换
+    update/                        待应用的启动器更新（apply-request.json + package.zip）
+    safedog/GC-SAVEDOG[.exe]       守护进程的运行副本（首次启动从 .GC/bin 复制）
+    logs/gc-YYYYMMDD.log           日志（中文）
+    logs/gc-YYYYMMDD.en.log        日志（English）
+```
+
+`.GC` 紧挨着主程序，装在哪都便携 —— 整个目录复制走，模型、设置、日志跟着走。
+守护进程「`.GC/bin` 放源、`.GC/safedog` 放运行副本」是因为更新要整目录替换：
+正在运行的 exe 在 Windows 上换不掉，所以跑副本、换源文件，下次启动再同步。
 
 **发布包不含任何模型**。首次启动联网检查后把模型下载到 `.GC/model/` 并立刻显示；
 安装目录不可写时自动退回用户数据目录。`.GC/cache` 与 `.GC/model` 随时可删，程序会重新下载；
@@ -93,7 +105,8 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 ```
 启动器下载 zip -> 校验 sha256 -> 写 apply-request.json -> 启动 .GC/safedog/GC-SAVEDOG -> 自己退出
   GC-SAVEDOG: 二次验签 -> 检查 zip 安全性 -> 解压到 .GC/update/stage
-            -> 整目录替换：旧文件搬到 .GC/update/backup，新文件就位（保留 .GC 不动）
+            -> 整目录替换：旧文件搬到 .GC/update/backup，新文件就位
+               （.GC 只合并 bin/，config/model/cache/update/logs/safedog 原地不动）
             -> 启动新版，等 .GC/update/health.json
             -> 收到：删备份、写 last-good.json
             -> 没收到/进程退出：撤掉新文件、把备份搬回、重启旧版，写 state.json = rolledback
@@ -253,9 +266,9 @@ Repository/
 | 产物 | 平台 |
 | --- | --- |
 | `dist/mac-arm64/GCL-<版本>-mac-arm64.zip` | macOS Apple Silicon（单顶层 `GCL-….app`） |
-| `dist/win-amd64/GCL-<版本>-win-amd64.zip` | Windows x64（单顶层 `GCL-…/`，含 Flutter 前端与 `safedog/`） |
+| `dist/win-amd64/GCL-<版本>-win-amd64.zip` | Windows x64（单顶层 `GCL-…/`，含 Flutter 前端，非本体文件在 `.GC/bin/`） |
 | `dist/win-arm64/GCL-<版本>-win-arm64.zip` | Windows on ARM 同上 |
-| `dist/linux-arm64/GCL-<版本>-linux-arm64.zip` | Linux ARM64 同上（启动器无扩展名，需在 aarch64 主机构建） |
+| `dist/linux-arm64/GCL-<版本>-linux-arm64.zip` | Linux ARM64 同上（启动器无扩展名；默认不构建，需 aarch64 主机 + `GC_BUILD_LINUX=1`） |
 
 平台目录就是「该平台的编译产物目录」：打包完成后只留最终 zip（原始 `.app` / `.exe`
 会被挪到 `build/trash/`，下次构建时移出，不做递归删除）。

@@ -18,8 +18,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 后端以库的方式编进启动器：发布包只需要一个 exe，不用再带一份运行时 -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GC\src\GC.Core.csproj" />
     <ProjectReference Include="..\GC-DOWNLOAD\GC-DOWNLOAD.csproj" />
+    <ProjectReference Include="..\GC-UI\backend\GC.UI.Server\GC.UI.Server.csproj" />
   </ItemGroup>
 
 </Project>

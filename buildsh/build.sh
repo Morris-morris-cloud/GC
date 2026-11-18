@@ -3,7 +3,10 @@
 #
 # 目标平台按构建主机决定，每条产物都带 Flutter 前端：
 #   macOS 主机 : mac-arm64（原生）+ win-amd64 / win-arm64（mingw 交叉）
-#   Linux 主机 : linux-arm64（原生 / 交叉）+ win-amd64 / win-arm64（mingw 交叉）
+#   Linux 主机 : win-amd64 / win-arm64（mingw 交叉）
+#                Linux 产物默认不构建：目标为 linux-arm64，官方 Flutter 引擎只有
+#                x64 产物，必须在 aarch64 主机上编。需要时用 GC_BUILD_LINUX=1 显式开启
+#                （云端 aarch64 runner 就是这么用的）。
 #   Windows 主机: win-amd64 / win-arm64（原生）
 #
 # 前端是默认必需项：flutter 缺失或编译失败一律中断，不再悄悄产出只带 Avalonia
@@ -23,16 +26,24 @@ bs_build() {
     MINGW*|MSYS*|CYGWIN*) : ;;          # Windows 主机只能编 Windows
     *) BUILD_LINUX=1 ;;
   esac
-  # Linux 目标已切成 arm64：Flutter 的 Linux 前端必须用 aarch64 主机自带的
-  # engine 产物（官方只发 x64 版），x64 主机上强行编出来的是 x64 二进制，
-  # 装到 arm 机器上跑不起来。这里直接跳过，并说明原因，不当成构建失败。
+  # Linux 产物默认不出：目标平台是 linux-arm64，而官方 Flutter 引擎只发 x64 产物，
+  # x64 主机上编出来的是 x64 二进制，装到 arm 机器上跑不起来。
+  # 需要时显式开启（云端 aarch64 runner）：GC_BUILD_LINUX=1 ./build.sh build
   if [ "$BUILD_LINUX" = 1 ]; then
-    case "$(uname -m)" in
-      aarch64|arm64) ;;
+    case "${GC_BUILD_LINUX:-0}" in
+      1|true|yes)
+        case "$(uname -m)" in
+          aarch64|arm64) ;;
+          *)
+            BUILD_LINUX=0
+            echo "!! 已请求 Linux 产物，但当前主机是 $(uname -m)"
+            echo "   （linux-arm64 需要有 aarch64 主机，Flutter 引擎只有 x64 官方产物）"
+            ;;
+        esac
+        ;;
       *)
         BUILD_LINUX=0
-        echo "!! 跳过 Linux 产物：目标为 linux-arm64，当前主机是 $(uname -m)"
-        echo "   （Flutter Linux 引擎只有 x64 官方产物，需在 aarch64 主机上构建）"
+        echo "==> 跳过 Linux 产物（默认不构建；需要时用 GC_BUILD_LINUX=1 显式开启）"
         ;;
     esac
   fi
@@ -81,8 +92,7 @@ bs_build() {
 
   if [ "$BUILD_MAC" = 1 ]; then
     progress_step "编译 Mac"
-    _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" false || return 1
-    publish_backend "osx-arm64" "dist/mac-arm64" || return 1
+    _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" true || return 1
     # Flutter 的 macOS 产物必须用 Xcode 在本机编，Linux 上无法替代
     build_flutter_ui macos "dist/mac-arm64" || {
       echo "!! macOS 前端编译失败。macOS 版 Flutter 只能在 macOS 上编。"
@@ -90,23 +100,19 @@ bs_build() {
     }
   elif [ "$ALLOW_NO_UI" = 1 ]; then
     progress_step "编译 Mac"
-    _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" false || return 1
-    publish_backend "osx-arm64" "dist/mac-arm64" || return 1
+    _run_publish mac 90 publish_rid "osx-arm64" "dist/mac-arm64" true || return 1
     echo "!! --allow-no-ui：macOS 包内不含 Flutter 前端，启动器将回退 Avalonia"
   fi
 
   progress_step "编译 Win-x64"
-  _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" false || return 1
-  publish_backend "win-x64" "dist/win-amd64" || return 1
+  _run_publish winx64 70 publish_rid "win-x64" "dist/win-amd64" true || return 1
 
   progress_step "编译 Win-arm64"
-  _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" false || return 1
-  publish_backend "win-arm64" "dist/win-arm64" || return 1
+  _run_publish winarm 70 publish_rid "win-arm64" "dist/win-arm64" true || return 1
 
   if [ "$BUILD_LINUX" = 1 ]; then
     progress_step "编译 Linux"
-    _run_publish linux 70 publish_rid "linux-arm64" "dist/linux-arm64" false || return 1
-    publish_backend "linux-arm64" "dist/linux-arm64" || return 1
+    _run_publish linux 70 publish_rid "linux-arm64" "dist/linux-arm64" true || return 1
     build_flutter_ui linux "dist/linux-arm64" || return 1
   fi
 

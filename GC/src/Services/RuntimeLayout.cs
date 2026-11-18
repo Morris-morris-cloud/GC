@@ -7,7 +7,7 @@ namespace GC.Services;
 /// 运行期目录准备：
 /// <list type="number">
 ///   <item>创建 <c>.GC/logs</c> 与 <c>.GC/safedog</c>；</item>
-///   <item>把安装包里的守护进程复制到 <c>.GC/safedog</c>（程序本体与用户数据分开）；</item>
+///   <item>把包内 <c>.GC/bin</c> 里的守护进程复制到 <c>.GC/safedog</c>（非本体文件不散落在安装目录）；</item>
 ///   <item>初始化双语日志并写一条启动记录。</item>
 /// </list>
 ///
@@ -36,7 +36,7 @@ public static class RuntimeLayout
         return safedog;
     }
 
-    /// <summary>把包内守护进程同步到 <c>.GC/safedog</c>。已是最新则不动。</summary>
+    /// <summary>把包内 <c>.GC/bin</c> 的守护进程同步到 <c>.GC/safedog</c>。已是最新则不动。</summary>
     private static string? InstallSafedog(AppPaths paths)
     {
         var name = SavedogFiles.ExecutableName;
@@ -64,10 +64,14 @@ public static class RuntimeLayout
 
     private static string? FindPackaged(AppPaths paths, string name)
     {
+        // 包内非本体文件统一收在 .GC/bin；后面几项兼容 1.0.10 及更早的包布局
         var candidates = new[]
         {
+            Path.Combine(paths.HomeRoot, "bin", name),
+            Path.Combine(paths.InstallDirectory, ".GC", "bin", name),
             Path.Combine(paths.InstallDirectory, "safedog", name),
             Path.Combine(paths.InstallDirectory, name),
+            Path.Combine(paths.AppRoot, ".GC", "bin", name),
             Path.Combine(paths.AppRoot, "safedog", name),
             Path.Combine(paths.AppRoot, name),
         };

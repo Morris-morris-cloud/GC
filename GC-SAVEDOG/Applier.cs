@@ -498,7 +498,7 @@ internal sealed class Applier
     ///   1. 安装目录里「新版没有」的条目 → 移到 backup（旧版本残留，如上一版的旧文件名）；
     ///   2. 与新版同名的条目 → 先移到 backup，再把新版放进来（覆盖正在被占用的文件会失败，
     ///      这种情况直接报错并还原，绝不留下半新半旧的目录）；
-    ///   3. `.GC`、更新目录自身、正在运行的 GC-SAVEDOG.exe 一律跳过。
+    ///   3. `.GC` 只合并 `bin/`（非本体文件），其余子目录与更新目录自身一律跳过。
     ///
     /// 返回 false 时调用方应调用 <see cref="RestoreFromBackup"/> 还原。
     /// </summary>
@@ -518,6 +518,14 @@ internal sealed class Applier
             foreach (var entry in Directory.GetFileSystemEntries(stage))
             {
                 var name = Path.GetFileName(entry);
+                if (string.Equals(name, ".GC", StringComparison.OrdinalIgnoreCase))
+                {
+                    // .GC 里只有 bin/ 属于程序本体（守护进程这类「非本体」文件），
+                    // 其余（config / model / cache / update / logs / safedog）是用户数据，
+                    // 整目录替换时必须原地不动。
+                    MergeGcBin(entry, installDir, backupDir, replaced);
+                    continue;
+                }
                 if (IsProtected(name))
                 {
                     // 例如 GC-SAVEDOG.exe：本进程正在运行，Windows 上无法替换。
@@ -576,6 +584,52 @@ internal sealed class Applier
     }
 
     /// <summary>
+    /// 合并新包里的 <c>.GC/bin</c>：只搬这一层文件，不动 .GC 下的用户数据。
+    ///
+    /// 守护进程放在这里（而不是安装目录根）是为了「非本体文件全部收进 .GC/bin」；
+    /// 但正在运行的是 <c>.GC/safedog</c> 里的副本，所以这里的文件可以安全替换。
+    /// </summary>
+    private void MergeGcBin(string stageGc, string installDir, string backupDir,
+        List<(string Name, string? BackupPath)> replaced)
+    {
+        try
+        {
+            var bin = Path.Combine(stageGc, "bin");
+            if (!Directory.Exists(bin)) return;
+
+            var relBin = Path.Combine(".GC", "bin");
+            var targetBin = Path.Combine(installDir, relBin);
+            Directory.CreateDirectory(targetBin);
+
+            foreach (var file in Directory.GetFiles(bin))
+            {
+                var name = Path.GetFileName(file);
+                var rel = Path.Combine(relBin, name);
+                var target = Path.Combine(targetBin, name);
+                var backup = Path.Combine(backupDir, ".GC-bin", name);
+
+                if (File.Exists(target))
+                {
+                    MoveEntry(target, backup);
+                    replaced.Add((rel, backup));
+                }
+                else
+                {
+                    replaced.Add((rel, null));
+                }
+
+                MoveEntry(file, target);
+                _log.Info("已更新非本体文件: " + rel, "Updated non-core file: " + rel);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"合并 .GC/bin 失败（继续使用已有版本）：{ex.Message}",
+                      $"Failed to merge .GC/bin (keeping the existing one): {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// 把备份里的条目原样搬回安装目录，撤掉新装的内容。
     /// <paramref name="BackupPath"/> 为 null 表示这一项是新包里独有的（没有旧版本），
     /// 回滚时只需要删掉。
@@ -623,7 +677,7 @@ internal sealed class Applier
 
     /// <summary>
     /// 安装目录里不该被更新碰的东西：
-    ///   · .GC —— 模型库、设置、日志、更新目录本身都在这里；
+    ///   · .GC —— 模型库、设置、日志、更新目录本身都在这里（只有 bin/ 由 MergeGcBin 单独处理）；
     ///   · GC-SAVEDOG.exe —— 本进程正在运行，Windows 上无法替换。
     /// </summary>
     private static bool IsProtected(string name)
