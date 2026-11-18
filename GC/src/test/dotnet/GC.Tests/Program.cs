@@ -310,8 +310,10 @@ internal static class Program
     /// <summary>序列化清单并用私钥签名（测试里模拟一次正式发布）。</summary>
     private static void WriteSigned(string path, RepoVersion version, ECDsa key)
     {
+        // keyId 必须与 .signing/ 里的私钥对应的公钥条目一致，否则客户端按 keyId
+        // 查不到受信任公钥，会判成 Invalid 而不是 Verified。
         var text = JsonSerializer.Serialize(version, Json.Options) + "\n";
-        File.WriteAllText(path, ManifestSignature.SignDocument(text, key, "gc-2026-11"));
+        File.WriteAllText(path, ManifestSignature.SignDocument(text, key, "gc-2026-12"));
     }
 
     private static void CopyTree(string src, string dst)

@@ -23,7 +23,7 @@ namespace GC.Savedog;
 /// </summary>
 internal static class Program
 {
-    private const string DefaultKeyId = "gc-2026-11";
+    private const string DefaultKeyId = "gc-2026-12";
     private const string DefaultKeyPath = ".signing/gc-signing.pem";
 
     private static int Main(string[] args)

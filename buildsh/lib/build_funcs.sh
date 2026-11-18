@@ -24,7 +24,7 @@ stamp_launcher_only() {
 # 没有私钥时只警告：清单不带 signature，客户端会按「未签名」处理。
 sign_manifest() {
   KEY="$ROOT_DIR/.signing/gc-signing.pem"
-  KEYID="${GC_SIGNING_KEY_ID:-gc-2026-11}"
+  KEYID="${GC_SIGNING_KEY_ID:-gc-2026-12}"
   if [ ! -f "$KEY" ]; then
     echo "!! 未找到签名私钥 ${KEY}，本次 version.json 未签名（客户端会拒绝更新）"
     echo "   生成密钥：dotnet run --project GC-SAVEDOG -- keygen"

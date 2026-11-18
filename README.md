@@ -135,11 +135,22 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 ### 签名密钥
 
 - 私钥：`.signing/gc-signing.pem`（**已在 `.gitignore`，永不入库**；请自行备份）
-- 公钥：硬编码在 `GC/src/Security/SignatureKeyring.cs`，指纹 `b41b1dd6259ea9ed`
-- 生成新密钥：`dotnet run --project GC-SAVEDOG -- keygen`
-- 轮换：把新公钥追加进 `SignatureKeyring.Keys`（保留旧公钥一个版本周期），再重新签名清单
+- 公钥：硬编码在 `GC/src/Security/SignatureKeyring.cs`
+  - 当前生效：`gc-2026-12`，指纹 `ee6083be47a87907`
+  - 已停用：`gc-2026-11`，指纹 `b41b1dd6259ea9ed`（私钥遗失，仅保留占位）
+- 生成新密钥：`dotnet run --project GC-SAVEDOG -- keygen --key-id gc-YYYY-MM`
+- 轮换：把新公钥追加进 `SignatureKeyring.Keys`（保留旧公钥一个版本周期），
+  同时把 `GC_SIGNING_KEY_ID`（默认值在 `buildsh/lib/build_funcs.sh`）改成新 keyId，
+  再重新签名清单
 - 部署前核对两边公钥一致：
   `dotnet run --project GC-SAVEDOG -- verify --manifest version.json`
+
+`build.sh` 在刷新清单后自动调用 `sign_manifest` 签名并同步 `model/version.json`；
+`.signing/gc-signing.pem` 不存在时只告警，清单不带签名（客户端会拒绝更新）。
+
+> 换钥匙的代价：老客户端只认识编译进去的那份公钥，所以**用新密钥签出的清单
+> 在旧版本上会判成「签名无效」**。密钥一旦丢失，只能靠发一个新版本把新公钥带出去，
+> 中间这段时间老客户端无法自动更新 —— 私钥务必备份两处以上。
 
 ### zip 解压加固
 
