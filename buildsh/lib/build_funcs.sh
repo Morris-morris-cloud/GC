@@ -94,7 +94,7 @@ TXT
   "memoryMb": 2048,
   "autoUpdateOnStartup": true,
   "requireSignedManifest": true,
-  "updateRepository": "https://gitcode.com/Morris_1/GC",
+  "updateRepository": "https://git.xhmcl.com/Morris/GC",
   "updateManifestUrl": "",
   "updateLocalRoot": "",
   "installedModelVersions": {},
@@ -190,18 +190,24 @@ publish_backend() {
     -o "$ROOT_DIR/$OUT" || return 1
 }
 
-# 当前主机原生构建 Flutter 前端（Windows 主机编 Windows，macOS 主机编 macOS）。
-# macOS 版 Flutter 桌面只能在 macOS 上编；Windows 版则由 build_flutter_ui_cross
-# 在 Linux/macOS 上交叉编译。
+# 当前主机原生构建 Flutter 前端（Windows 主机编 Windows，macOS 主机编 macOS，
+# Linux 主机编 Linux）。跨平台的 Windows 版由 build_flutter_ui_cross 负责。
+#
+# 默认「必须有前端」：缺 flutter 或编译失败直接返回非 0，让 build.sh 停下来说明
+# 原因，而不是悄悄出一个只有 Avalonia 回退界面的包。确实需要降级时用
+# ./build.sh build --allow-no-ui 显式声明。
 build_flutter_ui() {
   PLAT="$1"; DEST="$2"
   UI_SRC="$ROOT_DIR/GC-UI/frontend"
-  [ -d "$UI_SRC" ] || return 0
+  if [ ! -d "$UI_SRC" ]; then
+    echo "!! 找不到 Flutter 工程：$UI_SRC"
+    return 1
+  fi
 
   FLUTTER_BIN="${FLUTTER_BIN:-flutter}"
   if ! command -v "$FLUTTER_BIN" >/dev/null 2>&1; then
-    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定），本次包内不含 Flutter 界面"
-    return 0
+    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定）"
+    return 1
   fi
 
   echo "==> 构建 Flutter 前端 (${PLAT})"
@@ -217,6 +223,14 @@ build_flutter_ui() {
       rm -rf "$ROOT_DIR/$DEST/GC-UI.app"
       cp -R "$UI_SRC/build/macos/Build/Products/Release/GC-UI.app" "$ROOT_DIR/$DEST/"
       ;;
+    linux)
+      # bundle/ 里是 GC-UI、lib/*.so 与 data/，整体铺到包的根目录
+      cp -R "$UI_SRC/build/linux/x64/release/bundle/." "$ROOT_DIR/$DEST/"
+      ;;
+    *)
+      echo "!! 不支持的 Flutter 目标平台：$PLAT"
+      return 1
+      ;;
   esac
   echo "    -> $DEST（Flutter ${PLAT}）"
 }
@@ -231,8 +245,8 @@ build_flutter_ui_cross() {
 
   FLUTTER_BIN="${FLUTTER_BIN:-flutter}"
   if ! command -v "$FLUTTER_BIN" >/dev/null 2>&1; then
-    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定），本次包内不含 Flutter 界面"
-    return 0
+    echo "!! 未找到 flutter（可用 FLUTTER_BIN=<路径> 指定）"
+    return 1
   fi
 
   mkdir -p "$ROOT_DIR/build/logs"
@@ -240,8 +254,9 @@ build_flutter_ui_cross() {
   if ! FLUTTER_BIN="$FLUTTER_BIN" bash "$ROOT_DIR/buildsh/cross/build-ui-win-cross.sh" \
        "$UI_SRC/build/windows/x64/runner/Release" \
        >"$ROOT_DIR/build/logs/flutter-win-cross.log" 2>&1; then
-    echo "!! 交叉编译失败，本次包内不含 Flutter 界面（日志：build/logs/flutter-win-cross.log）"
-    return 0
+    echo "!! 交叉编译失败（日志：build/logs/flutter-win-cross.log）"
+    tail -5 "$ROOT_DIR/build/logs/flutter-win-cross.log" 2>/dev/null | sed 's/^/   /'
+    return 1
   fi
 
   mkdir -p "$ROOT_DIR/$DEST"
@@ -283,6 +298,27 @@ pack_launcher() {
     rm -rf "$TMP"
     echo "    -> dist/$LABEL/GC-${VERSION}-${LABEL}.zip"
   done
+
+  # --- Linux：整目录打包（启动器 + 守护 + 后端 + Flutter 前端）---
+  SRC="$ROOT_DIR/dist/linux-amd64"
+  if [ -d "$SRC" ]; then
+    TMP="$ROOT_DIR/dist/.linuxpkg"
+    rm -rf "$TMP"; mkdir -p "$TMP"
+    cp -R "$SRC"/. "$TMP"/
+    rm -f "$TMP"/*.zip
+    if [ -f "$TMP/GC" ]; then
+      mv "$TMP/GC" "$TMP/GC-${VERSION}-linux-amd64"
+      chmod +x "$TMP/GC-${VERSION}-linux-amd64" 2>/dev/null || true
+    fi
+    if [ ! -f "$TMP/GC-UI" ]; then
+      echo "    !! 包内没有 Flutter 前端，启动器将使用内置 Avalonia 界面"
+    fi
+    ZIP="$ROOT_DIR/dist/linux-amd64/GC-${VERSION}-linux-amd64.zip"
+    rm -f "$ZIP"
+    ( cd "$TMP" && zip -qry "$ZIP" . )
+    rm -rf "$TMP"
+    echo "    -> dist/linux-amd64/GC-${VERSION}-linux-amd64.zip"
+  fi
 
   # --- macOS：先得到真实 .app 目录（改名 + 同步 Info.plist）---
   MACAPP="$ROOT_DIR/dist/mac-arm64/GC.app"
