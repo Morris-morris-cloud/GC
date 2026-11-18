@@ -56,12 +56,14 @@ public sealed partial class DownloadJob : ObservableObject, IDownloadJob
     partial void OnErrorChanged(string? value) => RefreshText();
 }
 
-/// <summary>下载中心：最多 2 个并发，任务在「后台列表」里折叠展示。</summary>
+/// <summary>下载中心：最多 4 个并发，任务在「后台列表」里折叠展示。</summary>
 public sealed class DownloadCenter : IDownloadCenter
 {
     private readonly ModelRepository _repository;
     private readonly AppPaths _paths;
-    private readonly SemaphoreSlim _slots = new(2);
+    // 断点续传后单任务失败重来的代价小了很多，可以适当提高并发；
+    // 更新服务那边已是 6，模型下载保持 4，兼顾弱网吞吐与源站压力。
+    private readonly SemaphoreSlim _slots = new(4);
 
     public ObservableCollection<IDownloadJob> Jobs { get; } = new();
     public event Action? Installed;

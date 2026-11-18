@@ -5,6 +5,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using GC.Models;
@@ -158,18 +160,21 @@ public sealed class ModelSourceClient : IModelSourceClient
 
     private async Task DownloadZipAsync(string url, string cacheDir, CancellationToken ct)
     {
+        // .part 用 URL 哈希做稳定文件名：同一个源重试时命中同一份半成品，
+        // 断点续传才有意义（用 GUID 的话每次重试都是新文件，等于从零开始）。
+        // 解压目录仍用 GUID —— 它只是中间产物，成功后整块移走或失败即删。
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))[..16].ToLowerInvariant();
+        var partPath = Path.Combine(_paths.CacheRoot, "tmp", "downloads", key + ".part");
         var tmpRoot = Path.Combine(_paths.CacheRoot, "tmp", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpRoot);
         var zipPath = Path.Combine(tmpRoot, "source.zip");
         try
         {
-            using (var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct))
-            {
-                response.EnsureSuccessStatusCode();
-                await using var input = await response.Content.ReadAsStreamAsync(ct);
-                await using var output = File.Create(zipPath);
-                await input.CopyToAsync(output, 81920, ct);
-            }
+            // 带断点续传的流式下载；网络中断时 .part 保留，下次从这里接上。
+            await ResumableDownloader.DownloadAsync(Http, url, partPath, null, ct)
+                .ConfigureAwait(false);
+            // 下载完整，.part 转正。转正成功即代表这份 zip 已完整，删掉 .part 避免重复下载。
+            File.Move(partPath, zipPath, overwrite: true);
 
             var extractDir = Path.Combine(tmpRoot, "extract");
             Directory.CreateDirectory(extractDir);
