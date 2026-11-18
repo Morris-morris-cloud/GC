@@ -367,9 +367,9 @@ public static class LauncherUpdater
             else if (File.Exists(manifestCopy))
                 File.Delete(manifestCopy);
 
-            // 包名：GCL-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）。
+            // 包名：GC-<版本>-<平台标签>.app/.exe（SAVEDOG 找不到时会自行扫描包内顶层）。
             // Linux 的启动器没有扩展名，别硬加 .exe —— 那会让按包名查找永远落空。
-            var packageName = $"GCL-{latest}-{PlatformLabel}" +
+            var packageName = $"GC-{latest}-{PlatformLabel}" +
                               (OperatingSystem.IsMacOS() ? ".app"
                                   : OperatingSystem.IsWindows() ? ".exe"
                                   : "");
@@ -729,7 +729,8 @@ public static class LauncherUpdater
                 // Linux 的启动器没有扩展名（GC-1.0.9-linux-amd64），以前只认 .app/.exe，
                 // 结果解压完判定「没找到新版启动器」，Linux 更新永远失败。
                 // 注意不能用 Path.HasExtension：版本号 9.9.9 里的点会让它误判成有扩展名。
-                if (name.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase) &&
+                if ((name.StartsWith("GC-", StringComparison.OrdinalIgnoreCase) ||
+                     name.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase)) &&
                     name.EndsWith("-" + PlatformLabel, StringComparison.OrdinalIgnoreCase))
                 {
                     TryMarkExecutable(dest);

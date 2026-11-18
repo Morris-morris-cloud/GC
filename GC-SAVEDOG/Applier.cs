@@ -355,7 +355,7 @@ internal sealed class Applier
     {
         if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 0;
 
-        // 发布包把启动器改名成 GCL-<版本>-<系统>-<架构>.exe（旧包是 GC-），先按这个模式认出来。
+        // 发布包把启动器改名成 GC-<版本>-<系统>-<架构>.exe（GCL- 是预留前缀），先按这个模式认出来。
         if (VersionedExePattern.IsMatch(fileName)) return 110;
 
         var name = Path.GetFileNameWithoutExtension(fileName);

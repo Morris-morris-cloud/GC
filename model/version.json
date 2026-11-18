@@ -1,48 +1,46 @@
 {
   "schema": 1,
-  "generated": "2026-11-18T10:16:41Z",
+  "generated": "2026-11-18T12:33:25Z",
   "repository": "https://git.xhmcl.com/Morris/GC",
   "branch": "main",
   "modelDir": "model",
   "launcher": {
-    "version": "1.0.9",
+    "version": "1.0.10",
     "revision": "",
     "packages": {
       "win-x64": {
-        "path": "dist/win-amd64/GC-1.0.9-win-amd64.zip",
+        "path": "dist/win-amd64/GC-1.0.10-win-amd64.zip",
         "dir": "dist/win-amd64",
-        "name": "GC-1.0.9-win-amd64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.9/GC-1.0.9-win-amd64.zip",
-        "sha256": "0807f1005e2d8bd54316529670cf1c3c89a2df07bd39297145f21c9a0aae5f04",
-        "size": 114372206
+        "name": "GC-1.0.10-win-amd64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.10/GC-1.0.10-win-amd64.zip",
+        "sha256": "a2e581b82ccb61cc05f84f69c7ea7e3cd2e1eab0ed5118047e287453aab54d52",
+        "size": 74322650
       },
       "win-arm64": {
-        "path": "dist/win-arm64/GC-1.0.9-win-arm64.zip",
+        "path": "dist/win-arm64/GC-1.0.10-win-arm64.zip",
         "dir": "dist/win-arm64",
-        "name": "GC-1.0.9-win-arm64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.9/GC-1.0.9-win-arm64.zip",
-        "sha256": "ffdc37f8ea5041d69be88ffbcbf9ba5d80f7fb97c6b3debc5a918ff89f9e7f60",
-        "size": 110425463
+        "name": "GC-1.0.10-win-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.10/GC-1.0.10-win-arm64.zip",
+        "sha256": "e0a41e49fd7d493ff92b7b5093b9ce5685988fe572cd1eff6cf95bb9a46eeb70",
+        "size": 72067436
       },
       "osx-arm64": {
-        "path": "dist/mac-arm64/GC-1.0.9-mac-arm64.zip",
+        "path": "dist/mac-arm64/GC-1.0.10-mac-arm64.zip",
         "dir": "dist/mac-arm64",
-        "name": "GC-1.0.9-mac-arm64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.9/GC-1.0.9-mac-arm64.zip",
-        "sha256": "e62bbc8c9925d8158f850440600b5d16af7539c85651a5ebcc5f9a85d4c9bb01",
-        "size": 60066040
+        "name": "GC-1.0.10-mac-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.10/GC-1.0.10-mac-arm64.zip"
       },
       "osx-x64": {
-        "path": "dist/mac-x64/GC-1.0.9-mac-x64.zip",
+        "path": "dist/mac-x64/GC-1.0.10-mac-x64.zip",
         "dir": "dist/mac-x64",
-        "name": "GC-1.0.9-mac-x64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.9/GC-1.0.9-mac-x64.zip"
+        "name": "GC-1.0.10-mac-x64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.10/GC-1.0.10-mac-x64.zip"
       },
-      "linux-x64": {
-        "path": "dist/linux-amd64/GC-1.0.9-linux-amd64.zip",
-        "dir": "dist/linux-amd64",
-        "name": "GC-1.0.9-linux-amd64.zip",
-        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.9/GC-1.0.9-linux-amd64.zip"
+      "linux-arm64": {
+        "path": "dist/linux-arm64/GC-1.0.10-linux-arm64.zip",
+        "dir": "dist/linux-arm64",
+        "name": "GC-1.0.10-linux-arm64.zip",
+        "url": "https://git.xhmcl.com/Morris/GC/releases/download/1.0.10/GC-1.0.10-linux-arm64.zip"
       }
     }
   },
@@ -51,7 +49,7 @@
       "id": "contour-map",
       "version": "1.1",
       "build": "773ab2161d",
-      "manifestSha256": "f86a3f83d5953cafc333585da3009d8846448f6a8a9df13b39cde57b36037733",
+      "manifestSha256": "576c4088127982afaefeef6b3cd9ee2c0b062a94967ba854a090986d8136b0b6",
       "filesSha256": "a6bdf9b4273aabee50c3c94ceab4d0abee15f0df1af90c58bdbb796e0d2d5699",
       "files": 5,
       "dir": "model/contour-map"
@@ -60,7 +58,7 @@
       "id": "earth-geography",
       "version": "1.9",
       "build": "cc68b8863b",
-      "manifestSha256": "448f050fded46d7bfc8f0c3856e741c4a4f82523c8e012dd846ddcd400ff394a",
+      "manifestSha256": "fcd38ab5e23bd6faefcdf2d199b0643c1d3c014c789eb862688d588b4434fdb8",
       "filesSha256": "c018ba481831e23d3183a38ac47251f19754c7464baa5d85b47cea7a49fcfa95",
       "files": 11,
       "dir": "model/earth-geography"
@@ -69,7 +67,7 @@
       "id": "earth-revolution",
       "version": "1.7",
       "build": "53b7a0fbc3",
-      "manifestSha256": "c69fc53f50213c6ab7658e1a761a20d2c55a7a344beb3c75a30393c26fa40167",
+      "manifestSha256": "fc71fa7f6b524512ab7ad039e0ee759f45b8ac08ccdbca7e93297424fd36b64b",
       "filesSha256": "4cd45b0324a77574a0da3a939c2a6faebc785c5a24cb50136d62a78a6ea2e9b1",
       "files": 7,
       "dir": "model/earth-revolution"
@@ -78,7 +76,7 @@
       "id": "earth-rotation",
       "version": "1.7",
       "build": "ecd52665f9",
-      "manifestSha256": "cbf12a47747a331c9980260f39169b1813bb4b52a8916995fda05755267bddca",
+      "manifestSha256": "2aabc7a6e35c42b671e5be62b09414628eff08c5646de8d50dd16a25bb804b1c",
       "filesSha256": "594b005a6a9f36cd0b5d4e4a7a0b1ab42d53c8032832545b71c3915493d56c8e",
       "files": 7,
       "dir": "model/earth-rotation"
@@ -87,7 +85,7 @@
       "id": "scale-calculator",
       "version": "1.6",
       "build": "105653737d",
-      "manifestSha256": "fc6f7deb1efb076cc0bbee732e7de8f007ed74bc837dba2268be1e0adc1839d3",
+      "manifestSha256": "971b4438ebbbf4f8042d8ce035f696e713aae532c3b94231a2d9c60c102cef98",
       "filesSha256": "732dd26406e0f1e836970499d7ea644def332ce909d7f8aa0a403bbe7337e604",
       "files": 6,
       "dir": "model/scale-calculator"
@@ -96,8 +94,8 @@
   "signature": {
     "alg": "ECDSA-P256-SHA256",
     "keyId": "gc-2026-12",
-    "value": "A2jaSxRK1B43k8uOWmC/8diYG6JYUncGgjXW8B1ntO5Ag5rsG7Pb2gMz5ad6AcwjZ9zs8qtsSxJv8vLsUNXtWw==",
-    "contentSha256": "3bf738a164537e5d575e75c314f0ac01af1cb5d4d7cb882489d8dedeb73f51e9",
-    "signedAt": "2026-11-18T10:18:01Z"
+    "value": "6mZUj+t6AExyLQbauvQSLCicUFUbesPGs0jTd6FGwjm+mxEud7e+0fvmmdo+HDFZY6NifIrVENIB6Q5TlLVS7g==",
+    "contentSha256": "76cabe2d25001bf0a07aadc831bb6222bc00ed0114cde1e83ac8e29db6069a55",
+    "signedAt": "2026-11-18T12:33:26Z"
   }
 }

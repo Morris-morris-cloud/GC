@@ -151,7 +151,7 @@ var packages = new Dictionary<string, Dictionary<string, object>>();
 //      不发 Release、只提交产物也能更新（用户明确要求支持这种布局）。
 // 两种都写：url 只是「去哪儿找」，真正的完整性凭据是下面的 sha256（受签名保护）。
 var releaseBase = $"{Repository}/releases/download/{launcherVersion}";
-foreach (var rid in new[] { "win-x64", "win-arm64", "osx-arm64", "osx-x64", "linux-x64" })
+foreach (var rid in new[] { "win-x64", "win-arm64", "osx-arm64", "osx-x64", "linux-arm64" })
 {
     var label = LauncherArtifacts.LabelOf(rid);
     var fileName = LauncherArtifacts.PackageFileName(launcherVersion, rid);
