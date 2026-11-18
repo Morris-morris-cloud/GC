@@ -55,6 +55,10 @@ Windows 与 macOS 用**同一套 Flutter 代码 + 各自的原生 runner**：
 
 ### 1. 启动后端
 
+发布版里后端不走独立进程：`GC-BOOT` 直接引用本工程，调用
+`BackendServer.Start(args, port)` 在自己进程内托管，发布包因此只有一个 exe
+（两个自包含进程会把 60MB 运行时复制两份）。下面的独立运行方式只用于开发调试。
+
 ```bash
 # 仓库根目录
 dotnet run --project GC-UI/backend/GC.UI.Server

@@ -10,11 +10,12 @@ namespace GC.Services;
 /// &lt;安装目录&gt;/
 ///   GCL(.exe | .app/...)
 ///   .GC/
-///     settings.json     设置与已安装版本记录
+///     bin/              非本体文件（守护进程等，随包分发，更新时整目录替换）
+///     config/           设置与已安装版本记录（settings.json）
 ///     model/            模型（启动时下载）
 ///     cache/            下载缓存 / 原子替换暂存
 ///     update/           待下次启动应用的启动器更新包
-///     safedog/          更新守护进程（首次启动从安装包复制过来）
+///     safedog/          更新守护进程的运行副本（首次启动从 .GC/bin 复制过来）
 ///     logs/             日志，按天分中英两份：gc-YYYYMMDD.log / .en.log
 /// </code>
 /// 开发态同样使用仓库根 .GC/model，并自动同步仓库 model/ 的可分发部分。

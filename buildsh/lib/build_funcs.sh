@@ -65,48 +65,56 @@ build_models() {
   stamp_versions
 }
 
-# 发布目录只放启动器 + 空的 .GC 运行骨架，绝不放模型
+# 发布目录只放程序本体：不预置 .GC，也不放模型。
+# .GC（config / model / cache / update / safedog / logs）一律在首次启动时
+# 由 AppPaths.EnsureCreated + RuntimeLayout 创建，压缩包里只有 GC 本体。
 prepare_runtime_layout() {
   REL="$1"
   DEST="$ROOT_DIR/$REL"
   [ -d "$DEST" ] || return 0
-  rm -rf "$DEST/model" "$DEST/examples"
-  mkdir -p "$DEST/.GC/model" "$DEST/.GC/cache" "$DEST/.GC/update" "$DEST/.GC/config"
-  cat > "$DEST/.GC/model/README.txt" <<'TXT'
-模型库目录（.GC/model/）
-启动时程序会读取 GitCode 仓库的 version.json，把最新版模型下载到这里。
-离线使用也可以手动放入 <模型id>/<模型id>.json + <模型id>/<模型id>.model/。
-
-运行目录：
-  <可执行文件>
-  GC-SAVEDOG      更新守护进程（验签 + 原子替换 + 失败回滚）
-  .GC/config/settings.json   用户设置（删 .GC/cache 不会丢配置）
-  .GC/model/      本目录（下载的模型）
-  .GC/cache/      下载暂存
-  .GC/update/     待下次启动应用的启动器更新
-TXT
-  if [ ! -f "$DEST/.GC/config/settings.json" ]; then
-    cat > "$DEST/.GC/config/settings.json" <<'JSON'
-{
-  "language": "auto",
-  "theme": "light",
-  "renderFps": 30,
-  "memoryMb": 2048,
-  "autoUpdateOnStartup": true,
-  "requireSignedManifest": true,
-  "updateRepository": "https://git.xhmcl.com/Morris/GC",
-  "updateManifestUrl": "",
-  "updateLocalRoot": "",
-  "installedModelVersions": {},
-  "launcherVersion": "",
-  "pendingLauncherVersion": "",
-  "lastUpdateCheck": "",
-  "sources": [],
-  "recentModels": []
+  rm -rf "$DEST/model" "$DEST/examples" "$DEST/.GC"
+  echo "    运行目录 -> $REL（首次启动后生成 .GC/：config model cache update safedog logs）"
 }
-JSON
-  fi
-  echo "    运行目录 -> $REL/.GC （config/settings.json + model/ + cache/ + update/）"
+
+# 剔除与目标平台无关 / 只在调试诊断时才会加载的组件。
+# 判定依据：Windows 包用 Kestrel 自托管，不经过 IIS/HttpSys；Avalonia 在 Windows
+# 上只用 Win32 后端；DAC/DBI/DiaSymReader 只有调试器与读 PDB 时才需要，
+# 而发布包 DebugType=none、不带 PDB。全都不在启动与正常运行路径上。
+prune_package() {
+  DEST="$1"; PLAT="$2"
+  [ -d "$DEST" ] || return 0
+  case "$PLAT" in
+    win)
+      # ProjectReference 会把后端 exe 的 runtimeconfig 一起拷过来；后端已编入启动器，
+      # 这些残留没有用。
+      rm -f "$DEST"/GC.UI.Server.exe "$DEST"/GC.UI.Server.dll \
+            "$DEST"/GC.UI.Server.deps.json "$DEST"/GC.UI.Server.runtimeconfig.json
+      rm -f "$DEST"/mscordaccore*.dll \
+            "$DEST"/mscordbi.dll \
+            "$DEST"/Microsoft.DiaSymReader.Native*.dll \
+            "$DEST"/web.config \
+            "$DEST"/aspnetcorev2_inprocess.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.IIS.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.IISIntegration.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.HttpSys.dll \
+            "$DEST"/Avalonia.X11.dll \
+            "$DEST"/Avalonia.Native.dll \
+            "$DEST"/Avalonia.FreeDesktop.dll \
+            "$DEST"/Tmds.DBus.Protocol.dll
+      ;;
+    linux)
+      rm -f "$DEST"/mscordaccore*.dll \
+            "$DEST"/mscordbi.dll \
+            "$DEST"/Microsoft.DiaSymReader.Native*.dll \
+            "$DEST"/web.config \
+            "$DEST"/aspnetcorev2_inprocess.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.IIS.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.IISIntegration.dll \
+            "$DEST"/Microsoft.AspNetCore.Server.HttpSys.dll \
+            "$DEST"/Avalonia.Win32.dll \
+            "$DEST"/Avalonia.Win32.Automation.dll
+      ;;
+  esac
 }
 
 # $1=RID $2=输出目录 $3=singlefile(true/false)
@@ -124,15 +132,18 @@ publish_rid() {
     -p:DebugType=none \
     -p:PublishSingleFile="$SINGLE" \
     -p:IncludeNativeLibrariesForSelfExtract="$SINGLE" \
+    -p:EnableCompressionInSingleFile="$SINGLE" \
     -p:PublishTrimmed=false \
-    -o "$ROOT_DIR/$OUT"
+    -o "$ROOT_DIR/$OUT" || return 1
 
   # 更新守护进程：与主程序同目录（macOS 打包时会被一起移入 Contents/MacOS）
   if [ -n "${SAVEDOG_PROJ:-}" ] && [ -f "$ROOT_DIR/$SAVEDOG_PROJ" ]; then
-    echo "==> 编译 GC-SAVEDOG (${RID}) -> ${OUT}（裁剪单文件）"
+    echo "==> 编译 GC-SAVEDOG (${RID}) -> ${OUT}（裁剪 + 压缩单文件）"
     # 守护进程不引用 Avalonia，可以安全裁剪：70MB -> 14MB。
     # 前提是 JSON 全部走源生成上下文（GC-SAVEDOG/SavedogJson.cs），新增 JSON 类型
     # 忘了注册只会在发布产物里炸，所以 update-test 会跑一次真实 apply 兜底。
+    # EnableCompressionInSingleFile：运行时不常驻，启动时解压一次即可，
+    # 换来包内少 4MB 左右，对「下载一次、只在更新时跑」的守护进程很划算。
     dotnet publish "$SAVEDOG_PROJ" \
       -c Release \
       -r "$RID" \
@@ -141,6 +152,7 @@ publish_rid() {
       -p:DebugType=none \
       -p:PublishSingleFile=true \
       -p:IncludeNativeLibrariesForSelfExtract=true \
+      -p:EnableCompressionInSingleFile=true \
       -p:PublishTrimmed=true \
       -p:TrimMode=full \
       -p:JsonSerializerIsReflectionEnabledByDefault=false \
@@ -161,7 +173,8 @@ pack_models() {
   du -sh "$ZIP"
 }
 
-# 启动器更新包：只包含程序文件，排除 .GC（否则会覆盖用户已下载的模型与设置）
+# 启动器更新包：安装目录根只放 GC 本体；非本体文件（守护进程等）收进 .GC/bin。
+# .GC 下的用户数据（config / model / cache / update / logs / safedog）不进包。
 #
 # 产物落点遵循「仓库 dist/<系统>-<架构>/」布局：
 #   dist/mac-arm64/GCL-<版本>-mac-arm64.zip
@@ -186,7 +199,9 @@ publish_backend() {
     --self-contained true \
     -p:Version="$VERSION" \
     -p:DebugType=none \
-    -p:PublishSingleFile=false \
+    -p:PublishSingleFile=true \
+    -p:IncludeNativeLibrariesForSelfExtract=true \
+    -p:EnableCompressionInSingleFile=true \
     -p:PublishTrimmed=false \
     -o "$ROOT_DIR/$OUT" || return 1
 }
@@ -307,14 +322,16 @@ pack_launcher() {
     rm -rf "$TMP"; mkdir -p "$PKG"
     cp -R "$SRC"/. "$PKG"/
     rm -f "$PKG"/*.zip
+    prune_package "$PKG" win
     mv "$PKG/$(basename "$EXE")" "$PKG/$PKGNAME.exe"
     chmod +x "$PKG/$PKGNAME.exe" 2>/dev/null || true
     if [ ! -f "$PKG/GC-SAVEDOG.exe" ]; then
       echo "    !! 缺少 GC-SAVEDOG.exe，该平台将退回旧脚本更新"
     else
-      # 守护进程放 safedog/：首次启动复制到 .GC/safedog，更新替换不再动它
-      mkdir -p "$PKG/safedog"
-      mv "$PKG/GC-SAVEDOG.exe" "$PKG/safedog/"
+      # 非本体文件统一收进 .GC/bin：安装目录根只留 GC 本体。
+      # 首次启动复制到 .GC/safedog 再运行，所以这里的源文件更新时可安全替换。
+      mkdir -p "$PKG/.GC/bin"
+      mv "$PKG/GC-SAVEDOG.exe" "$PKG/.GC/bin/"
     fi
     if [ ! -f "$PKG/GC-UI.exe" ]; then
       echo "    !! 包内没有 Flutter 前端，启动器将使用内置 Avalonia 界面"
@@ -336,13 +353,14 @@ pack_launcher() {
     rm -rf "$TMP"; mkdir -p "$PKG"
     cp -R "$SRC"/. "$PKG"/
     rm -f "$PKG"/*.zip
+    prune_package "$PKG" linux
     if [ -f "$PKG/GC" ]; then
       mv "$PKG/GC" "$PKG/$PKGNAME"
       chmod +x "$PKG/$PKGNAME" 2>/dev/null || true
     fi
     if [ -f "$PKG/GC-SAVEDOG" ]; then
-      mkdir -p "$PKG/safedog"
-      mv "$PKG/GC-SAVEDOG" "$PKG/safedog/"
+      mkdir -p "$PKG/.GC/bin"
+      mv "$PKG/GC-SAVEDOG" "$PKG/.GC/bin/"
     fi
     if [ ! -f "$PKG/GC-UI" ]; then
       echo "    !! 包内没有 Flutter 前端，启动器将使用内置 Avalonia 界面"
