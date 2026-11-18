@@ -29,7 +29,8 @@ public static class LauncherArtifacts
         "win-arm64" => "win-arm64",
         "osx-arm64" => "mac-arm64",
         "osx-x64" => "mac-x64",
-        "linux-x64" => "linux-amd64",
+        "linux-x64" => "linux-amd64",   // 旧产物目录名，仍能读
+        "linux-arm64" => "linux-arm64",
         _ => rid
     };
 
@@ -46,7 +47,7 @@ public static class LauncherArtifacts
         return new[] { label, rid };
     }
 
-    /// <summary>启动器包应有的文件名，如 <c>GCL-1.0.9-mac-arm64.zip</c>。</summary>
+    /// <summary>启动器包应有的文件名，如 <c>GCL-1.0.10-mac-arm64.zip</c>。</summary>
     public static string PackageFileName(string version, string rid)
         => $"GCL-{version.Trim().TrimStart('v', 'V')}-{LabelOf(rid)}.zip";
 
@@ -57,7 +58,8 @@ public static class LauncherArtifacts
     public static bool LooksLikePackage(string fileName, string version, string rid)
     {
         if (!fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) return false;
-        // 新包叫 GCL-<版本>-<平台>.zip；旧包（GC-）仍认，方便从旧版本升级。
+        // 1.0.10 起发布包统一叫 GCL-<版本>-<平台>.zip；GC- 是老命名，
+        // 一并认，装过 1.0.9 及更早版本的机器才不会把新包当成「不是启动器包」。
         if (!fileName.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase) &&
             !fileName.StartsWith("GC-", StringComparison.OrdinalIgnoreCase)) return false;
 

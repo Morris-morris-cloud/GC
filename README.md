@@ -60,7 +60,7 @@ Windows 用 `.\build.ps1`，参数相同（`build / check / models / stamp / run
 
 ```
 <解压出来的目录>/                    ← 压缩包里只有这一个文件夹
-  GCL-<版本>-<平台>(.exe | .app/)   启动器
+  GCL-<版本>-<平台>(.exe | .app/)  启动器
   GC-UI(.exe)                       Flutter 前端
   safedog/GC-SAVEDOG[.exe]          更新守护进程（运行时复制到 .GC/safedog）
   data/ lib/ *.dll                  后端与 Flutter 运行时
@@ -255,12 +255,12 @@ Repository/
 | `dist/mac-arm64/GCL-<版本>-mac-arm64.zip` | macOS Apple Silicon（单顶层 `GCL-….app`） |
 | `dist/win-amd64/GCL-<版本>-win-amd64.zip` | Windows x64（单顶层 `GCL-…/`，含 Flutter 前端与 `safedog/`） |
 | `dist/win-arm64/GCL-<版本>-win-arm64.zip` | Windows on ARM 同上 |
-| `dist/linux-amd64/GCL-<版本>-linux-amd64.zip` | Linux x64 同上（启动器无扩展名） |
+| `dist/linux-arm64/GCL-<版本>-linux-arm64.zip` | Linux ARM64 同上（启动器无扩展名，需在 aarch64 主机构建） |
 
 平台目录就是「该平台的编译产物目录」：打包完成后只留最终 zip（原始 `.app` / `.exe`
 会被挪到 `build/trash/`，下次构建时移出，不做递归删除）。
 
-发新版：`./build.sh build -version=1.0.10` → 把 `dist/<平台>/GCL-1.0.10-<平台>.zip`
+发新版：`./build.sh build` → 把 `dist/<平台>/GCL-<版本>-<平台>.zip`
 上传到 Gitea Release（tag `v1.0.8`），**或者**直接提交/上传到仓库的
 `dist/<平台>/` 目录 → 提交并推送 `version.json` / `model/version.json`。
 两种都能被客户端识别，客户端下次启动就会看到更新。

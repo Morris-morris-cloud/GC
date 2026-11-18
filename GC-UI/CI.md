@@ -69,7 +69,7 @@ Windows 还需要 **VS Build Tools 的「使用 C++ 的桌面开发」工作负�
 ```bash
 # 按构建主机自动选目标，每条产物都带 Flutter 前端：
 #   macOS 主机 → mac-arm64（原生）+ win-amd64 / win-arm64（mingw 交叉）
-#   Linux 主机 → linux-amd64（原生）+ win-amd64 / win-arm64（mingw 交叉）
+#   Linux 主机 → linux-arm64（仅 aarch64 主机）+ win-amd64 / win-arm64（mingw 交叉）
 #   Windows 主机 → win-amd64 / win-arm64（原生）
 ./build.sh build
 
@@ -96,7 +96,7 @@ sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-14-de
 `-lstdc++`，系统只装了 gcc-13 的开发包时链接会失败，报 `cannot find -lstdc++`。
 
 产物布局：`GC-UI` + `lib/libflutter_linux_gtk.so` + `data/`，与官方 `flutter build
-linux` 的 bundle 一致，直接铺进 `dist/linux-amd64/`。
+linux` 的 bundle 一致，直接铺进 `dist/linux-arm64/`。
 
 ### Windows 前端交叉编译
 

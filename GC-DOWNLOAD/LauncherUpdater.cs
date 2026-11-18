@@ -729,7 +729,8 @@ public static class LauncherUpdater
                 // Linux 的启动器没有扩展名（GC-1.0.9-linux-amd64），以前只认 .app/.exe，
                 // 结果解压完判定「没找到新版启动器」，Linux 更新永远失败。
                 // 注意不能用 Path.HasExtension：版本号 9.9.9 里的点会让它误判成有扩展名。
-                if (name.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase) &&
+                if ((name.StartsWith("GC-", StringComparison.OrdinalIgnoreCase) ||
+                     name.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase)) &&
                     name.EndsWith("-" + PlatformLabel, StringComparison.OrdinalIgnoreCase))
                 {
                     TryMarkExecutable(dest);
