@@ -149,14 +149,35 @@ flutter test
 # 前后端联调（需要后端正在运行；后端没起时自动跳过）
 flutter test test/backend_contract_test.dart
 
-# 生成界面截图到 test/shots/（视觉检查用）
+# 生成界面截图到 test/shots/（视觉检查用，不需要后端）
 flutter test tool/render_shots_test.dart
 ```
 
-截图脚本覆盖四个页面（首页 / 下载 / 设置 / 关于）再加一整套外壳：
-`test/shots/home.png`、`download.png`、`settings.png`、`about.png`、`shell.png`。
-需要先在本机 17890 端口跑起后端；脚本用 `runAsync` 给真实 HTTP 留出时间，
-否则 `flutter_test` 的假时钟会让页面停在加载态。
+截图脚本覆盖四个页面（首页 / 下载 / 设置 / 关于），再加一整套外壳与 1024×680 小窗回归：
+`test/shots/home.png`、`download.png`、`settings.png`、`about.png`、`shell.png`、
+`home-small.png`、`download-small.png`、`settings-small.png`，以及浅色主题的
+`home-light.png`、`settings-light.png`。小窗用例会顺带抓布局溢出（RenderFlex overflow）。
+
+四个页面都用预置数据（`initialModels` / `initialSources` / `initialAbout` 等）渲染，
+所以**不需要先起后端**。测试环境的字体是 Ahem（所有字都是方块），脚本会显式加载
+系统里的 Noto Sans SC / 微软雅黑 / 苹方，并顺带加载 Material 图标字体，中文和图标才正常。
+截图必须放在 `runAsync` 里取像素（`toImage` / `toByteData` 走真实引擎管线），
+否则 fake async 时钟不推进，每个用例会卡满 10 分钟才超时。
+
+## 界面清晰度（DPI）
+
+`GC-UI.exe` 必须在启动时就声明 DPI 感知，否则 Windows 在 125% / 150% 缩放下会把
+整块窗口当位图拉伸，界面看起来「糊」—— 中文小字最先糊。两处保证：
+
+- `windows/runner/runner.exe.manifest`：PerMonitorV2（原生 MSVC 构建由 CMake 自动嵌入）
+- `windows/runner/main.cpp`：建窗前再声明一次，依次尝试
+  `SetProcessDpiAwarenessContext` → `SetProcessDpiAwareness` → `SetProcessDPIAware`
+- `buildsh/cross/CMakeLists.txt`：交叉编译时把清单写进 `.rc`（windres 不会自动嵌入）
+
+另外主题里做了两件跟「清晰」有关的事：字体族走
+`Segoe UI + Microsoft YaHei UI`（macOS 走苹方）而不是让引擎随意回退；
+正文最小 12px、行高固定，中文不再挤成一片。详见
+[CI.md 的「交叉编译必须自己嵌 DPI 清单」](CI.md#交叉编译必须自己嵌-dpi-清单)。
 
 ## 「关于」页展示的技术栈
 

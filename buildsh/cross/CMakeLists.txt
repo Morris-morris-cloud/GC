@@ -44,6 +44,19 @@ string(REPLACE "#define VERSION_AS_STRING FLUTTER_VERSION"
                _rc_text "${_rc_text}")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/Runner.cross.rc" "${_rc_text}")
 
+# ★ DPI 清单必须自己嵌进去。
+#
+# windows/runner/CMakeLists.txt 把 runner.exe.manifest 当源文件列进 target，
+# Visual Studio 生成器会把它交给链接器（/MANIFESTINPUT）自动嵌入；
+# 但这里的交叉编译只用 windres 编 Runner.rc，CMake 不会做这一步，
+# 编出来的 GC-UI.exe 就完全没有清单 —— Windows 当它「DPI 不感知」，
+# 在 125% / 150% 缩放的屏幕上整体位图拉伸，界面全是糊的。
+#
+# 因此把清单直接写成资源条目：id 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID，
+# type 24 = RT_MANIFEST。windres 不按相对路径解析，这里给绝对路径。
+file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/Runner.cross.rc"
+     "\n1 24 \"${RUN_DIR}/runner.exe.manifest\"\n")
+
 add_executable(${BINARY_NAME} WIN32
   "${RUN_DIR}/main.cpp"
   "${RUN_DIR}/flutter_window.cpp"

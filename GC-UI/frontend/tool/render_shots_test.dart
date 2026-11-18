@@ -21,9 +21,18 @@ import 'package:gc_ui/theme.dart';
 ///   flutter test tool/render_shots_test.dart
 void main() {
   setUpAll(() async {
-    HttpOverrides.global = null;
-
+    // 不要设置 HttpOverrides.global = null：那会打开真实网络，
+    // flutter_test 的假时钟下 HTTP 定时器永远悬着，用例结束时
+    // 会撞上「!timersPending」断言。保持 flutter_test 默认的 FakeHttpClient
+    // （所有请求立即返回 400），页面本身都用预置数据渲染，不需要后端。
+    // 测试环境默认用 Ahem 占位字体（所有字都是方块），必须显式加载一套真字体：
+    // Linux CI 用 Noto CJK，Windows 本机用 Noto Sans SC / 微软雅黑，macOS 用苹方。
     const candidates = <String>[
+      r'C:\Windows\Fonts\Deng.ttf',
+      r'C:\Windows\Fonts\NotoSansSC-VF.ttf',
+      r'C:\Windows\Fonts\msyh.ttc',
+      r'C:\Windows\Fonts\simhei.ttf',
+      '/System/Library/Fonts/PingFang.ttc',
       '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
       '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
     ];
@@ -35,6 +44,22 @@ void main() {
         ..addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
       await loader.load();
       break;
+    }
+
+    // Material 图标字体：flutter_test 不会自动加载，不加载的话所有 Icon
+    // 都是方框，截图就没法检查图标。SDK 缓存里那份由 flutter test 通过
+    // FLUTTER_ROOT 指过来。
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    if (flutterRoot != null) {
+      final icons = File(
+        '$flutterRoot/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+      );
+      if (icons.existsSync()) {
+        final bytes = icons.readAsBytesSync();
+        final loader = FontLoader('MaterialIcons')
+          ..addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
+        await loader.load();
+      }
     }
   });
 
@@ -123,9 +148,26 @@ void main() {
       'uiAvailable': true,
     });
 
+  /// 外壳用的 controller：bootstrap 直接返回，不去连后端。
+  ///
+  /// 真 ShellPage 会在 initState 里 bootstrap，后端不在时会挂重试定时器，
+  /// 用例结束时报「!timersPending」。这里只把 bootstrap 换成空实现，
+  /// 页面里的数据请求仍会走 flutter_test 的假 HTTP（立即 400）。
+  ShellController shellController() => _StubShellController()
+    ..settings = sampleSettings()
+    ..health = HealthInfo.fromJson(<String, dynamic>{
+      'ok': true,
+      'version': '1.0.7',
+      'platform': 'osx-arm64',
+      'uiAvailable': true,
+    });
+
   Future<void> shoot(WidgetTester tester, String name, Widget page,
-      {Brightness brightness = Brightness.dark}) async {
-    tester.view.physicalSize = const Size(1280, 820);
+      {Brightness brightness = Brightness.dark,
+      Size size = const Size(1280, 860)}) async {
+    // 1280×860：与发布包窗口默认尺寸（1280×720）接近，再多留一点高度看得到
+    // 底部状态条。像素比 1.0，方便逐像素检查描边和文字。
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -136,10 +178,13 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: buildGcTheme(brightness).copyWith(
-          textTheme: buildGcTheme(brightness).textTheme.apply(
-                fontFamily: 'Noto Sans CJK SC',
-              ),
+        // 四个页面都用预置数据渲染，不需要后端；字体统一换成测试里加载的
+        // 那一套，并且清空 fallback —— 否则主题里的按钮 / 输入框样式会去
+        // 找系统字体（测试环境没有），缺字处就画成方块。
+        theme: buildGcTheme(
+          brightness,
+          fontFamily: 'Noto Sans CJK SC',
+          fontFamilyFallback: const <String>[],
         ),
         home: RepaintBoundary(
           key: key,
@@ -148,25 +193,27 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 200));
-    // 页面里的数据来自真实后端（/api/about、/api/sources 等）。
-    // flutter_test 默认用假时钟，真实 HTTP 永远不会完成，所以这里用 runAsync
-    // 让出真实时间，等请求回来后再 pump 出最终画面。
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-    });
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-    });
     await tester.pump(const Duration(milliseconds: 300));
 
     final boundary =
         key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 1.0);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    // toImage / toByteData 要走真实引擎的异步管线，必须放在 runAsync 里，
+    // 否则 fake async 时钟不会推进，Future 一直不完成（表现为每个用例卡
+    // 满 10 分钟超时才返回）。
+    final stopwatch = Stopwatch()..start();
+    final image = await tester.runAsync(
+      () => boundary.toImage(pixelRatio: 1.0),
+    );
+    final bytes = await tester.runAsync(
+      () => image!.toByteData(format: ui.ImageByteFormat.png),
+    );
 
     final dir = Directory('test/shots')..createSync(recursive: true);
     File('${dir.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+    stopwatch.stop();
+    // ignore: avoid_print
+    print(
+        '[shots] $name (${brightness.name}) 耗时 ${stopwatch.elapsedMilliseconds} ms');
   }
 
   testWidgets('home', (tester) async {
@@ -174,7 +221,8 @@ void main() {
     await shoot(
       tester,
       'home',
-      HomePageView(controller: sampleController(), initialModels: sampleModels()),
+      HomePageView(
+          controller: sampleController(), initialModels: sampleModels()),
     );
   });
 
@@ -261,7 +309,8 @@ void main() {
 
   testWidgets('settings', (tester) async {
     I18n.language.value = 'zh-CN';
-    await shoot(tester, 'settings', SettingsPageView(controller: sampleController()));
+    await shoot(
+        tester, 'settings', SettingsPageView(controller: sampleController()));
   });
 
   testWidgets('about', (tester) async {
@@ -292,7 +341,77 @@ void main() {
 
   testWidgets('shell', (tester) async {
     I18n.language.value = 'zh-CN';
-    await shoot(tester, 'shell', ShellPage(controller: sampleController()));
+    final controller = shellController()
+      ..setUpdateStatus(
+        visible: true,
+        busy: false,
+        progress: 1,
+        status: '已更新 2 个模型，立即生效',
+        detail: '模型与启动器均为最新版',
+        notice: '',
+      );
+    await shoot(tester, 'shell', ShellPage(controller: controller));
+  });
+
+  /// 小窗口回归：1024×680 下不应出现溢出条纹或卡片挤压。
+  testWidgets('home-small', (tester) async {
+    I18n.language.value = 'zh-CN';
+    await shoot(
+      tester,
+      'home-small',
+      HomePageView(
+          controller: sampleController(), initialModels: sampleModels()),
+      size: const Size(1024, 680),
+    );
+  });
+
+  testWidgets('download-small', (tester) async {
+    I18n.language.value = 'zh-CN';
+    await shoot(
+      tester,
+      'download-small',
+      DownloadPageView(
+        controller: sampleController(),
+        initialSources: <SourceInfo>[
+          SourceInfo.fromJson(<String, dynamic>{
+            'id': 'github',
+            'name': 'GitHub',
+            'url': 'https://github.com/Morris-GC/GC',
+            'enabled': true,
+            'builtIn': true,
+            'host': 'github.com',
+          }),
+        ],
+        initialIndex: SourceIndexInfo.fromJson(<String, dynamic>{
+          'sourceId': 'github',
+          'root': 'https://github.com/Morris-GC/GC',
+          'fromCache': false,
+          'resolvedFrom': 'version.json',
+          'models': <dynamic>[
+            <String, dynamic>{
+              'id': 'sun',
+              'name': '太阳系',
+              'description': '观察八大行星的公转轨道与相对大小。',
+              'version': '1.2',
+              'sizeText': '2.3 MB',
+              'installed': true,
+            },
+          ],
+        }),
+        initialJobs: const <JobInfo>[],
+      ),
+      size: const Size(1024, 680),
+    );
+  });
+
+  testWidgets('settings-small', (tester) async {
+    I18n.language.value = 'zh-CN';
+    await shoot(
+      tester,
+      'settings-small',
+      SettingsPageView(controller: sampleController()),
+      size: const Size(1024, 680),
+    );
   });
 
   testWidgets('home-light', (tester) async {
@@ -300,7 +419,8 @@ void main() {
     await shoot(
       tester,
       'home-light',
-      HomePageView(controller: sampleController(), initialModels: sampleModels()),
+      HomePageView(
+          controller: sampleController(), initialModels: sampleModels()),
       brightness: Brightness.light,
     );
   });
@@ -314,4 +434,10 @@ void main() {
       brightness: Brightness.light,
     );
   });
+}
+
+/// 只用于截图的 controller：不连后端，避免挂上重试定时器。
+class _StubShellController extends ShellController {
+  @override
+  Future<void> bootstrap() async {}
 }
