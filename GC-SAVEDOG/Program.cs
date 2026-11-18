@@ -67,7 +67,10 @@ internal static class Program
             return 3;
         }
 
-        var log = new Log(Path.Combine(Path.GetFullPath(updateDir), SavedogFiles.Log));
+        // 日志统一放 .GC/logs（update 目录的上一层），不再塞在 update/ 里
+        var updateRoot = Path.GetFullPath(updateDir);
+        var home = Path.GetDirectoryName(updateRoot) ?? updateRoot;
+        var log = new Log(Path.Combine(home, "logs"));
         var applyOptions = new ApplyOptions
         {
             UpdateDir = updateDir,

@@ -195,7 +195,7 @@ internal static class Program
         Directory.CreateDirectory(stage);
         // Linux 的启动器没有扩展名，测试包名要跟着平台走
         var launcherExt = OperatingSystem.IsWindows() ? ".exe" : "";
-        File.WriteAllText(Path.Combine(stage, "GC-9.9.9-" + LauncherUpdater.PlatformLabel + launcherExt),
+        File.WriteAllText(Path.Combine(stage, "GCL-9.9.9-" + LauncherUpdater.PlatformLabel + launcherExt),
             "new launcher");
         var zip = Path.Combine(tmp, "GC-" + rid + ".zip");
         ZipFile.CreateFromDirectory(stage, zip);
@@ -238,14 +238,14 @@ internal static class Program
         {
             var script = File.ReadAllText(scriptPath);
             Check(!script.Contains(tmp), "脚本不含绝对路径");
-            Check(script.Contains("GC-*.app") || script.Contains("GC-*"), "脚本按 GC-* 匹配删除");
+            Check(script.Contains("GCL-*") || script.Contains("GC-*"), "脚本按 GCL-*/GC-* 匹配删除");
         }
 
         // 5b) 只发产物、不发 Release：更新包只存在于仓库 dist/<系统>-<架构>/ 目录里。
         //     清单不写 url、不写 path，只给 dir + name + sha256，客户端要能自己找过去。
         var distDir = Path.Combine(remote, "dist", LauncherUpdater.PlatformLabel);
         Directory.CreateDirectory(distDir);
-        var distName = "GC-9.9.10-" + LauncherUpdater.PlatformLabel + ".zip";
+        var distName = "GCL-9.9.10-" + LauncherUpdater.PlatformLabel + ".zip";
         var distZip = Path.Combine(distDir, distName);
         File.Copy(zip, distZip, true);
 

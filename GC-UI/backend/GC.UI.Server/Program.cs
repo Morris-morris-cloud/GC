@@ -76,6 +76,12 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
 var app = builder.Build();
 app.UseCors();
 
+// 日志与启动器共用 .GC/logs，整条启动链路（启动器 → 后端 → 守护进程）都在同一组文件里。
+var logPaths = AppPaths.Discover();
+GcLog.Init(logPaths.LogsRoot);
+GcLog.Info($"GC-UI 后端启动，监听 127.0.0.1:{port}",
+           $"GC-UI backend started on 127.0.0.1:{port}");
+
 // 设置白名单 / 标识校验用到的规则（只在本进程内使用）。
 var allowedLanguages = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     { "auto", "zh-CN", "en" };

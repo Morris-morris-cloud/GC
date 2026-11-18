@@ -15,6 +15,9 @@ internal static class Program
         var paths = AppPaths.Discover();
         paths.EnsureCreated();
 
+        // 目录约定 + 双语日志 + 把包里的守护进程落到 .GC/safedog
+        RuntimeLayout.Ensure(paths);
+
         // 上次下载的启动器新版，到这次启动才应用
         if (DownloadModuleHost.Factory.TryApplyPending(paths)) return;
 

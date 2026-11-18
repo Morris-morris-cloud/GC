@@ -20,8 +20,16 @@ public static class SavedogLauncher
         var name = SavedogFiles.ExecutableName;
         var install = paths.InstallDirectory;
 
+        // 首选 .GC/safedog：更新时整目录替换不会碰这里，正在运行的守护进程也安全。
+        var home = Path.Combine(paths.SafedogRoot, name);
+        if (File.Exists(home)) return home;
+
         var direct = Path.Combine(install, name);
         if (File.Exists(direct)) return direct;
+
+        // 新包把守护进程放在 safedog/ 子目录
+        var packaged = Path.Combine(install, "safedog", name);
+        if (File.Exists(packaged)) return packaged;
 
         // macOS：可能放在 .app 内部
         try

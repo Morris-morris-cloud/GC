@@ -42,6 +42,8 @@
          ManifestLoader 依赖启动器的 RepoVersion 模型，守护进程不需要，排除。 -->
     <Compile Include="..\GC\src\Security\**\*.cs" Exclude="..\GC\src\Security\ManifestLoader.cs" LinkBase="Security" />
     <Compile Include="..\GC\src\Services\Json.cs" Link="Shared\Json.cs" />
+    <!-- 与启动器共用同一份双语日志实现，保证 .GC/logs 里格式一致 -->
+    <Compile Include="..\GC\src\Services\GcLog.cs" Link="Shared\GcLog.cs" />
   </ItemGroup>
 
 </Project>

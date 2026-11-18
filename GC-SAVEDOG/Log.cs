@@ -1,34 +1,22 @@
 using System;
-using System.IO;
+using GC.Services;
 
 namespace GC.Savedog;
 
-/// <summary>同时写 stdout 与 .GC/update/savedog.log，便于用户离线排查。</summary>
+/// <summary>
+/// 守护进程的日志入口，实际写入 <see cref="GcLog"/>：控制台 + <c>.GC/logs</c> 下的
+/// <c>gc-YYYYMMDD.log</c>（中文）与 <c>gc-YYYYMMDD.en.log</c>（英文）。
+///
+/// 每条日志都必须同时给中英两份文案 —— 用户反馈问题时直接发对应语言的文件。
+/// </summary>
 internal sealed class Log
 {
-    private readonly string? _path;
-    private readonly object _gate = new();
-
-    public Log(string? path) => _path = path;
-
-    public void Info(string message) => Write("INFO ", message);
-    public void Warn(string message) => Write("WARN ", message);
-    public void Error(string message) => Write("ERROR", message);
-
-    private void Write(string level, string message)
+    public Log(string? dir)
     {
-        var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {message}";
-        Console.WriteLine(line);
-        if (string.IsNullOrWhiteSpace(_path)) return;
-        try
-        {
-            lock (_gate)
-            {
-                var dir = Path.GetDirectoryName(_path!);
-                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                File.AppendAllText(_path!, line + "\n");
-            }
-        }
-        catch { /* 日志失败不能影响更新 */ }
+        if (!string.IsNullOrWhiteSpace(dir)) GcLog.Init(dir);
     }
+
+    public void Info(string zh, string en) => GcLog.Info(zh, en);
+    public void Warn(string zh, string en) => GcLog.Warn(zh, en);
+    public void Error(string zh, string en) => GcLog.Error(zh, en);
 }

@@ -4,7 +4,7 @@ using System.Globalization;
 namespace GC.Services;
 
 /// <summary>
-/// 版本号工具：Release tag 有 v1.0.6 / GC-1.0.6 / 1.0.6 等写法，
+/// 版本号工具：Release tag 有 v1.0.6 / GCL-1.0.6 / GC-1.0.6 / 1.0.6 等写法，
 /// 统一成可比较的 Version 再排序，挑**版本号最高**的那个。
 /// </summary>
 public static class VersionUtil
@@ -15,8 +15,9 @@ public static class VersionUtil
         if (string.IsNullOrWhiteSpace(tag)) return "";
         var s = tag!.Trim();
 
-        // 去掉前缀：v / V / GC- / release-
-        if (s.StartsWith("GC-", StringComparison.OrdinalIgnoreCase)) s = s[3..];
+        // 去掉前缀：v / V / GC- / GCL- / release-
+        if (s.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase)) s = s[4..];
+        else if (s.StartsWith("GC-", StringComparison.OrdinalIgnoreCase)) s = s[3..];
         else if (s.StartsWith("release-", StringComparison.OrdinalIgnoreCase)) s = s[8..];
         s = s.TrimStart('v', 'V');
 

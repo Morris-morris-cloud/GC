@@ -46,9 +46,9 @@ public static class LauncherArtifacts
         return new[] { label, rid };
     }
 
-    /// <summary>启动器包应有的文件名，如 <c>GC-1.0.7-mac-arm64.zip</c>。</summary>
+    /// <summary>启动器包应有的文件名，如 <c>GCL-1.0.9-mac-arm64.zip</c>。</summary>
     public static string PackageFileName(string version, string rid)
-        => $"GC-{version.Trim().TrimStart('v', 'V')}-{LabelOf(rid)}.zip";
+        => $"GCL-{version.Trim().TrimStart('v', 'V')}-{LabelOf(rid)}.zip";
 
     /// <summary>
     /// 判断某个 zip 名是不是「这个版本 + 这个平台」的启动器包。
@@ -57,7 +57,9 @@ public static class LauncherArtifacts
     public static bool LooksLikePackage(string fileName, string version, string rid)
     {
         if (!fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) return false;
-        if (!fileName.StartsWith("GC-", StringComparison.OrdinalIgnoreCase)) return false;
+        // 新包叫 GCL-<版本>-<平台>.zip；旧包（GC-）仍认，方便从旧版本升级。
+        if (!fileName.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase) &&
+            !fileName.StartsWith("GC-", StringComparison.OrdinalIgnoreCase)) return false;
 
         var v = version.Trim().TrimStart('v', 'V');
         if (v.Length > 0 && fileName.IndexOf(v, StringComparison.OrdinalIgnoreCase) < 0) return false;
