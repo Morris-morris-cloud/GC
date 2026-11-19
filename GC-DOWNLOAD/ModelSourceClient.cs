@@ -154,7 +154,13 @@ public sealed class ModelSourceClient : IModelSourceClient
             else if (host.Contains("gitee.com"))
                 yield return $"https://gitee.com/{owner}/{repo}/repository/archive/{b}.zip";
             else
-                yield break;
+            {
+                // 自托管 Gitea（如 git.xhmcl.com）：用 archive/<branch>.zip 拉源码归档。
+                // 关键：不能在这里 yield break —— 那样就只剩 git clone 一条路，
+                // 用户机器没装 git 时「检测模型 / 下载 / 自动更新」会全部失效。
+                // 归档下载走 ResumableDownloader，无需系统 git。
+                yield return $"{uri.GetLeftPart(UriPartial.Authority)}/{owner}/{repo}/archive/{b}.zip";
+            }
         }
     }
 
