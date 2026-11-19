@@ -5,8 +5,8 @@
     "en": "Contour Map"
   },
   "descriptionI18n": {
-    "zh-CN": "立体地形与平面等高线联动，判读山峰、山脊、山谷、鞍部、陡崖五种部位。",
-    "en": "Link 3D relief with contour lines; identify peaks, ridges, valleys, saddles and cliffs."
+    "zh-CN": "可旋转 3D 地形 + 等高切割/交线/投影/判坡四步动画，判读山峰、山脊、山谷、鞍部、陡崖五大典型地貌。",
+    "en": "Rotatable 3D terrain with a four-step animation of contour cutting, lines, projection and slope; identify five classic landforms."
   },
   "author": "Morris GC",
   "tags": [
@@ -17,7 +17,7 @@
   ],
   "assembly": "ContourMapModel.dll",
   "type": "GC.ContourMap.ContourMapFactory",
-  "version": "1.1",
+  "version": "1.2",
   "chrome": {
     "titleBar": "#0C1828",
     "titleBorder": "#1B2740",

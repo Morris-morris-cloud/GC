@@ -123,8 +123,6 @@ public static class TerrainAnalyzer
     public static (byte R, byte G, byte B) ColorForHeight(float h, float min, float max)
     {
         // 按绝对高程分档（教科书就是这么画的：看的是海拔，不是相对高度）
-        const float band = 200f;   // 每 200 米一档
-
         if (h < 200) return (0x1E, 0x6B, 0x3A);      // 深绿：< 200 m
         if (h < 400) return (0x4E, 0x9E, 0x4E);      // 浅绿：200–400
         if (h < 600) return (0xA8, 0xC6, 0x66);      // 绿：400–600
@@ -134,6 +132,31 @@ public static class TerrainAnalyzer
         if (h < 1400) return (0xA8, 0x74, 0x4C);     // 褐：1200–1400
         if (h < 1600) return (0xC8, 0xA8, 0x8C);     // 浅棕：1400–1600
         return (0xF5, 0xF5, 0xF0);                   // 白：> 1600（雪线以上）
+    }
+
+    /// <summary>
+    /// 3D 立体视图用的连续设色：与俯视图同一套色阶，但在档位之间线性过渡。
+    /// 立体视图的色块是按三角面着色的，直接用硬分档会在坡面上切出锯齿状阶梯，
+    /// 看起来像渲染错误；俯视图仍保留硬分档（那才是课本的分层设色）。
+    /// </summary>
+    public static (byte R, byte G, byte B) ColorForHeightSmooth(float h)
+    {
+        // 每个档位的代表色（取档位中心），由低到高
+        (byte R, byte G, byte B)[] stops =
+        {
+            (0x1E, 0x6B, 0x3A), (0x4E, 0x9E, 0x4E), (0xA8, 0xC6, 0x66),
+            (0xE8, 0xE2, 0x9A), (0xE0, 0xC0, 0x5A), (0xC8, 0x9A, 0x63),
+            (0xA8, 0x74, 0x4C), (0xC8, 0xA8, 0x8C), (0xF5, 0xF5, 0xF0)
+        };
+        const float band = 200f;
+        var p = Math.Clamp(h / band - 0.5f, 0f, stops.Length - 1f);   // 0 => 档心 100 m
+        var i = (int)Math.Floor(p);
+        var j = Math.Min(i + 1, stops.Length - 1);
+        var t = p - i;
+        t = t * t * (3 - 2 * t);                                      // 平滑过渡
+        return (Lerp(stops[i].R, stops[j].R, t),
+                Lerp(stops[i].G, stops[j].G, t),
+                Lerp(stops[i].B, stops[j].B, t));
     }
 
     /// <summary>该颜色属于哪一档（用于图例）。</summary>
@@ -152,4 +175,20 @@ public static class TerrainAnalyzer
 
     private static byte Lerp(byte a, byte b, double k)
         => (byte)Math.Clamp(a + (b - a) * k, 0, 255);
+
+    /// <summary>
+    /// 归一化坡度（0=平缓，1=陡峭），用于「疏密判坡」着色。
+    /// 以有限差分求地面梯度，并按本模型的典型高差归一化。
+    /// </summary>
+    public static double SlopeAt(TerrainField f, double u, double v)
+    {
+        const double h = 0.006;
+        var du = (f.SampleSmooth(u + h, v) - f.SampleSmooth(u - h, v)) / (2 * h);
+        var dv = (f.SampleSmooth(u, v + h) - f.SampleSmooth(u, v - h)) / (2 * h);
+        var grad = Math.Sqrt(du * du + dv * dv);   // 米 / 归一化距离
+        // 按本图实际起伏自适应归一化：跨度越大，同样的相对坡度对应更大的梯度。
+        // 固定阈值会让所有山体都顶到 1（整片红），判坡就失效了。
+        var span = Math.Max(60f, f.MaxHeight - f.MinHeight);
+        return Math.Clamp(grad / (span * 2.6), 0, 1);
+    }
 }
