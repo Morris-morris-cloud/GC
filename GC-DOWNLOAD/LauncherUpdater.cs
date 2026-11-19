@@ -194,8 +194,26 @@ public static class LauncherUpdater
         {
             using var ms = new MemoryStream(zip);
             using var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read);
-            // 找主程序：app 内的可执行文件 / GC.dll / 单文件 exe
-            var entry = archive.Entries.FirstOrDefault(e =>
+
+            // 发布包从 1.0.10 起改为 GCL 命名 + 单文件 + 单顶层目录，主程序是
+            //   <顶层>/GCL-<版本>-<平台>.exe        (Windows)
+            //   <顶层>/GCL-<版本>-<平台>            (Linux，无扩展名)
+            //   <顶层>/GCL-<版本>-mac-arm64.app/... (macOS)
+            // 旧布局则是 GC.dll / GC / GC*.dll。先找新名，再退回旧名，兼容老发布包。
+            // 注意排除 GC-UI / GC-SAVEDOG / .GC/bin 里的附属程序，它们不是启动器本体。
+            bool IsLauncher(System.IO.Compression.ZipArchiveEntry e)
+            {
+                var n = e.Name;
+                if (n.Length == 0) return false;                       // 目录条目
+                if (n.StartsWith("GC-UI", StringComparison.OrdinalIgnoreCase) ||
+                    n.StartsWith("GC-SAVEDOG", StringComparison.OrdinalIgnoreCase)) return false;
+                if (e.FullName.Replace('\\', '/').Contains("/.GC/")) return false;
+                if (n.StartsWith("GCL-", StringComparison.OrdinalIgnoreCase)) return true;
+                return false;
+            }
+
+            var entry = archive.Entries.FirstOrDefault(IsLauncher)
+                        ?? archive.Entries.FirstOrDefault(e =>
                             e.Name.Equals("GC.dll", StringComparison.OrdinalIgnoreCase))
                         ?? archive.Entries.FirstOrDefault(e =>
                             e.Name.Equals("GC", StringComparison.OrdinalIgnoreCase))

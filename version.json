@@ -49,7 +49,7 @@
       "id": "contour-map",
       "version": "1.1",
       "build": "773ab2161d",
-      "manifestSha256": "f673521f7462324a2a461253ed975c9f89abc4df34b937cad70a2a134623456d",
+      "manifestSha256": "f86a3f83d5953cafc333585da3009d8846448f6a8a9df13b39cde57b36037733",
       "filesSha256": "a6bdf9b4273aabee50c3c94ceab4d0abee15f0df1af90c58bdbb796e0d2d5699",
       "files": 5,
       "dir": "model/contour-map"
@@ -58,7 +58,7 @@
       "id": "earth-geography",
       "version": "1.9",
       "build": "cc68b8863b",
-      "manifestSha256": "89e3afa8843fb080c81e062967790cddba54665b182e4a0819c8c1fd737d5189",
+      "manifestSha256": "448f050fded46d7bfc8f0c3856e741c4a4f82523c8e012dd846ddcd400ff394a",
       "filesSha256": "c018ba481831e23d3183a38ac47251f19754c7464baa5d85b47cea7a49fcfa95",
       "files": 11,
       "dir": "model/earth-geography"
@@ -67,7 +67,7 @@
       "id": "earth-revolution",
       "version": "1.7",
       "build": "53b7a0fbc3",
-      "manifestSha256": "31f20837131573957101f7fba9a653c8785f6dbda5fd678862148a9f7f87e841",
+      "manifestSha256": "c69fc53f50213c6ab7658e1a761a20d2c55a7a344beb3c75a30393c26fa40167",
       "filesSha256": "4cd45b0324a77574a0da3a939c2a6faebc785c5a24cb50136d62a78a6ea2e9b1",
       "files": 7,
       "dir": "model/earth-revolution"
@@ -76,7 +76,7 @@
       "id": "earth-rotation",
       "version": "1.7",
       "build": "ecd52665f9",
-      "manifestSha256": "caa89497a70b29db87e67d35cd7d3e27a18306646209b2178cfb71b73cfca8ba",
+      "manifestSha256": "cbf12a47747a331c9980260f39169b1813bb4b52a8916995fda05755267bddca",
       "filesSha256": "594b005a6a9f36cd0b5d4e4a7a0b1ab42d53c8032832545b71c3915493d56c8e",
       "files": 7,
       "dir": "model/earth-rotation"
@@ -85,7 +85,7 @@
       "id": "scale-calculator",
       "version": "1.6",
       "build": "105653737d",
-      "manifestSha256": "952d2529f3b62f6703456ae9bc6f867edac148b7ec9963444c426d26aa35208d",
+      "manifestSha256": "fc6f7deb1efb076cc0bbee732e7de8f007ed74bc837dba2268be1e0adc1839d3",
       "filesSha256": "732dd26406e0f1e836970499d7ea644def332ce909d7f8aa0a403bbe7337e604",
       "files": 6,
       "dir": "model/scale-calculator"
@@ -94,8 +94,8 @@
   "signature": {
     "alg": "ECDSA-P256-SHA256",
     "keyId": "gc-2026-12",
-    "value": "A/A7GQ2muXgqhtG+HVKkAvs0cAX90TXDgXOtxWCr8VTQW10FPUUroUSdmp4x5FUT7KNnrs1wIoz4/YSJspv9oQ==",
-    "contentSha256": "84488b35a9f45f44c3b6c21c400f6c0d0a26b5f0f045a696afd889cf5af6f2f1",
-    "signedAt": "2026-11-18T14:46:36Z"
+    "value": "DzOHHAa1bdiwt2erQ0tpynhT4ukgtG7IMvfNO7oXo+FUe3RdokAtIbuQ599yOG2lGABxkU19UBp9scs5fiTdZA==",
+    "contentSha256": "17f9d2eacc27592db13167742c214498941267e7b77b54fcd3c5896f818cb082",
+    "signedAt": "2026-11-19T05:09:10Z"
   }
 }
