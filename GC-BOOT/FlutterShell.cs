@@ -39,6 +39,7 @@ internal static class FlutterShell
         if (uiPath == null) return false;
 
         var port = Port;
+        AvaloniaHost? uiHost = null;
 
         // 用户可能重复启动：已有后端在跑就直接复用，退出时也不要关掉别人的进程。
         if (!IsHealthy(port))
@@ -50,13 +51,14 @@ internal static class FlutterShell
 
             for (var candidate = start; candidate < start + Services.GcUiContract.PortScanRange; candidate++)
             {
-                var app = TryStartBackend(args, candidate);
+                var app = TryStartBackend(args, candidate, out var host);
                 if (app == null) continue;
 
                 if (WaitHealthy(candidate, TimeSpan.FromSeconds(25)))
                 {
                     port = candidate;
                     _backend = app;
+                    uiHost = host;
                     break;
                 }
 
@@ -76,7 +78,29 @@ internal static class FlutterShell
             return false;
         }
 
-        ui.WaitForExit();
+        // 前端窗口已拉起。模型窗口由 Avalonia 承载，而 macOS 的 AppKit 要求
+        // NSApplication 必须在**主线程**——所以事件循环要跑在这里（当前正是主线程），
+        // 不能再丢到副线程，否则一点「启动模型」就会把整个后端带崩。
+        ui.EnableRaisingEvents = true;
+        var closed = 0;
+        void RequestClose()
+        {
+            if (Interlocked.Exchange(ref closed, 1) == 1) return;
+            uiHost?.Shutdown();
+        }
+
+        ui.Exited += (_, _) => RequestClose();
+        if (ui.HasExited) RequestClose();
+
+        if (!ui.HasExited && uiHost != null)
+        {
+            // 阻塞直到界面退出（或图形环境初始化失败）。
+            uiHost.RunOnCurrentThread();
+        }
+
+        // Avalonia 起不来（无桌面会话）时仍要等界面退出，避免后端被提前收掉。
+        if (!ui.HasExited) ui.WaitForExit();
+
         StopBackend(_backend);
         _backend = null;
         return true;
@@ -108,11 +132,14 @@ internal static class FlutterShell
     // ---------------------------------------------------------------- 进程管理
 
     /// <summary>在本进程内启动后端；端口被占用等失败情况返回 null。</summary>
-    private static WebApplication? TryStartBackend(string[] args, int port)
+    /// <param name="uiHost">成功时交出模型窗口宿主，由调用方在主线程跑事件循环。</param>
+    private static WebApplication? TryStartBackend(string[] args, int port, out AvaloniaHost? uiHost)
     {
+        uiHost = null;
         try
         {
-            var app = BackendServer.Start(args, port);
+            var app = BackendServer.Start(args, port, out var host);
+            uiHost = host;
             app.StartAsync().GetAwaiter().GetResult();
             return app;
         }

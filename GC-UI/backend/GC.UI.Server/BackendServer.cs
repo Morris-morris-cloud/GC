@@ -30,19 +30,33 @@ public static class BackendServer
 {
     /// <summary>按命令行 / GC_UI_PORT 解析端口并构建（未启动）的后端。</summary>
     public static WebApplication StartFromCommandLine(string[] args)
-        => Start(args, ResolvePort(args));
+        => Start(args, ResolvePort(args), out _);
+
+    /// <summary>同上，并交出模型窗口宿主（独立进程入口用：主线程留给 Avalonia）。</summary>
+    public static WebApplication StartFromCommandLine(string[] args, out AvaloniaHost uiHost)
+        => Start(args, ResolvePort(args), out uiHost);
 
     /// <summary>
     /// 构建后端。返回的 <see cref="WebApplication"/> 尚未启动：
     /// 独立进程直接 <c>Run()</c>，启动器用 <c>StartAsync()</c> 之后继续拉起界面。
     /// </summary>
     public static WebApplication Start(string[] args, int port)
+        => Start(args, port, out _);
+
+    /// <summary>
+    /// 构建后端，并通过 <paramref name="uiHost"/> 交出模型窗口宿主。
+    ///
+    /// 调用方（启动器）必须在**主线程**调用 <see cref="AvaloniaHost.RunOnCurrentThread"/>：
+    /// macOS 的 AppKit 要求 NSApplication 运行在主线程，否则打开模型窗口时整个进程会崩溃。
+    /// </summary>
+    public static WebApplication Start(string[] args, int port, out AvaloniaHost uiHost)
     {
         // 下载模块（GC-DOWNLOAD）通过宿主钩子注入，和 GC-BOOT 的做法一致。
         DownloadModuleHost.Factory = new DownloadModuleFactory();
 
         var services = AppServices.Create();
-        var uiHost = new AvaloniaHost(services);
+        var host = new AvaloniaHost(services);
+        uiHost = host;
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args });
         builder.Logging.ClearProviders();
@@ -161,8 +175,8 @@ public static class BackendServer
             true,
             LauncherRuntimeInfo.CurrentLauncherVersion,
             LauncherRuntimeInfo.CurrentRid,
-            uiHost.IsAvailable,
-            uiHost.LastError)));
+            host.IsAvailable,
+            host.LastError)));
 
         // ---- 已安装模型 -----------------------------------------------------------
 
@@ -190,7 +204,7 @@ public static class BackendServer
             try
             {
                 services.Memory.Refresh();
-                var message = await uiHost.LaunchAsync(package);
+                var message = await host.LaunchAsync(package);
                 return Results.Ok(new LaunchResultDto(true, message));
             }
             catch (Exception ex)
