@@ -1,130 +1,116 @@
 {
   "zh-CN": {
-    "title": "如何使用 · 等高线地形图",
+    "title": "如何使用 · 等高线地形与五大典型地貌",
     "sections": [
       {
         "h": "开始使用（跟着做）",
         "lines": [
-          "第 1 步：顶部选一种地形（山地 / 盆地 / 丘陵 / 高原 / 平原），画面会换成对应的等高线图。",
-          "第 2 步：把鼠标移到图上任意位置，底部会显示该点的海拔、相对高度和地形部位。",
-          "第 3 步：观察左边的立体地形与右边的等高线图，找出同一个山峰，看它在两张图上分别长什么样。",
-          "第 4 步：点右下角「取消上色」，只留等高线；再点一次恢复分层设色，对比哪种更便于判读。",
-          "第 5 步：对着右侧的判读要点，依次在图上找出一个山峰、一条山脊、一条山谷、一处鞍部和一处陡崖。"
+          "第 1 步：点右下角「开始实验」，在立体地形里观察水平切面下降、交线形成、垂直投影与疏密判坡四步动画。",
+          "第 2 步：在立体地形上按住鼠标拖动可旋转视角，滚轮缩放；这是可交互的 3D 地形。",
+          "第 3 步：点画布上方「五大典型地貌」标签（山峰/山脊/山谷/鞍部/陡崖），画面换成对应的专门地形并叠加完整等高线，观察各自的等高线特征。",
+          "第 4 步：点底部「俯视图 / 立体图」在等高线地图与 3D 地形间切换；鼠标悬停任意位置，底部显示该点海拔与地形部位。",
+          "第 5 步：点「上色 / 取消上色」对比分层设色与纯等高线；点「全屏」进入全屏演示。"
         ]
       },
       {
-        "h": "等高线是什么",
+        "h": "键盘快捷键",
         "lines": [
-          "在地图上，把海拔相同的点用线连起来，这条线就叫等高线。",
-          "相邻两条等高线之间的高差叫等高距：本图山地、高原、盆地用 100 米，丘陵用 10 米，平原用 5 米。",
-          "等高线的闭合圈，数值由中心向四周递减的是山峰；四周高中间低的是盆地。",
-          "等高线向海拔低处凸出的是山脊（分水线）；向海拔高处凸出的是山谷（集水线）。",
-          "两个山峰之间低下去的地方叫鞍部；等高线重叠或挤成一团的地方是陡崖。",
-          "等高线越密，坡度越陡；越疏，坡度越缓。",
-          "每 5 条等高线加粗一条叫计曲线，上面标着海拔，方便读数。"
+          "空格：播放 / 暂停实验。",
+          "数字 1 – 5：依次切换到山峰、山脊、山谷、鞍部、陡崖。"
         ]
       },
       {
-        "h": "海拔与相对高度",
+        "h": "四步实验流程",
         "lines": [
-          "海拔：地面某一点高出海平面的垂直距离。",
-          "相对高度：两个地点海拔的差值，也就是图上两点的落差。",
-          "底部读数里的「相对高度」是本图最低点到该点的高差。"
+          "等高切割：一个水平面从山顶向下移动，与山体在同一海拔相交。",
+          "形成交线：每个水平切面留下一条闭合交线，多层交线共同描述山体起伏。",
+          "投影成图：各高度的交线沿垂线投影到同一平面，累积成完整等高线图。",
+          "疏密判坡：坡度着色叠加等高线，陡处线密、缓处线疏。"
         ]
       },
       {
-        "h": "五种地体的等高线特征",
+        "h": "五大典型地貌的判读",
         "lines": [
-          "山地：海拔高、起伏大，等高线密集且数值跨度大。",
-          "盆地：四周高、中间低，等高线由外向内数值递减，常有河流发育。",
-          "丘陵：海拔不高、坡度和缓，等高线稀疏弯曲。",
-          "高原：海拔高而顶面平坦，等高线中部稀疏、边缘密集。",
-          "平原：海拔低、地面平坦，等高线很少甚至没有。"
+          "山峰：等高线闭合，数值由中心向四周递减（若向内降低则为洼地）。",
+          "山脊：等高线向海拔低处凸出（凸低为脊），脊线是分水线。",
+          "山谷：等高线向海拔高处凸出（凸高为谷），谷线是集水线，常发育河流。",
+          "鞍部：两座山峰之间相对低洼，俯视轮廓呈马鞍状收腰。",
+          "陡崖：等高线密集甚至重合，近乎垂直；n 条线重合时 (n−1)d ≤ ΔH < (n+1)d。"
         ]
       },
       {
-        "h": "地图上的教科书符号",
+        "h": "等高线基础",
         "lines": [
-          "分层设色：按固定高程档位套固定色阶（深绿→浅绿→绿→浅黄→黄→浅褐→褐→白），同一档内颜色完全相同。",
-          "山峰用 ▲ 加高程数字标注。",
-          "河流用蓝色线表示，沿谷底（等高线凸向高处的一侧）流。",
-          "陡崖用红色锯齿线表示。",
-          "指北针在图幅右上角，比例尺在左下角，分层设色图例在右下角。",
-          "地形剖面图在图幅底部：沿南北中线剖开地面，标出各点海拔，看清起伏。"
+          "同一条等高线上各点海拔相等；相邻等高线之间的高差叫等高距（本图 100 米）。",
+          "等高线越密坡越陡，越疏坡越缓。",
+          "每 5 条加粗一条叫计曲线，标注海拔便于读数。",
+          "海拔：某地高出海平面的垂直距离；相对高度：两点海拔之差。"
         ]
       },
       {
-        "h": "容易出错的地方",
+        "h": "地图符号",
         "lines": [
-          "把「等高线密集 = 陡」记反：密集是陡，稀疏是缓。",
-          "把山脊和山谷看反：看凸出的方向 —— 凸向低处是山脊，凸向高处是山谷。",
-          "忽视等高距：等高距变了，同样的等高线密度代表的坡度就不同。",
-          "把计曲线当成普通等高线：计曲线加粗并标了数值，读高程要看它。"
+          "分层设色按固定高程档位套固定色阶（深绿→浅绿→绿→浅黄→黄→浅褐→褐→白）。",
+          "山峰用 ▲ 加高程数字标注；河流用蓝色线沿谷底绘制；陡崖用红色锯齿线表示。",
+          "指北针在图幅右上，比例尺在左下，分层设色图例在右下，地形剖面图在底部。"
         ]
       }
     ]
   },
   "en": {
-    "title": "How to use · Contour Map",
+    "title": "How to use · Contour Lines & Five Landforms",
     "sections": [
       {
         "h": "Getting started (follow along)",
         "lines": [
-          "Step 1: pick a terrain type at the top (mountains / basin / hills / plateau / plain) — the map switches to its contour map.",
-          "Step 2: move the pointer anywhere on the map; the footer shows elevation, relative height and the terrain feature.",
-          "Step 3: compare the 3D block on the left with the contour map on the right — find the same peak in both.",
-          "Step 4: click “No colour” at the bottom right to keep only the contour lines; click again to restore the colour fill.",
-          "Step 5: using the panel on the right, find one peak, one ridge, one valley, one saddle and one cliff."
+          "Step 1: press Start to watch the four-step animation — contour cutting, line formation, vertical projection and slope reading.",
+          "Step 2: drag with the mouse to rotate the 3D terrain, scroll to zoom; it is fully interactive.",
+          "Step 3: click a landform tab above the canvas (peak / ridge / valley / saddle / cliff) to load its dedicated terrain with its full contour pattern.",
+          "Step 4: toggle Top view / 3D view at the bottom; hover anywhere to read elevation and terrain feature.",
+          "Step 5: use Colour / No colour to compare hypsometric tint with pure contour lines; use Fullscreen for presentation."
         ]
       },
       {
-        "h": "What contour lines are",
+        "h": "Keyboard shortcuts",
         "lines": [
-          "Connect points of equal elevation on a map and you get a contour line.",
-          "The height gap between neighbouring contours is the contour interval: 100 m for mountains, plateau and basin; 10 m for hills; 5 m for plain.",
-          "A closed loop whose values decrease outward is a peak; high ground around a low centre is a basin.",
-          "Contours bulging toward lower ground form a ridge (watershed); bulging toward higher ground form a valley (drainage).",
-          "The low ground between two peaks is a saddle; overlapping or tightly crowded contours mark a cliff.",
-          "The closer the contours, the steeper the slope; the wider apart, the gentler.",
-          "Every 5th contour is bolded as an index contour and labelled with its elevation."
+          "Space: play / pause the experiment.",
+          "Numbers 1 – 5: switch to peak, ridge, valley, saddle, cliff."
         ]
       },
       {
-        "h": "Elevation and relative height",
+        "h": "The four experiment steps",
         "lines": [
-          "Elevation is the vertical height of a point above sea level.",
-          "Relative height is the difference between two elevations — the drop between two points on the map.",
-          "The relative height in the footer is measured from the lowest point of this map."
+          "Contour cutting: a horizontal plane descends from the summit and intersects the mountain at one elevation.",
+          "Forming lines: each slice leaves a closed intersection line; stacked lines describe the relief.",
+          "Projection: intersection lines are projected vertically onto one plane, building the contour map.",
+          "Slope density: slope shading over contours — dense lines mean steep, sparse lines mean gentle."
         ]
       },
       {
-        "h": "Contour patterns of the five terrains",
+        "h": "Reading the five landforms",
         "lines": [
-          "Mountains: high elevation, large relief, dense contours over a wide value range.",
-          "Basin: high rim, low centre; values decrease inward, often with a river.",
-          "Hills: low elevation, gentle slopes, sparse winding contours.",
-          "Plateau: high but flat on top — contours sparse in the middle and crowded at the edges.",
-          "Plain: low and flat — few or no contour lines at all."
+          "Peak: closed contours, values decrease outward (if they decrease inward it is a depression).",
+          "Ridge: contours bulge toward lower ground; a watershed line.",
+          "Valley: contours bulge toward higher ground; a drainage line, often a stream.",
+          "Saddle: low ground between two peaks, pinched like a saddle in plan view.",
+          "Cliff: contours crowd or overlap, nearly vertical; n overlapping lines: (n−1)d ≤ ΔH < (n+1)d."
         ]
       },
       {
-        "h": "Textbook map symbols",
+        "h": "Contour basics",
         "lines": [
-          "Hypsometric tint: fixed colour bands by elevation (dark green → light green → green → pale yellow → yellow → light brown → brown → white); each band is a flat colour.",
-          "Peaks are marked with a ▲ and their elevation.",
-          "Rivers are drawn in blue along the valley floor (where contours bulge uphill).",
-          "Cliffs are marked with a red saw-tooth line.",
-          "A north arrow sits top-right, a scale bar bottom-left, and the tint legend bottom-right.",
-          "The terrain profile along the bottom cuts the ground open and labels elevations, showing the relief at a glance."
+          "All points on one contour share the same elevation; the gap between neighbours is the contour interval (100 m here).",
+          "Closer contours mean steeper slopes; wider spacing means gentler slopes.",
+          "Every 5th contour is bolded as an index contour and labelled with elevation.",
+          "Elevation is height above sea level; relative height is the difference between two elevations."
         ]
       },
       {
-        "h": "Common mistakes",
+        "h": "Map symbols",
         "lines": [
-          "Reversing dense and sparse: dense means steep, sparse means gentle.",
-          "Mixing up ridge and valley — look which way the bulge points: toward lower ground is a ridge, toward higher ground is a valley.",
-          "Ignoring the contour interval: change it and the same spacing means a different slope.",
-          "Treating index contours as ordinary ones — they are bold and labelled, so read elevations off them."
+          "Hypsometric tint uses fixed colour bands (dark green → light green → green → pale yellow → yellow → light brown → brown → white).",
+          "Peaks are marked with ▲ plus elevation; rivers are blue lines along valleys; cliffs use a red saw-tooth line.",
+          "North arrow top-right, scale bar bottom-left, tint legend bottom-right, terrain profile along the bottom."
         ]
       }
     ]

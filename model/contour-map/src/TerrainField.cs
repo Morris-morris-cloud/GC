@@ -13,6 +13,16 @@ public enum TerrainKind
     Plain       // 平原：海拔低、地面平坦
 }
 
+/// <summary>五大典型地貌部位（等高线判读的核心对象）。</summary>
+public enum LandformKind
+{
+    Peak,       // 山峰：闭合等高线，数值向内升高
+    Ridge,      // 山脊：等高线凸向低处，凸低为脊
+    Valley,     // 山谷：等高线凸向高处，凸高为谷
+    Saddle,     // 鞍部：两峰之间相对低洼，俯视收腰
+    Cliff       // 陡崖：等高线密集甚至重合
+}
+
 /// <summary>
 /// 地形高度场（等高线模型的数据核心）。
 ///
@@ -42,12 +52,25 @@ public sealed class TerrainField
     /// <summary>这块地形属于哪种类型（决定界面标题与说明）。</summary>
     public TerrainKind Kind { get; }
 
+    /// <summary>若这块地形是某个典型地貌部位，则记录其种类；否则为 null。</summary>
+    public LandformKind? Landform { get; }
+
     public TerrainField(TerrainKind kind = TerrainKind.Mountain, int size = 192)
     {
         Size = size;
         Kind = kind;
         Heights = new float[size, size];
         Build(kind);
+    }
+
+    /// <summary>创建一个专门表现某种典型地貌部位的高度场。</summary>
+    public TerrainField(LandformKind landform, int size = 192)
+    {
+        Size = size;
+        Kind = TerrainKind.Mountain;
+        Landform = landform;
+        Heights = new float[size, size];
+        BuildLandform(landform);
     }
 
     /// <summary>该类型对应的等高距：平原/丘陵用 20m，山地/高原/盆地用 100m。</summary>
@@ -266,6 +289,157 @@ public sealed class TerrainField
         MinHeight = min; MaxHeight = max;
     }
 
+    // ───────────────────────── 五大典型地貌部位 ─────────────────────────
+
+    private void BuildLandform(LandformKind landform)
+    {
+        switch (landform)
+        {
+            case LandformKind.Peak:   BuildPeak(); break;
+            case LandformKind.Ridge:  BuildRidge(); break;
+            case LandformKind.Valley: BuildValley(); break;
+            case LandformKind.Saddle: BuildSaddle(); break;
+            case LandformKind.Cliff:  BuildCliff(); break;
+        }
+        BuildFeatures();
+    }
+
+    /// <summary>山峰：单峰为主、层层闭合，四周逐级降低。配一处小侧峰便于读鞍部。</summary>
+    private void BuildPeak()
+    {
+        var min = double.MaxValue; var max = double.MinValue;
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var u = (double)x / (Size - 1);
+            var v = (double)y / (Size - 1);
+            var du = u - 0.5; var dv = (v - 0.5) / 0.94;
+            var r = Math.Sqrt(du * du + dv * dv);
+            // 主峰：宽阔的穹状山体（半径约占图幅 8 成），层层闭合的等高线才画得开
+            var core = Math.Exp(-Math.Pow(r / 0.36, 1.85));
+            var rim = 1 - SmoothStep(0.36, 0.50, r);      // 山脚过渡到平地
+            var h = 65 + 1230 * core * rim;
+            // 东南侧肩部，让等高线不是完美同心圆
+            h += 120 * Math.Exp(-(Math.Pow(u - 0.72, 2) + Math.Pow(v - 0.66, 2)) / 0.016) * rim;
+            h += 22 * Math.Sin(u * 7.3 + 0.6) * Math.Cos(v * 6.1) * rim;
+            h = Math.Max(0, h);
+            Heights[y, x] = (float)h;
+            if (h < min) min = h; if (h > max) max = h;
+        }
+        MinHeight = (float)min; MaxHeight = (float)max;
+        Tags.Clear();
+        Tags.Add((0.5, 0.5, 0.09, TerrainFeature.Peak));
+    }
+
+    /// <summary>山脊：一条狭长高地，等高线沿脊线向低处凸出（凸低为脊）。</summary>
+    private void BuildRidge()
+    {
+        var min = double.MaxValue; var max = double.MinValue;
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var u = (double)x / (Size - 1);
+            var v = (double)y / (Size - 1);
+            // 脊线沿 u 方向（西高东低），东西向是长坡，南北向是宽缓的两翼
+            var crestV = 0.5 + 0.10 * Math.Sin(u * 3.1);   // 脊线轻微弯曲
+            var across = v - crestV;
+            var crest = 1150 - 380 * u;                    // 脊线海拔由西向东降低
+            var lateral = Math.Exp(-Math.Pow(Math.Abs(across) / 0.27, 1.55));
+            var h = 85 + (crest - 85) * lateral;
+            // 两翼的次级起伏，避免像一堵直墙
+            h += 60 * Math.Exp(-Math.Pow(Math.Abs(across) - 0.30, 2) / 0.010) * (0.4 + 0.6 * (1 - u));
+            h += 24 * Math.Sin(u * 8.0) * Math.Cos(v * 5.6);
+            h = Math.Max(0, h);
+            Heights[y, x] = (float)h;
+            if (h < min) min = h; if (h > max) max = h;
+        }
+        MinHeight = (float)min; MaxHeight = (float)max;
+        Tags.Clear();
+        Tags.Add((0.30, 0.50, 0.09, TerrainFeature.Ridge));
+        Tags.Add((0.70, 0.50, 0.09, TerrainFeature.Ridge));
+    }
+
+    /// <summary>山谷：两侧高地夹持的低槽，等高线形成 V 形指向上游（凸高为谷）。</summary>
+    private void BuildValley()
+    {
+        var min = double.MaxValue; var max = double.MinValue;
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var u = (double)x / (Size - 1);
+            var v = (double)y / (Size - 1);
+            // 谷轴沿 v 方向：两侧高、中间是 V 形谷底；北侧(v 小)为上游更高
+            var side = Math.Pow(Math.Abs(u - 0.5) / 0.5, 1.5);        // 0=谷心 1=图边
+            var downhill = 1 - v;                                      // 上游 1 → 下游 0
+            var h = 90 + 760 * downhill + 585 * side * (0.30 + 0.70 * downhill);
+            // 谷底再切深一点，形成明显的集水线
+            h -= 70 * Math.Exp(-Math.Pow(u - 0.5, 2) / 0.0022);
+            h += 18 * Math.Sin(u * 6.5) * Math.Cos(v * 7.2);
+            h = Math.Max(0, h);
+            Heights[y, x] = (float)h;
+            if (h < min) min = h; if (h > max) max = h;
+        }
+        MinHeight = (float)min; MaxHeight = (float)max;
+        Tags.Clear();
+        Tags.Add((0.50, 0.40, 0.075, TerrainFeature.Valley));
+        Tags.Add((0.50, 0.68, 0.075, TerrainFeature.Valley));
+    }
+
+    /// <summary>鞍部：两座山峰之间相对低洼、俯视轮廓收腰的过渡地带。</summary>
+    private void BuildSaddle()
+    {
+        var min = double.MaxValue; var max = double.MinValue;
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var u = (double)x / (Size - 1);
+            var v = (double)y / (Size - 1);
+            // 两峰在 v≈0.5 的连线上，u=0.27 与 u=0.73；中间 u=0.5 为垭口
+            var d1 = Math.Sqrt(Math.Pow((u - 0.27) / 0.30, 2) + Math.Pow((v - 0.52) / 0.28, 2));
+            var d2 = Math.Sqrt(Math.Pow((u - 0.73) / 0.30, 2) + Math.Pow((v - 0.48) / 0.28, 2));
+            var p1 = 1140 * Math.Exp(-Math.Pow(d1, 2.2));
+            var p2 = 1060 * Math.Exp(-Math.Pow(d2, 2.2));
+            // 南北两侧缓慢降低，把两峰连成一条东西向的山梁
+            var bench = 330 * Math.Exp(-Math.Pow((v - 0.5) / 0.34, 2));
+            var h = 65 + bench + Math.Max(p1, p2);
+            h += 20 * Math.Sin(u * 8.0) * Math.Cos(v * 7.0);
+            h = Math.Max(0, h);
+            Heights[y, x] = (float)h;
+            if (h < min) min = h; if (h > max) max = h;
+        }
+        MinHeight = (float)min; MaxHeight = (float)max;
+        Tags.Clear();
+        Tags.Add((0.28, 0.50, 0.05, TerrainFeature.Peak));
+        Tags.Add((0.72, 0.50, 0.05, TerrainFeature.Peak));
+        Tags.Add((0.50, 0.50, 0.045, TerrainFeature.Saddle));
+    }
+
+    /// <summary>陡崖：一侧近乎直立的高差带，等高线在崖壁处高度密集甚至重合。</summary>
+    private void BuildCliff()
+    {
+        var min = double.MaxValue; var max = double.MinValue;
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        {
+            var u = (double)x / (Size - 1);
+            var v = (double)y / (Size - 1);
+            // 西侧低台地、东侧高台地，中间一条近乎直立的高差带形成陡崖
+            // 崖线略呈波状（真实崖壁不是一条直线），过渡带留出 2~3 个采样格
+            var edge = SmoothStep(0.50, 0.62, u + 0.045 * Math.Sin(v * 5.2) + 0.02 * Math.Sin(v * 11.0));
+            var h = 210 + 940 * edge;
+            // 高台地北高南低、顶面起伏，低台地保持缓坡
+            h += 170 * (1 - v) * edge;
+            h += 55 * Math.Sin(v * 5.4) * Math.Cos(u * 4.2) * (0.4 + 0.6 * edge);
+            h += 26 * Math.Sin(u * 9.0);          // 顶面轻微起伏
+            h = Math.Max(0, h);
+            Heights[y, x] = (float)h;
+            if (h < min) min = h; if (h > max) max = h;
+        }
+        MinHeight = (float)min; MaxHeight = (float)max;
+        Tags.Clear();
+        Tags.Add((0.50, 0.50, 0.035, TerrainFeature.Cliff));
+    }
+
     private static double SmoothStep(double a, double b, double x)
     {
         var t = Math.Clamp((x - a) / (b - a), 0, 1);
@@ -452,46 +626,77 @@ public sealed class TerrainField
     private static double Lerp(double a, double b, double t)
         => a + (b - a) * Math.Clamp(double.IsNaN(t) ? 0.5 : t, 0, 1);
 
-    /// <summary>把零散线段按端点邻近关系串成折线。</summary>
+    /// <summary>
+    /// 把零散线段按端点串成完整折线。
+    /// 关键点：必须**两端都延伸**。只往尾部延伸时，起点落在曲线中段就会把一条等高线
+    /// 切成许多短链，渲染出来是断续的虚线（学生看到的就是“虚线等高线”）。
+    /// </summary>
     private static List<List<(double U, double V)>> Chain(
         List<(double U1, double V1, double U2, double V2)> segments)
     {
-        const double Eps = 0.004;
-        var result = new List<List<(double, double)>>();
+        // 量化到 1e-4 的网格做端点索引：共享边上的交点由同一次插值算出，
+        // 端点值完全一致；网格远小于采样间距（1/192≈0.0052），不会误并。
+        const double Q = 1e4;
+        static (long, long) Key(double u, double v)
+            => ((long)Math.Round(u * Q), (long)Math.Round(v * Q));
+
+        var index = new Dictionary<(long, long), List<int>>();
+        void Register(double u, double v, int seg)
+        {
+            var k = Key(u, v);
+            if (!index.TryGetValue(k, out var list)) index[k] = list = new List<int>();
+            list.Add(seg);
+        }
+
+        for (var i = 0; i < segments.Count; i++)
+        {
+            Register(segments[i].U1, segments[i].V1, i);
+            Register(segments[i].U2, segments[i].V2, i);
+        }
+
         var used = new bool[segments.Count];
+        var result = new List<List<(double, double)>>();
+
+        int NextAt(double u, double v)
+        {
+            if (!index.TryGetValue(Key(u, v), out var list)) return -1;
+            foreach (var j in list) if (!used[j]) return j;
+            return -1;
+        }
 
         for (var i = 0; i < segments.Count; i++)
         {
             if (used[i]) continue;
             used[i] = true;
-            var line = new List<(double, double)>
+            var line = new List<(double U, double V)>
             {
                 (segments[i].U1, segments[i].V1),
                 (segments[i].U2, segments[i].V2)
             };
 
-            // 向两端延伸
-            var grown = true;
-            while (grown)
+            // 向尾部延伸
+            while (true)
             {
-                grown = false;
-                var (tailU, tailV) = line[^1];
-                for (var j = 0; j < segments.Count; j++)
-                {
-                    if (used[j]) continue;
-                    var s = segments[j];
-                    if (Near(tailU, tailV, s.U1, s.V1, Eps))
-                    {
-                        line.Add((s.U2, s.V2)); used[j] = true; grown = true; break;
-                    }
-                    if (Near(tailU, tailV, s.U2, s.V2, Eps))
-                    {
-                        line.Add((s.U1, s.V1)); used[j] = true; grown = true; break;
-                    }
-                }
+                var (tu, tv) = line[^1];
+                var j = NextAt(tu, tv);
+                if (j < 0) break;
+                used[j] = true;
+                var s = segments[j];
+                line.Add(Key(s.U1, s.V1) == Key(tu, tv) ? (s.U2, s.V2) : (s.U1, s.V1));
             }
 
-            if (line.Count >= 4) result.Add(line);
+            // 向头部延伸
+            while (true)
+            {
+                var (hu, hv) = line[0];
+                var j = NextAt(hu, hv);
+                if (j < 0) break;
+                used[j] = true;
+                var s = segments[j];
+                line.Insert(0, Key(s.U1, s.V1) == Key(hu, hv) ? (s.U2, s.V2) : (s.U1, s.V1));
+            }
+
+            if (line.Count >= 3) result.Add(line);
         }
 
         return result;
