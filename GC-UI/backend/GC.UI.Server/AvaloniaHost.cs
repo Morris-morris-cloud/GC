@@ -29,7 +29,9 @@ public sealed class AvaloniaHost
     private readonly AppServices _services;
     private readonly object _gate = new();
     private readonly Dictionary<string, PlayerWindow> _windows = new(StringComparer.OrdinalIgnoreCase);
-    private Task<bool>? _startTask;
+    private readonly TaskCompletionSource<bool> _ready =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _started;
 
     public AvaloniaHost(AppServices services) => _services = services;
 
@@ -37,56 +39,60 @@ public sealed class AvaloniaHost
 
     public string? LastError { get; private set; }
 
-    public Task<bool> EnsureStartedAsync()
+    /// <summary>
+    /// 后端线程调用：等待「主线程已把 Avalonia 事件循环跑起来」。
+    ///
+    /// 关键点：macOS 的 AppKit 要求 NSApplication 在**主线程**。以前这里把
+    /// <c>StartWithClassicDesktopLifetime</c> 丢到一个新建的后台线程里跑，在 macOS 上
+    /// 会直接崩掉整个后端进程（表现为点「启动模型」界面无反应、随后后端消失）。
+    /// 现在改为由启动器在主线程调用 <see cref="RunOnCurrentThread"/>，
+    /// 这里只等待就绪信号。
+    /// </summary>
+    public Task<bool> EnsureStartedAsync() => _ready.Task;
+
+    /// <summary>
+    /// 必须在 UI 主线程调用。启动 Avalonia 桌面生命周期并阻塞，直到 <see cref="Shutdown"/>。
+    /// 返回后（或初始化失败后）调用方负责收尾。
+    /// </summary>
+    public void RunOnCurrentThread()
     {
-        lock (_gate)
+        if (Interlocked.Exchange(ref _started, 1) == 1) return;
+
+        try
         {
-            _startTask ??= Task.Run(StartCore);
-            return _startTask;
+            AppBuilder.Configure<HostApp>()
+                .UsePlatformDetect()
+                .AfterSetup(_ =>
+                {
+                    IsAvailable = true;
+                    _ready.TrySetResult(true);
+                })
+                .StartWithClassicDesktopLifetime(Array.Empty<string>());
+        }
+        catch (Exception ex)
+        {
+            // 无桌面会话（CI / 无头环境）：模型窗口不可用，但后端其余接口照常。
+            LastError = ex.Message;
+            _ready.TrySetResult(false);
         }
     }
 
-    private bool StartCore()
+    /// <summary>从任意线程请求结束事件循环，使 <see cref="RunOnCurrentThread"/> 返回。</summary>
+    public void Shutdown()
     {
-        var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var thread = new Thread(() =>
+        if (_started == 0) return;
+        try
         {
-            try
+            Dispatcher.UIThread.Post(() =>
             {
-                AppBuilder.Configure<HostApp>()
-                    .UsePlatformDetect()
-                    .AfterSetup(_ => ready.TrySetResult(true))
-                    .StartWithClassicDesktopLifetime(Array.Empty<string>());
-            }
-            catch (Exception ex)
-            {
-                LastError = ex.Message;
-                ready.TrySetResult(false);
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "gc-ui-avalonia"
-        };
-
-        // Windows 上 Avalonia 需要 STA 线程；macOS / Linux 不支持也不必要。
-        if (OperatingSystem.IsWindows())
-        {
-            try { thread.SetApartmentState(ApartmentState.STA); }
-            catch { /* 忽略：部分运行时不允许设置 */ }
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.Shutdown();
+            });
         }
-
-        thread.Start();
-
-        if (!ready.Task.Wait(TimeSpan.FromSeconds(30)))
+        catch
         {
-            LastError = "图形环境初始化超时";
-            return false;
+            // 事件循环尚未建立或已退出：无需处理
         }
-
-        IsAvailable = ready.Task.Result;
-        return IsAvailable;
     }
 
     /// <summary>在 Avalonia UI 线程上加载模型并打开它自己的窗口。</summary>
