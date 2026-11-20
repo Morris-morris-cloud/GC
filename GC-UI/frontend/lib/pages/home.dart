@@ -276,12 +276,12 @@ class _HomePageViewState extends State<HomePageView> {
                     ),
                     const SizedBox(width: GcSpace.md),
                     OutlinedButton(
-                      onPressed: () => widget.controller.goTo(1),
+                      onPressed: () => widget.controller.goTo(2),
                       child: Text(T('home.download')),
                     ),
                     const SizedBox(width: GcSpace.xs),
                     TextButton(
-                      onPressed: () => widget.controller.goTo(2),
+                      onPressed: () => widget.controller.goTo(3),
                       child: Text(T('home.settings')),
                     ),
                   ],
@@ -414,7 +414,7 @@ class _HomePageViewState extends State<HomePageView> {
           ),
           const SizedBox(height: GcSpace.xl),
           FilledButton(
-            onPressed: () => widget.controller.goTo(1),
+            onPressed: () => widget.controller.goTo(2),
             child: Text(T('home.emptyAction')),
           ),
         ],

@@ -34,6 +34,9 @@ dependencies:
   # 与 GC-UI 后端（本地 HTTP 服务）通信
   http: ^1.2.2
 
+  # 桌面 WebView：承载离线等高线课件（Win/macOS/Linux）
+  flutter_inappwebview: 6.1.5
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -60,10 +63,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    # 离线等高线课件（去除授权验证后的纯净版），整体作为目录打包。
+    - courseware/
+    - courseware/assets/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
