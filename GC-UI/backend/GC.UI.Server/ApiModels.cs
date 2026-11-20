@@ -12,7 +12,8 @@ public sealed record HealthDto(
     string Version,
     string Platform,
     bool UiAvailable,
-    string? UiError);
+    string? UiError,
+    string? SessionProof = null);
 
 public sealed record ModelDto(
     string Id,

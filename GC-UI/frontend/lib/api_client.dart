@@ -397,27 +397,45 @@ class GcApi {
 
   final String baseUrl;
 
+  /// 启动器注入的一次性会话令牌。后端在发布包模式下会校验它，
+  /// 防止前端误连到同机其他进程伪造的「后端」。
+  static final String? _sessionToken = _readSessionToken();
+
+  static String? _readSessionToken() {
+    const fromDefine = String.fromEnvironment('GC_UI_TOKEN');
+    if (fromDefine.isNotEmpty) return fromDefine;
+    final fromEnv = Platform.environment['GC_UI_TOKEN'];
+    return (fromEnv != null && fromEnv.isNotEmpty) ? fromEnv : null;
+  }
+
+  /// 带会话令牌的请求头；没有令牌时返回 const 空 map（调试/独立后端模式）。
+  Map<String, String> get _authHeaders =>
+      _sessionToken == null ? const {} : {'X-GC-UI-Token': _sessionToken!};
+
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$baseUrl$path').replace(queryParameters: query);
 
   Future<dynamic> _send(String method, String path,
       {Map<String, String>? query, Object? body}) async {
     final uri = _uri(path, query);
+    final auth = _authHeaders;
     late http.Response response;
     try {
       switch (method) {
         case 'GET':
-          response = await _client.get(uri).timeout(const Duration(seconds: 30));
+          response = await _client.get(uri, headers: auth)
+              .timeout(const Duration(seconds: 30));
           break;
         case 'POST':
           response = await _client
               .post(uri,
-                  headers: const {'Content-Type': 'application/json'},
+                  headers: <String, String>{...auth, 'Content-Type': 'application/json'},
                   body: body == null ? null : jsonEncode(body))
               .timeout(const Duration(seconds: 120));
           break;
         case 'DELETE':
-          response = await _client.delete(uri).timeout(const Duration(seconds: 30));
+          response = await _client.delete(uri, headers: auth)
+              .timeout(const Duration(seconds: 30));
           break;
         default:
           throw ApiException('不支持的方法 $method');
@@ -516,6 +534,13 @@ class GcApi {
       await _send('POST', '/api/shell/open-url', body: {'url': url})
           as Map<String, dynamic>);
 
-  /// 模型封面图地址（直接给 Image.network 用）。
-  String previewUrl(ModelInfo model) => '$baseUrl${model.previewUrl}';
+  /// 模型封面图地址（直接给 Image.network 用，带不上自定义头，令牌走 query 参数）。
+  String previewUrl(ModelInfo model) {
+    if (_sessionToken == null) return '$baseUrl${model.previewUrl}';
+    final uri = Uri.parse('$baseUrl${model.previewUrl}');
+    return uri.replace(queryParameters: {
+      ...uri.queryParameters,
+      'X-GC-UI-Token': _sessionToken!,
+    }).toString();
+  }
 }
