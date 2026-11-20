@@ -169,6 +169,35 @@ public static class BackendServer
             await next();
         });
 
+        // 会话令牌校验：启动器拉起时经 GC_UI_TOKEN 注入一次性令牌，前端每个 /api 请求
+        // 都必须带回。这样同机其他进程即使占了端口、伪造 /api/health 返回 200，也过不了
+        // 这一关——它拿不到令牌。独立进程 / 调试模式未设置令牌时放行，保持兼容。
+        var sessionToken = Environment.GetEnvironmentVariable(GcUiContract.TokenEnvVar);
+        if (!string.IsNullOrEmpty(sessionToken))
+        {
+            var expected = System.Text.Encoding.UTF8.GetBytes(sessionToken);
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    // 正常请求从请求头取；封面图由 Image.network 发起、无法加自定义头，
+                    // 用同名 query 参数携带（GET 只读资源，参数不会落到日志正文）。
+                    var supplied = context.Request.Headers[GcUiContract.TokenHeader].ToString();
+                    if (string.IsNullOrEmpty(supplied))
+                        supplied = context.Request.Query[GcUiContract.TokenHeader].ToString();
+                    var actual = System.Text.Encoding.UTF8.GetBytes(supplied);
+                    // 长度不等时 CryptographicOperations 仍安全比较，但先比对长度省一次分支泄漏。
+                    if (actual.Length != expected.Length ||
+                        !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(actual, expected))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return;
+                    }
+                }
+                await next();
+            });
+        }
+
         // ---- 健康检查 -------------------------------------------------------------
 
         app.MapGet("/api/health", () => Results.Ok(new HealthDto(
@@ -176,7 +205,8 @@ public static class BackendServer
             LauncherRuntimeInfo.CurrentLauncherVersion,
             LauncherRuntimeInfo.CurrentRid,
             host.IsAvailable,
-            host.LastError)));
+            host.LastError,
+            GcUiContract.DeriveSessionProof(sessionToken))));
 
         // ---- 已安装模型 -----------------------------------------------------------
 

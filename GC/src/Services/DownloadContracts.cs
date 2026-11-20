@@ -172,6 +172,16 @@ public static class GcUiContract
     /// <summary>传给后端与前端的环境变量名。</summary>
     public const string PortEnvVar = "GC_UI_PORT";
 
+    /// <summary>
+    /// 启动器为本次会话生成的一次性令牌，经环境变量同时传给进程内后端与 Flutter 前端。
+    /// 前端每个请求都要带该令牌，后端据此确认对方是自己拉起的那个前端；
+    /// 同机伪装进程即便占了端口，也没有令牌，无法被前端当成后端复用。
+    /// </summary>
+    public const string TokenEnvVar = "GC_UI_TOKEN";
+
+    /// <summary>前端携带一次性令牌的请求头。</summary>
+    public const string TokenHeader = "X-GC-UI-Token";
+
     /// <summary>读取环境变量里指定的端口；非法或未设置时返回 <see cref="DefaultPort"/>。</summary>
     public static int PortFromEnvironment()
     {
@@ -179,5 +189,26 @@ public static class GcUiContract
         return int.TryParse(value, out var port) && port > 0 && port < 65536
             ? port
             : DefaultPort;
+    }
+
+    /// <summary>生成 256 位会话令牌（hex）；cryptographically random，无法预测。</summary>
+    public static string NewSessionToken()
+    {
+        var bytes = new byte[32];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// 由令牌派生一段短指纹，后端在 /api/health 里回给启动器用于身份确认。
+    /// 回指纹而非令牌本身，避免会话令牌出现在明文 HTTP 响应体里；启动器用同一函数
+    /// 算期望值比对，不匹配的「健康」响应一律视为伪装服务。
+    /// </summary>
+    public static string DeriveSessionProof(string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return "";
+        var bytes = System.Text.Encoding.UTF8.GetBytes("gc-health-proof:" + token);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToHexString(hash.AsSpan(0, 16)).ToLowerInvariant();
     }
 }
