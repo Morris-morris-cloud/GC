@@ -15,6 +15,7 @@ class _NavItem {
 
 const List<_NavItem> _navItems = <_NavItem>[
   _NavItem(Icons.dashboard_rounded, 'nav.home'),
+  _NavItem(Icons.terrain_rounded, 'nav.courseware'),
   _NavItem(Icons.download_rounded, 'nav.download'),
   _NavItem(Icons.tune_rounded, 'nav.settings'),
   _NavItem(Icons.info_outline_rounded, 'nav.about'),
@@ -89,7 +90,10 @@ class _ShellPageState extends State<ShellPage> {
   }
 
   Widget _content(ShellController controller) {
-    if (!controller.backendReady) {
+    // 课件页是纯前端资源，不依赖后端：即使后端未就绪也可打开。
+    // 注意 _buildPage 内部对 index 1 返回课件页，这里单独放行它。
+    final courseware = controller.index == 1;
+    if (!courseware && !controller.backendReady) {
       if (controller.loadError != null) {
         return _BackendDown(controller: controller);
       }
@@ -124,10 +128,13 @@ class _ShellPageState extends State<ShellPage> {
   Widget _buildPage(ShellController controller, int index) {
     switch (index) {
       case 1:
-        return DownloadPageView(controller: controller);
+        // 课件页自持有 WebView 状态，不需要 controller。
+        return const CoursewarePage();
       case 2:
-        return SettingsPageView(controller: controller);
+        return DownloadPageView(controller: controller);
       case 3:
+        return SettingsPageView(controller: controller);
+      case 4:
         return AboutPageView(controller: controller);
       default:
         return HomePageView(controller: controller);
