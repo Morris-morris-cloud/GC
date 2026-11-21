@@ -61,19 +61,20 @@ jobs:
           echo "ahead=$AHEAD" >> "$GITHUB_OUTPUT"
 
           # GitHub 的 mergeable 字段是异步计算的，前几次可能为 null，重试几次
+          MERGEABLE="null"
           STATE="unknown"
-          CONFLICT="unknown"
-          for i in 1 2 3 4 5; do
-            INFO=$(gh api "repos/${{ github.repository }}/pulls/${PR}" --jq '.mergeable, .mergeable_state' 2>/dev/null || true)
-            CONFLICT=$(printf '%s\n' "$INFO" | sed -n '1p')
-            STATE=$(printf '%s\n' "$INFO" | sed -n '2p')
-            if [ "$CONFLICT" = "true" ] || [ "$CONFLICT" = "false" ]; then break; fi
-            sleep 3
+          for i in 1 2 3 4 5 6 7 8; do
+            read -r MERGEABLE STATE <<< "$(gh api "repos/${{ github.repository }}/pulls/${PR}" \
+              --jq '"\(.mergeable | tostring) \(.mergeable_state // "unknown")"' 2>/dev/null || echo 'null unknown')"
+            # mergeable 只有 true / false 才是算完的结果，null 说明还在算
+            if [ "$MERGEABLE" = "true" ] || [ "$MERGEABLE" = "false" ]; then break; fi
+            sleep 4
           done
 
-          case "$CONFLICT" in
-            false) echo "conflict=ok" >> "$GITHUB_OUTPUT" ;;
-            true)  echo "conflict=conflict" >> "$GITHUB_OUTPUT" ;;
+          # 注意语义：mergeable=true 表示「可以合并」，false 才是冲突
+          case "$MERGEABLE" in
+            true)  echo "conflict=ok" >> "$GITHUB_OUTPUT" ;;
+            false) echo "conflict=conflict" >> "$GITHUB_OUTPUT" ;;
             *)     echo "conflict=unknown" >> "$GITHUB_OUTPUT" ;;
           esac
           echo "merge_state=$STATE" >> "$GITHUB_OUTPUT"
@@ -83,8 +84,9 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          dotnet restore GC.sln > dotnet-restore.log 2>&1
-          dotnet build GC.sln -c Release --no-restore 2>&1 | tee dotnet-build.log
+          dotnet restore GC.sln > "$GITHUB_WORKSPACE/dotnet-restore.log" 2>&1
+          dotnet build GC.sln -c Release --no-restore 2>&1 \
+            | tee "$GITHUB_WORKSPACE/dotnet-build.log"
           exit ${PIPESTATUS[0]}
 
       - id: flutter
@@ -93,8 +95,12 @@ jobs:
         working-directory: GC-UI/frontend
         run: |
           set -o pipefail
-          flutter pub get 2>&1 | tee ../flutter-pubget.log
-          flutter analyze 2>&1 | tee ../flutter-analyze.log
+          # 日志统一写到仓库根目录：后面的汇总步骤在根目录读，路径必须一致
+          flutter pub get 2>&1 | tee "$GITHUB_WORKSPACE/flutter-pubget.log"
+          # 仓库里已有历史 warning / info，不应该让它们卡住合并；
+          # 只把真正的 error 当失败。
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 \
+            | tee "$GITHUB_WORKSPACE/flutter-analyze.log"
           exit ${PIPESTATUS[0]}
 
       - id: summary
@@ -111,13 +117,22 @@ jobs:
           set -e
           bad=0
 
+          # 静态分析结果分「错误」和「警告/提示」：只有错误才算不通过
+          FE=$(grep -cE '^ *error •' flutter-analyze.log 2>/dev/null || true); FE=${FE:-0}
+          FW=$(grep -cE '^ *(warning|info) •' flutter-analyze.log 2>/dev/null || true); FW=${FW:-0}
+
           case "$DOTNET_OUTCOME" in
             success) DOTNET_LINE="✅ .NET 编译通过" ;;
             *)       DOTNET_LINE="❌ .NET 编译失败"; bad=1 ;;
           esac
           case "$FLUTTER_OUTCOME" in
-            success) FLUTTER_LINE="✅ Flutter 静态分析通过" ;;
-            *)       FLUTTER_LINE="❌ Flutter 静态分析有问题"; bad=1 ;;
+            success)
+              if [ "$FW" -gt 0 ]; then
+                FLUTTER_LINE="✅ 无错误（另有 ${FW} 条历史 warning/info，未阻断）"
+              else
+                FLUTTER_LINE="✅ 无错误"
+              fi ;;
+            *)       FLUTTER_LINE="❌ 有 ${FE} 个 error"; bad=1 ;;
           esac
           case "$CONFLICT" in
             ok)       CONFLICT_LINE="✅ 与目标分支无冲突" ;;
@@ -153,10 +168,17 @@ jobs:
             echo
             echo '```'
             echo "== dotnet build（尾部 40 行）=="
-            tail -40 dotnet-build.log 2>/dev/null || echo "(无日志)"
+            tail -40 dotnet-build.log 2>/dev/null || echo "(日志缺失：编译步骤可能未执行)"
             echo
             echo "== flutter analyze（尾部 40 行）=="
-            tail -40 flutter-analyze.log 2>/dev/null || echo "(无日志)"
+            if [ -f flutter-analyze.log ]; then
+              tail -40 flutter-analyze.log
+            elif [ -f flutter-pubget.log ]; then
+              echo "(analyze 未产生日志，pub get 输出如下)"
+              tail -20 flutter-pubget.log
+            else
+              echo "(日志缺失：Flutter 步骤可能未执行)"
+            fi
             echo '```'
             echo
             echo "</details>"
