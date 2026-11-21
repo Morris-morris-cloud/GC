@@ -86,10 +86,39 @@ jobs:
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "目标=$TARGET 提交=$REF 是否PR=$IS_PR"
 
+      - name: 回复「开始编译」
+        if: steps.parse.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+          TARGET: ${{ steps.parse.outputs.target }}
+          REF: ${{ steps.parse.outputs.ref }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -e
+          case "$TARGET" in
+            mac)     PLATFORMS="macOS" ;;
+            win-amd) PLATFORMS="Windows amd64" ;;
+            win-arm) PLATFORMS="Windows arm64" ;;
+            *)       PLATFORMS="macOS + Windows amd64 + Windows arm64" ;;
+          esac
+
+          cat > ack.md <<EOF
+          🔨 **开始编译**：${PLATFORMS}
+
+          - 来源提交：\`${REF:0:7}\`
+          - 目标：\`${TARGET}\`
+          - 实时日志：${RUN_URL}
+
+          编译完成后会在这里回复结果。
+          EOF
+
+          gh issue comment "$ISSUE" --body-file ack.md
+
   build-mac:
     needs: prepare
     if: needs.prepare.outputs.ok == 'true' && (needs.prepare.outputs.target == 'mac' || needs.prepare.outputs.target == 'all')
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
