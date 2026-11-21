@@ -79,7 +79,15 @@ jobs:
           echo "is_pr=$IS_PR" >> "$GITHUB_OUTPUT"
 
           if [ "$IS_PR" = "true" ]; then
-            REF=$(gh api "repos/${{ github.repository }}/pulls/${ISSUE_NUMBER}" --jq '.head.sha')
+            # 只有「还开着」的 PR 才编它的 head；已合并/已关闭的 PR 编默认分支，
+            # 否则会编到一份过期的代码。
+            PR_STATE=$(gh api "repos/${{ github.repository }}/pulls/${ISSUE_NUMBER}" --jq '.state')
+            if [ "$PR_STATE" = "open" ]; then
+              REF=$(gh api "repos/${{ github.repository }}/pulls/${ISSUE_NUMBER}" --jq '.head.sha')
+            else
+              REF="${{ github.event.repository.default_branch }}"
+              echo "PR 已 $PR_STATE，改为编译默认分支"
+            fi
           else
             REF="${{ github.event.repository.default_branch }}"
           fi
@@ -261,6 +269,8 @@ jobs:
       - name: 回帖结果
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 本 job 不 checkout（省时间），gh 需要显式指定仓库
+          GH_REPO: ${{ github.repository }}
           ISSUE: ${{ github.event.issue.number }}
           TARGET: ${{ needs.prepare.outputs.target }}
           REF: ${{ needs.prepare.outputs.ref }}
