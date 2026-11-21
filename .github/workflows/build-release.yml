@@ -1,0 +1,293 @@
+name: build-release
+
+# 在 Issue / PR 里评论触发「编译 + 发布正式版本」：
+#   @build-release-bot build 1.1.3
+#
+# 与 build-bot 的区别：
+#   build-bot        只编译，产物丢进 ip-prerelease（预发布，反复覆盖）
+#   build-release    编译三平台，发一个 tag = 版本号的正式 Release（会更新 latest）
+#
+# 不会改动仓库里的 version.json：它由 GC-SAVEDOG 签名，CI 里没有签名私钥，
+# 重新 stamp 会产出一份客户端拒绝接受的清单。清单更新请走本地 ./build.sh stamp。
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: release-manual
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  TZ: Asia/Shanghai
+  DOTNET_VERSION: '8.0.x'
+  FLUTTER_VERSION: '3.24.5'
+
+jobs:
+  prepare:
+    if: |
+      contains(github.event.comment.body, '@build-release-bot') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.parse.outputs.ok }}
+      version: ${{ steps.parse.outputs.version }}
+      ref: ${{ steps.parse.outputs.ref }}
+      reason: ${{ steps.parse.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: parse
+        name: 解析版本号并预检
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          set -e
+          # 只认 主.次.修订，其它写法直接忽略
+          VER=$(printf '%s' "$BODY" \
+            | grep -oiE '@build-release-bot[[:space:]]+build[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+' \
+            | head -1 \
+            | awk '{print $NF}' || true)
+
+          if [ -z "$VER" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=没有匹配到合法版本号（格式：@build-release-bot build 1.2.3）" >> "$GITHUB_OUTPUT"
+            echo "未匹配到版本号，忽略"
+            exit 0
+          fi
+
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ github.event.repository.default_branch }}" >> "$GITHUB_OUTPUT"
+          echo "版本号=$VER"
+
+          # tag 已存在就不能再发：重复 tag 会让客户端拿到两份不同内容
+          if gh api "repos/${{ github.repository }}/git/ref/tags/${VER}" >/dev/null 2>&1; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=tag ${VER} 已存在，请换一个版本号" >> "$GITHUB_OUTPUT"
+            echo "tag ${VER} 已存在"
+            exit 0
+          fi
+
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "reason=" >> "$GITHUB_OUTPUT"
+
+      - name: 回复「开始编译并发布」
+        if: steps.parse.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          VER: ${{ steps.parse.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -e
+          cat > ack.md <<EOF
+          🔨 **开始编译并发布 \`${VER}\`**
+
+          平台：macOS (arm64) + Windows (amd64 / arm64)
+
+          - 实时日志：${RUN_URL}
+
+          编译完成后会在这里回复结果。
+          EOF
+          gh issue comment "$ISSUE" --body-file ack.md
+
+      - name: 回复「忽略原因」
+        if: steps.parse.outputs.ok != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          REASON: ${{ steps.parse.outputs.reason }}
+        run: |
+          set -e
+          gh issue comment "$ISSUE" --body "⏭ 未触发：${REASON}"
+
+  build-mac:
+    needs: prepare
+    if: needs.prepare.outputs.ok == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 环境信息
+        run: |
+          sw_vers
+          xcodebuild -version
+          flutter --version
+
+      - name: 编译 macOS
+        env:
+          GC_NO_PROGRESS: '1'
+        run: ./build.sh build --targets=mac -version=${{ needs.prepare.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-zip
+          path: dist/mac-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 5
+
+  build-win:
+    needs: prepare
+    if: needs.prepare.outputs.ok == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 编译 Windows（amd64 + arm64）
+        run: ./build.ps1 build -Version ${{ needs.prepare.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-zip
+          path: |
+            dist/win-amd64/*.zip
+            dist/win-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 5
+
+  publish:
+    needs: [prepare, build-mac, build-win]
+    if: needs.prepare.outputs.ok == 'true' && needs.build-mac.result == 'success' && needs.build-win.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 汇总产物
+        run: |
+          set -e
+          mkdir -p out
+          find artifacts -name '*.zip' -exec cp {} out/ \;
+          ls -lh out
+
+      - name: 生成 sha256 清单
+        working-directory: out
+        run: |
+          set -e
+          shasum -a 256 *.zip > SHA256SUMS.txt 2>/dev/null || sha256sum *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VER: ${{ needs.prepare.outputs.version }}
+          REF: ${{ needs.prepare.outputs.ref }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -e
+          cat > notes.md <<EOF
+          GC ${VER}
+
+          - macOS（arm64）
+          - Windows（amd64 / arm64）
+
+          触发人：@${ACTOR}（#${ISSUE}）
+          构建来源：\`${REF}\`
+
+          各包 sha256 见 \`SHA256SUMS.txt\`。
+
+          > macOS 包为 ad-hoc 签名，首次打开需右键 →「打开」，或在「系统设置 → 隐私与安全性」里放行。
+          EOF
+
+          gh release create "$VER" out/* \
+            --target "$REF" \
+            --title "GC ${VER}" \
+            --notes-file notes.md
+
+          echo "https://github.com/${{ github.repository }}/releases/tag/$VER" >> "$GITHUB_STEP_SUMMARY"
+
+  report:
+    needs: [prepare, build-mac, build-win, publish]
+    if: always() && needs.prepare.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 回帖结果
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          VER: ${{ needs.prepare.outputs.version }}
+          MAC: ${{ needs.build-mac.result }}
+          WIN: ${{ needs.build-win.result }}
+          PUB: ${{ needs.publish.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -e
+          REPO="${{ github.repository }}"
+
+          line() {
+            case "$2" in
+              success) echo "- $1：✅ 成功" ;;
+              skipped) echo "- $1：⏭ 跳过" ;;
+              cancelled) echo "- $1：⛔ 已取消" ;;
+              *) echo "- $1：❌ 失败" ;;
+            esac
+          }
+
+          if [ "$PUB" = "success" ]; then
+            HEADLINE="✅ **已发布 \`${VER}\`**"
+          elif [ "$MAC" = "success" ] || [ "$WIN" = "success" ]; then
+            HEADLINE="⚠️ **编译完成但未发布 \`${VER}\`**（需要两个平台都成功才会发 Release）"
+          else
+            HEADLINE="❌ **\`${VER}\` 编译失败**"
+          fi
+
+          {
+            echo "$HEADLINE"
+            echo
+            line "macOS" "$MAC"
+            line "Windows" "$WIN"
+            line "发布" "$PUB"
+            echo
+            if [ "$PUB" = "success" ]; then
+              echo "- Release：https://github.com/${REPO}/releases/tag/${VER}"
+            else
+              echo "- 日志：${RUN_URL}"
+            fi
+          } > result.md
+
+          gh issue comment "$ISSUE" --body-file result.md

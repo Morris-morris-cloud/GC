@@ -6,9 +6,11 @@
 | --- | --- | --- |
 | `nightly-prerelease.yml` | 每天 21:00（Asia/Shanghai），或手动 | 编译 macOS + Windows(amd64/arm64)，发布 **`nightly`** 预发布 |
 | `build-bot.yml` | Issue / PR 评论里 `@build-bot build <目标>` | 只编译指定平台，发布 **`ip-prerelease`** 预发布 |
+| `build-release.yml` | Issue / PR 评论里 `@build-release-bot build <版本号>` | 编译三平台，发布 **tag = 版本号** 的正式 Release |
 | `pr-review.yml` | 向 main 提 PR（新建 / 有新提交 / 重新打开） | 检查能否编译、是否有错、是否冲突、是否落后 main |
 
-两个预发布用**不同的 tag**，互不覆盖：夜间构建发 `nightly`，手动触发的发 `ip-prerelease`。
+预发布用**不同的 tag**，互不覆盖：夜间构建发 `nightly`，`@build-bot` 发 `ip-prerelease`；
+`@build-release-bot` 发的是正式版本（tag 就是版本号，会更新 latest）。
 
 ## 每夜构建
 
@@ -61,3 +63,25 @@
 - Secrets 不需要额外配置，统一用内置的 `GITHUB_TOKEN`。
 - macOS 产物是 **ad-hoc 签名**（无开发者证书）。下载后首次打开需右键 →「打开」，
   或在「系统设置 → 隐私与安全性」里放行。
+
+## build-release 用法
+
+在 Issue 或 PR 里评论：
+
+```
+@build-release-bot build 1.1.3
+```
+
+规则：
+
+- 版本号必须是 `主.次.修订`（如 `1.1.3`），其它写法会被忽略
+- tag 已存在时不会触发，会回帖说明「请换一个版本号」——同一个 tag 发两次会让客户端拿到两份不同内容
+- 只有 `OWNER` / `MEMBER` / `COLLABORATOR` 能触发
+- 编 macOS + Windows(amd64/arm64)，**两个平台都成功**才发 Release，否则只回帖失败原因
+- Release 附带 `SHA256SUMS.txt`
+- **不会**改动仓库里的 `version.json`：它由 GC-SAVEDOG 签名，CI 没有签名私钥。清单更新请在本地跑 `./build.sh stamp`
+
+## macOS runner
+
+统一用 `macos-latest`。`macos-14` 在本账号会被判为 `macos-14-arm64-us-default` 不受支持，
+job 在启动前就变成 cancelled。runner 自带多个版本的 Xcode 和 CocoaPods，不需要额外安装。
