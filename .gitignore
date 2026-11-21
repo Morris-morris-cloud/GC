@@ -54,3 +54,11 @@ GC-UI/frontend/test/shots/
 # GC.Tests 离屏渲染输出（dotnet run ... GC.Tests 默认写到仓库根 screenshots/）
 screenshots/
 
+# 构建/发布临时文件（禁止入库）
+decrypt.js
+script_*.js
+*.mp4
+courseware/
+.GC/UI/frontend/courseware/assets/*.png
+.workbuddy/
+
