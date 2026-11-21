@@ -37,15 +37,12 @@ flutter_build() {
       _flutter pub get || return 1
   fi
 
-  # CI 上没有签名证书：GC_NO_CODESIGN=1 时给 macOS 加 --no-codesign，
-  # 直接产出未签名的 .app（用户首次打开需右键「打开」或在系统设置里放行）。
-  _flags="--release"
-  if [ "${GC_NO_CODESIGN:-0}" = 1 ] && [ "$_plat" = macos ]; then
-    _flags="$_flags --no-codesign"
-  fi
-
+  # 注意：macOS 的 `flutter build macos` 没有 --no-codesign 选项（那是 iOS 的），
+  # 传了会直接报 "Could not find an option named no-codesign"。
+  # macOS 模板默认用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），无证书的 CI 也能构建出 .app，
+  # 只是首次打开需要右键「打开」。
   run_logged "$GC_ROOT/build/logs/flutter-$_plat.log" "Flutter $_plat 构建 " \
-    _flutter build "$_plat" $_flags || return 1
+    _flutter build "$_plat" --release || return 1
   step_ok "Flutter ${_plat}"
 }
 

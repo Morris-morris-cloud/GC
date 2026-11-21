@@ -59,5 +59,5 @@
 - `Settings → Actions → General → Workflow permissions` 给 **Read and write**，
   否则 `gh release` / 评论接口会 403（工作流里已声明 `permissions:`，但组织策略可能覆盖）。
 - Secrets 不需要额外配置，统一用内置的 `GITHUB_TOKEN`。
-- macOS 产物是 **未签名** 的（`GC_NO_CODESIGN=1`）。下载后首次打开需右键 →「打开」，
+- macOS 产物是 **ad-hoc 签名**（无开发者证书）。下载后首次打开需右键 →「打开」，
   或在「系统设置 → 隐私与安全性」里放行。

@@ -59,7 +59,6 @@ jobs:
       - name: 编译 macOS
         env:
           GC_TARGETS: mac
-          GC_NO_CODESIGN: '1'
           GC_NO_PROGRESS: '1'
         run: ./build.sh build --targets=mac
 

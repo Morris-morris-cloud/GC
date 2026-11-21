@@ -136,7 +136,6 @@ jobs:
 
       - name: 编译 macOS
         env:
-          GC_NO_CODESIGN: '1'
           GC_NO_PROGRESS: '1'
         run: ./build.sh build --targets=mac
 
@@ -252,18 +251,52 @@ jobs:
 
           echo "https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 回帖
-        if: always()
+  # 结果回帖独立成一个 job：编译失败 / 发布失败也要有回音，
+  # 不能因为 publish 被跳过就静默。
+  report:
+    needs: [prepare, build-mac, build-win, publish]
+    if: always() && needs.prepare.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 回帖结果
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TARGET: ${{ needs.prepare.outputs.target }}
           ISSUE: ${{ github.event.issue.number }}
-          STATE: ${{ steps.publish_step.outcome }}
+          TARGET: ${{ needs.prepare.outputs.target }}
+          REF: ${{ needs.prepare.outputs.ref }}
+          MAC: ${{ needs.build-mac.result }}
+          WIN: ${{ needs.build-win.result }}
+          PUB: ${{ needs.publish.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ "$STATE" = "success" ]; then
-            MSG="已编译 **${TARGET}** 并发布到预发布：https://github.com/${{ github.repository }}/releases/tag/ip-prerelease"
-          else
-            MSG="编译 **${TARGET}** 失败，见日志：${RUN_URL}"
-          fi
-          gh issue comment "$ISSUE" --body "$MSG"
+          set -e
+          REPO="${{ github.repository }}"
+
+          line() {
+            case "$2" in
+              success) echo "- $1：✅ 成功" ;;
+              skipped) echo "- $1：⏭ 未请求（跳过）" ;;
+              cancelled) echo "- $1：⛔ 已取消" ;;
+              *) echo "- $1：❌ 失败" ;;
+            esac
+          }
+
+          {
+            if [ "$PUB" = "success" ]; then
+              echo "✅ **编译完成**：\`${TARGET}\`"
+            else
+              echo "❌ **编译未完成**：\`${TARGET}\`"
+            fi
+            echo
+            line "macOS" "$MAC"
+            line "Windows" "$WIN"
+            echo
+            echo "- 来源提交：\`${REF:0:7}\`"
+            if [ "$PUB" = "success" ]; then
+              echo "- 产物：https://github.com/${REPO}/releases/tag/ip-prerelease"
+            else
+              echo "- 日志：${RUN_URL}"
+            fi
+          } > result.md
+
+          gh issue comment "$ISSUE" --body-file result.md
