@@ -20,7 +20,6 @@ const List<_NavItem> _navItems = <_NavItem>[
   _NavItem(Icons.download_rounded, 'nav.download'),
   _NavItem(Icons.tune_rounded, 'nav.settings'),
   _NavItem(Icons.info_outline_rounded, 'nav.about'),
-  _NavItem(Icons.auto_awesome_rounded, 'nav.treasure'),
   _NavItem(Icons.person_rounded, 'nav.user'),
 ];
 
@@ -148,8 +147,6 @@ class _ShellPageState extends State<ShellPage> {
       case 4:
         return AboutPageView(controller: controller);
       case 5:
-        return TreasurePage(controller: controller);
-      case 6:
         return UserPage(controller: controller);
       default:
         return HomePageView(controller: controller);

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
@@ -248,8 +246,6 @@ class _SettingsPageViewState extends State<SettingsPageView> {
   }
 
   Widget _appearanceCard(SettingsInfo settings) {
-    final current =
-        GcPalette.parseHex(settings.accentColor) ?? GcPalette.defaultAccent;
     return GcCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,142 +283,9 @@ class _SettingsPageViewState extends State<SettingsPageView> {
               if (mounted) setState(() => _status = T('common.applied'));
             },
           ),
-          const SizedBox(height: GcSpace.xl),
-          GcHint(T('set.accent.desc')),
-          const SizedBox(height: GcSpace.md + 2),
-          Wrap(
-            spacing: GcSpace.sm + 2,
-            runSpacing: GcSpace.sm + 2,
-            children: <Widget>[
-              for (final color in GcPalette.presets)
-                _accentSwatch(color, current),
-              _customAccentChip(),
-            ],
-          ),
-          const SizedBox(height: GcSpace.md),
-          Text(
-            '${T('set.accent')}: ${GcPalette.toHex(current)}',
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.4,
-              color: GcColors.faint,
-            ),
-          ),
         ],
       ),
     );
-  }
-
-  Widget _accentSwatch(Color color, Color current) {
-    final selected = color.value == current.value;
-    return Tooltip(
-      message: GcPalette.toHex(color),
-      child: GestureDetector(
-        onTap: () => _applyAccent(GcPalette.toHex(color)),
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(GcRadius.control),
-            border: Border.all(
-              color: selected ? GcColors.ink : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: selected
-              ? Icon(
-                  Icons.check_rounded,
-                  size: 18,
-                  color: color.computeLuminance() > 0.42
-                      ? const Color(0xFF0A1226)
-                      : Colors.white,
-                )
-              : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _customAccentChip() {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: _pickCustomAccent,
-        child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: GcSpace.md),
-          decoration: BoxDecoration(
-            color: GcColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(GcRadius.control),
-            border: Border.all(color: GcColors.line),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(Icons.colorize_rounded, size: 16, color: GcColors.faint),
-              const SizedBox(width: GcSpace.xs + 2),
-              Text(
-                T('set.accent.custom'),
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.3,
-                  color: GcColors.muted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickCustomAccent() async {
-    final controller = TextEditingController(
-      text: GcPalette.toHex(GcPalette.accent.value),
-    );
-    final hex = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: GcColors.surface,
-        title: Text(T('set.accent.custom')),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: Theme.of(context).textTheme.bodyLarge!.copyWith(fontSize: 13),
-          decoration: InputDecoration(
-            hintText: '#8FB6FF',
-            helperText: T('set.accent.hexHint'),
-          ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(T('common.cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(T('common.confirm')),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (hex != null) await _applyAccent(hex);
-  }
-
-  Future<void> _applyAccent(String hex) async {
-    final parsed = GcPalette.parseHex(hex);
-    if (parsed == null) {
-      if (mounted) setState(() => _status = T('set.accent.invalid'));
-      return;
-    }
-    final normalized = GcPalette.toHex(parsed);
-    GcPalette.apply(normalized); // 立即预览
-    await widget.controller
-        .saveSettings(SettingsPatch(accentColor: normalized));
-    if (mounted) setState(() => _status = T('common.applied'));
   }
 
   Widget _memoryCard(SettingsInfo settings) {

@@ -169,7 +169,7 @@ class _UserPageState extends State<UserPage> {
       _user = null;
       _fortune = null;
     });
-    GcPalette.apply('#${ThemeColor.defaultHex}');
+    GcPalette.accent.value = GcPalette.defaultAccent;
     _toast(T('user.logoutDone'));
   }
 

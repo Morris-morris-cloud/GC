@@ -67,6 +67,8 @@ class ShellController extends ChangeNotifier {
     if (settingsResult != null) {
       settings = settingsResult;
       _applySettings(settingsResult!);
+      // 主题色现在归用户账号所有（设置页不再提供），启动时按当前用户恢复
+      unawaited(_applyUserTheme());
     }
 
     if (firstError != null && settingsResult == null) {
@@ -97,8 +99,21 @@ class ShellController extends ChangeNotifier {
 
   void _applySettings(SettingsInfo value) {
     I18n.setLanguage(value.language);
-    GcPalette.apply(value.accentColor);
+    // 强调色不再来自设置：由用户账号的 theme_color 决定（见 _applyUserTheme）
     GcPalette.applyTheme(value.theme);
+  }
+
+  /// 按当前登录用户的 theme_color 应用强调色；未登录时保持默认。
+  Future<void> applyUserTheme() => _applyUserTheme();
+
+  Future<void> _applyUserTheme() async {
+    try {
+      final resp = await api.me();
+      final hex = resp?['theme_color'] as String?;
+      if (hex != null && hex.isNotEmpty) GcPalette.apply('#$hex');
+    } catch (_) {
+      // 后端没起来或未登录：保持当前颜色即可
+    }
   }
 
   void goTo(int value) {
