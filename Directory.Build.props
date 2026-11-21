@@ -14,6 +14,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <MvvmVersion>8.2.2</MvvmVersion>
+    <!-- 模型窗口仍由 Avalonia 承载（模型契约返回 Avalonia Control），
+         界面本身是 Flutter。Avalonia.BuildServices 的遥测会向用户目录写日志，
+         在只读目录 / CI 里会直接让编译失败，build.sh / build.ps1 已默认关闭。 -->
+    <AvaloniaVersion>11.3.9</AvaloniaVersion>
     <Version>1.1.2</Version>
     <Company>Morris</Company>
     <Product>GC</Product>

@@ -54,6 +54,7 @@ internal static class FlutterShell
         Environment.SetEnvironmentVariable(Services.GcUiContract.TokenEnvVar, token);
 
         var port = Port;
+        AvaloniaHost? uiHost = null;
 
         // 用户可能重复启动：只有当端口上已有一个「持有同一令牌」的后端时才复用。
         // 同机其他程序即便占端口并返回 200，也没有令牌，会被 IsHealthy 拒绝，
@@ -67,13 +68,14 @@ internal static class FlutterShell
 
             for (var candidate = start; candidate < start + Services.GcUiContract.PortScanRange; candidate++)
             {
-                var app = TryStartBackend(args, candidate);
+                var app = TryStartBackend(args, candidate, out var host);
                 if (app == null) continue;
 
                 if (WaitHealthy(candidate, token, TimeSpan.FromSeconds(25)))
                 {
                     port = candidate;
                     _backend = app;
+                    uiHost = host;
                     break;
                 }
 
@@ -93,9 +95,27 @@ internal static class FlutterShell
             return false;
         }
 
-        // 前端窗口已拉起。这里不再需要 AppKit 事件循环：模型已经全部在 Flutter 里渲染，
-        // 后端只是纯 HTTP 服务，主线程阻塞等它退出即可。
+        // 前端窗口已拉起。模型窗口由 Avalonia 承载，而 macOS 的 AppKit 要求
+        // NSApplication 必须在**主线程**——所以事件循环要跑在这里（当前正是主线程），
+        // 不能丢到副线程，否则一点「启动模型」就会把整个后端带崩。
         ui.EnableRaisingEvents = true;
+        var closed = 0;
+        void RequestClose()
+        {
+            if (Interlocked.Exchange(ref closed, 1) == 1) return;
+            uiHost?.Shutdown();
+        }
+
+        ui.Exited += (_, _) => RequestClose();
+        if (ui.HasExited) RequestClose();
+
+        if (!ui.HasExited && uiHost != null)
+        {
+            // 阻塞直到界面退出（或图形环境初始化失败）。
+            uiHost.RunOnCurrentThread();
+        }
+
+        // Avalonia 起不来（无桌面会话）时仍要等界面退出，避免后端被提前收掉。
         if (!ui.HasExited) ui.WaitForExit();
 
         StopBackend(_backend);
@@ -158,16 +178,20 @@ internal static class FlutterShell
     // ---------------------------------------------------------------- 进程管理
 
     /// <summary>在本进程内启动后端；端口被占用等失败情况返回 null。</summary>
-    private static WebApplication? TryStartBackend(string[] args, int port)
+    /// <param name="uiHost">成功时交出模型窗口宿主，由调用方在主线程跑事件循环。</param>
+    private static WebApplication? TryStartBackend(string[] args, int port, out AvaloniaHost? uiHost)
     {
+        uiHost = null;
         try
         {
-            var app = BackendServer.Start(args, port);
+            var app = BackendServer.Start(args, port, out var host);
+            uiHost = host;
             app.StartAsync().GetAwaiter().GetResult();
             return app;
         }
         catch (Exception ex)
         {
+            uiHost = null;
             Console.Error.WriteLine($"[shell] 后端启动失败（端口 {port}）: {ex.Message}");
             return null;
         }

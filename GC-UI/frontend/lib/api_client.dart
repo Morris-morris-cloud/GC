@@ -729,6 +729,19 @@ class GcApi {
     final r = await _send('POST', '/api/user/theme', body: {'color': color});
     return r as Map<String, dynamic>;
   }
+
+  /// 摇人品值。价格由后端算：当天第一次免费，之后按当日次数阶梯计费。
+  Future<Map<String, dynamic>> rollFortune() async {
+    final r = await _send('POST', '/api/user/fortune');
+    return r as Map<String, dynamic>;
+  }
+
+  /// 二选一。当天第一次免费，之后每次 0.5 积分。
+  Future<Map<String, dynamic>> pickOne(String optionA, String optionB) async {
+    final r = await _send('POST', '/api/user/pick',
+        body: {'optionA': optionA, 'optionB': optionB});
+    return r as Map<String, dynamic>;
+  }
 }
 
 /// 人机验证题

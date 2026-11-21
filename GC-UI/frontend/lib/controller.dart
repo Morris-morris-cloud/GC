@@ -119,27 +119,11 @@ class ShellController extends ChangeNotifier {
   void goTo(int value) {
     if (index == value) return;
     index = value;
-    activeModelId = null;      // 切页时收起模型视图
     notifyListeners();
   }
 
-  /// 当前在壳内打开的模型（null 表示在看普通页面）。
-  ///
-  /// 模型全部由 Flutter 自绘，不再由后端开 Avalonia 窗口：
-  /// 点「启动模型」只是把内容区换成模型视图，标题栏与侧栏保持可用。
-  String? activeModelId;
-
-  void openModel(String id) {
-    if (activeModelId == id) return;
-    activeModelId = id;
-    notifyListeners();
-  }
-
-  void closeModel() {
-    if (activeModelId == null) return;
-    activeModelId = null;
-    notifyListeners();
-  }
+  // 模型视图已回退为后端开 Avalonia 独立窗口（见 AvaloniaHost），
+  // Flutter 内嵌的 activeModelId / openModel / ModelViewPage 一套已移除。
 
   /// 模型库有变化（安装 / 删除 / 下载完成）：通知首页刷新。
   void modelsChanged() {

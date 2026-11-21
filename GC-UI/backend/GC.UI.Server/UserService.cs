@@ -100,8 +100,9 @@ public sealed class UserService
     {
         var lines = yaml.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         string? username = null, pwHash = null, pwSalt = null, themeColor = null;
-        int points = 0, consecutiveDays = 0, themePaid = 0;
-        DateTime? lastSignIn = null, themePaidAt = null;
+        decimal points = 0, themePaid = 0;
+        int consecutiveDays = 0, fortuneCount = 0, pickCount = 0;
+        DateTime? lastSignIn = null, themePaidAt = null, fortuneDate = null, pickDate = null;
 
         foreach (var line in lines)
         {
@@ -114,16 +115,25 @@ public sealed class UserService
                 case "username": username = val; break;
                 case "pw_hash": pwHash = val; break;
                 case "pw_salt": pwSalt = val; break;
-                case "points": int.TryParse(val, out var p); points = p; break;
+                // 旧文件里积分是整数；decimal.TryParse 兼容读取
+                case "points": decimal.TryParse(val, out var p); points = p; break;
                 case "last_sign_in":
                     if (DateTime.TryParse(val, out var ls)) lastSignIn = ls;
                     break;
                 case "consecutive_days": int.TryParse(val, out var d); consecutiveDays = d; break;
                 case "theme_color": themeColor = val; break;
-                case "theme_paid": int.TryParse(val, out var tp); themePaid = tp; break;
+                case "theme_paid": decimal.TryParse(val, out var tp); themePaid = tp; break;
                 case "theme_paid_at":
                     if (DateTime.TryParse(val, out var ta)) themePaidAt = ta;
                     break;
+                case "fortune_date":
+                    if (DateTime.TryParse(val, out var fd)) fortuneDate = fd;
+                    break;
+                case "fortune_count": int.TryParse(val, out var fc); fortuneCount = fc; break;
+                case "pick_date":
+                    if (DateTime.TryParse(val, out var pd)) pickDate = pd;
+                    break;
+                case "pick_count": int.TryParse(val, out var pc); pickCount = pc; break;
             }
         }
 
@@ -132,7 +142,13 @@ public sealed class UserService
 
         return new UserRecord(username!, pwHash, pwSalt, points, lastSignIn, consecutiveDays,
             string.IsNullOrWhiteSpace(themeColor) ? DefaultThemeColor : themeColor,
-            themePaid, themePaidAt);
+            themePaid, themePaidAt)
+        {
+            FortuneDate = fortuneDate,
+            FortuneCount = fortuneCount,
+            PickDate = pickDate,
+            PickCount = pickCount
+        };
     }
 
     private void SaveUser(UserRecord rec)
@@ -146,12 +162,16 @@ public sealed class UserService
                 .AppendLine($"username: {rec.Username}")
                 .AppendLine($"pw_hash: {rec.PwHash}")
                 .AppendLine($"pw_salt: {rec.PwSalt}")
-                .AppendLine($"points: {rec.Points}")
+                .AppendLine($"points: {rec.Points.ToString("0.##")}")
                 .AppendLine($"last_sign_in: {rec.LastSignIn?.ToString("yyyy-MM-dd") ?? ""}")
                 .AppendLine($"consecutive_days: {rec.ConsecutiveDays}")
                 .AppendLine($"theme_color: {rec.ThemeColor ?? DefaultThemeColor}")
-                .AppendLine($"theme_paid: {rec.ThemePaid}")
+                .AppendLine($"theme_paid: {rec.ThemePaid.ToString("0.##")}")
                 .AppendLine($"theme_paid_at: {rec.ThemePaidAt?.ToString("o") ?? ""}")
+                .AppendLine($"fortune_date: {rec.FortuneDate?.ToString("yyyy-MM-dd") ?? ""}")
+                .AppendLine($"fortune_count: {rec.FortuneCount}")
+                .AppendLine($"pick_date: {rec.PickDate?.ToString("yyyy-MM-dd") ?? ""}")
+                .AppendLine($"pick_count: {rec.PickCount}")
                 .ToString();
 
             File.WriteAllText(Path.Combine(dir, "pw.yaml"), yaml);
@@ -322,7 +342,7 @@ public sealed class UserService
 
     public UserRecord? GetFirstUser() => _users.Values.FirstOrDefault();
 
-    public bool UpdatePoints(string username, int deltaPoints, out string error)
+    public bool UpdatePoints(string username, decimal deltaPoints, out string error)
     {
         error = "";
         if (!_users.TryGetValue(username.Trim().ToLowerInvariant(), out var rec))
@@ -426,7 +446,7 @@ public sealed class UserService
     /// 换主题色。服务端自己算价，不信客户端传的 cost。
     /// 上次购买在 1 小时内，先按 80% 退还上次花费。
     /// </summary>
-    public bool ChangeThemeColor(string username, string colorHex, out string error, out int refunded)
+    public bool ChangeThemeColor(string username, string colorHex, out string error, out decimal refunded)
     {
         error = "";
         refunded = 0;
@@ -457,12 +477,12 @@ public sealed class UserService
             return false;
         }
 
-        // 1 小时内换色：退回上次花费的 80%
+        // 1 小时内换色：退回上次花费的 80%（保留 2 位小数）
         var available = rec.Points;
         if (rec.ThemePaid > 0 && rec.ThemePaidAt.HasValue &&
             DateTime.UtcNow - rec.ThemePaidAt.Value <= RefundWindow)
         {
-            refunded = (int)Math.Floor(rec.ThemePaid * RefundRate);
+            refunded = Math.Floor(rec.ThemePaid * (decimal)RefundRate * 100) / 100;
             available += refunded;
         }
 
@@ -490,6 +510,119 @@ public sealed class UserService
         return left > TimeSpan.Zero ? left : null;
     }
 
+    // ---------------------------------------------------------------- 人品值 / 二选一
+
+    /// <summary>
+    /// 人品值当日费用。第一次免费；之后按当日已付费次数阶梯计费：
+    /// 第 1–5 次 0.1 / 第 6–10 次 0.2 / 第 11–25 次 0.5 / 第 26 次起 1。
+    /// </summary>
+    public static decimal FortuneCost(int paidIndexToday)
+    {
+        if (paidIndexToday <= 0) return 0m;
+        if (paidIndexToday <= 5) return 0.1m;
+        if (paidIndexToday <= 10) return 0.2m;
+        if (paidIndexToday <= 25) return 0.5m;
+        return 1m;
+    }
+
+    /// <summary>二选一当日费用：第一次免费，之后每次 0.5。</summary>
+    public static decimal PickCost(int paidIndexToday)
+        => paidIndexToday <= 0 ? 0m : 0.5m;
+
+    /// <summary>算出当日费用并扣费；积分不足返回 false。成功后计数 +1。</summary>
+    private bool ChargeDailyFeature(UserRecord rec, Func<int, decimal> costFn,
+        DateTime? featureDate, int featureCount, out decimal cost, out string error)
+    {
+        error = "";
+        cost = 0;
+
+        var today = DateTime.UtcNow.Date;
+        // 跨天了先重置计数
+        if (featureDate.HasValue && featureDate.Value.Date != today)
+            featureCount = 0;
+
+        cost = costFn(featureCount);
+        if (rec.Points < cost)
+        {
+            error = cost > 0
+                ? $"积分不足，本次需要 {cost.ToString("0.##")} 积分"
+                : "积分不足";
+            return false;
+        }
+
+        rec.Points = Math.Round(rec.Points - cost, 2);
+        return true;
+    }
+
+    /// <summary>
+    /// 摇一次人品值（服务端算随机数，客户端不信自己传的值）。
+    /// 当天第一次免费，之后按阶梯扣积分。
+    /// </summary>
+    public bool RollFortune(string username, out string error, out int value,
+        out decimal cost, out UserRecord? record)
+    {
+        error = "";
+        value = 0;
+        cost = 0;
+        record = null;
+
+        if (!_users.TryGetValue(username.Trim().ToLowerInvariant(), out var rec))
+        {
+            error = "用户不存在";
+            return false;
+        }
+
+        var today = DateTime.UtcNow.Date;
+        var count = rec.FortuneDate.HasValue && rec.FortuneDate.Value.Date == today
+            ? rec.FortuneCount : 0;
+
+        if (!ChargeDailyFeature(rec, FortuneCost, rec.FortuneDate, count, out cost, out error))
+            return false;
+
+        rec.FortuneDate = today;
+        rec.FortuneCount = count + 1;
+        value = RandomNumberGenerator.GetInt32(0, 101);
+        record = rec;
+        SaveUser(rec);
+        return true;
+    }
+
+    /// <summary>二选一：服务端随机挑一个。当天第一次免费，之后每次 0.5。</summary>
+    public bool PickOne(string username, string optionA, string optionB, out string error,
+        out string choice, out decimal cost, out UserRecord? record)
+    {
+        error = "";
+        choice = "";
+        cost = 0;
+        record = null;
+
+        if (string.IsNullOrWhiteSpace(optionA) || string.IsNullOrWhiteSpace(optionB))
+        {
+            error = "两个选项都不能为空";
+            return false;
+        }
+
+        if (!_users.TryGetValue(username.Trim().ToLowerInvariant(), out var rec))
+        {
+            error = "用户不存在";
+            return false;
+        }
+
+        var today = DateTime.UtcNow.Date;
+        var count = rec.PickDate.HasValue && rec.PickDate.Value.Date == today
+            ? rec.PickCount : 0;
+
+        if (!ChargeDailyFeature(rec, PickCost, rec.PickDate, count, out cost, out error))
+            return false;
+
+        rec.PickDate = today;
+        rec.PickCount = count + 1;
+        choice = RandomNumberGenerator.GetInt32(0, 2) == 0 ? optionA : optionB;
+        record = rec;
+        SaveUser(rec);
+        return true;
+    }
+
     // ---------------------------------------------------------------- 散列
 
     private static string GenerateSalt()
@@ -513,20 +646,34 @@ public class UserRecord
     public string Username { get; init; } = "";
     public string PwHash { get; init; } = "";
     public string PwSalt { get; init; } = "";
-    public int Points { get; set; }
+
+    /// <summary>积分，精确到 0.01。</summary>
+    public decimal Points { get; set; }
     public DateTime? LastSignIn { get; set; }
     public int ConsecutiveDays { get; set; }
     public string? ThemeColor { get; set; }
 
     /// <summary>当前这个颜色实际花了多少分（用于 1 小时内退款）。</summary>
-    public int ThemePaid { get; set; }
+    public decimal ThemePaid { get; set; }
 
     /// <summary>购买该颜色的时间（UTC）。</summary>
     public DateTime? ThemePaidAt { get; set; }
 
-    public UserRecord(string username, string pwHash, string pwSalt, int points,
+    /// <summary>人品值当日最后计算日期（UTC），跨天计数清零。</summary>
+    public DateTime? FortuneDate { get; set; }
+
+    /// <summary>人品值当日已计算次数（含免费的那次）。</summary>
+    public int FortuneCount { get; set; }
+
+    /// <summary>二选一当日最后使用日期（UTC）。</summary>
+    public DateTime? PickDate { get; set; }
+
+    /// <summary>二选一当日已使用次数（含免费的那次）。</summary>
+    public int PickCount { get; set; }
+
+    public UserRecord(string username, string pwHash, string pwSalt, decimal points,
         DateTime? lastSignIn, int consecutiveDays, string? themeColor = null,
-        int themePaid = 0, DateTime? themePaidAt = null)
+        decimal themePaid = 0, DateTime? themePaidAt = null)
     {
         Username = username;
         PwHash = pwHash;

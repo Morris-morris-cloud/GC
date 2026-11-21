@@ -15,7 +15,9 @@ class UserRecord {
   });
 
   final String username;
-  final int points;
+
+  /// 积分，精确到 0.01
+  final double points;
 
   /// 连续签到天数（断签会重置）
   final int consecutiveDays;
@@ -38,7 +40,7 @@ class UserRecord {
   final String? themeColor;
 
   /// 当前这个颜色实际花了多少分
-  final int themePaid;
+  final double themePaid;
 
   /// 退款窗口剩余秒数（0 表示没有可退的）
   final int refundSeconds;
@@ -46,7 +48,7 @@ class UserRecord {
   factory UserRecord.fromJson(Map<String, dynamic> json) {
     return UserRecord(
       username: json['username'] as String? ?? '',
-      points: (json['points'] as num?)?.toInt() ?? 0,
+      points: (json['points'] as num?)?.toDouble() ?? 0,
       consecutiveDays: (json['consecutive_days'] as num?)?.toInt() ?? 0,
       cycleDay: (json['cycle_day'] as num?)?.toInt() ?? 1,
       cycleDays: (json['cycle_days'] as num?)?.toInt() ?? 30,
@@ -54,7 +56,7 @@ class UserRecord {
       nextReward: (json['next_reward'] as num?)?.toInt() ?? 10,
       lastSignIn: json['last_sign_in'] as String?,
       themeColor: json['theme_color'] as String?,
-      themePaid: (json['theme_paid'] as num?)?.toInt() ?? 0,
+      themePaid: (json['theme_paid'] as num?)?.toDouble() ?? 0,
       refundSeconds: (json['refund_seconds'] as num?)?.toInt() ?? 0,
     );
   }
@@ -130,6 +132,14 @@ class ThemeColor {
     }
     return customCost;
   }
+}
+
+/// 积分显示：整数不带小数位，小数保留到 0.01（去掉多余的 0）。
+String formatPoints(double v) {
+  var s = v.toStringAsFixed(2);
+  if (s.endsWith('.00')) return s.substring(0, s.length - 3);
+  if (s.endsWith('0')) return s.substring(0, s.length - 1);
+  return s;
 }
 
 /// 人品值结果

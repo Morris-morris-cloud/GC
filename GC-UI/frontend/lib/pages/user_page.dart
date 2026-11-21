@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 import '../controller.dart';
@@ -40,8 +38,6 @@ class _UserPageState extends State<UserPage> {
   final _option1Ctrl = TextEditingController();
   final _option2Ctrl = TextEditingController();
   String? _randomResult;
-
-  final _rand = Random();
 
   @override
   void initState() {
@@ -197,30 +193,60 @@ class _UserPageState extends State<UserPage> {
 
   // ---------------------------------------------------------------- 人品值
 
-  void _rollFortune() {
+  Future<void> _rollFortune() async {
+    if (_user == null) {
+      _toast(T('user.loginFirst'));
+      return;
+    }
     setState(() => _rolling = true);
-
-    // 短延时让数字有个「落定」的观感；每天不限次数
-    Future<void>.delayed(const Duration(milliseconds: 260), () {
+    try {
+      // 服务端算随机数和价格：当天第一次免费，之后按当日次数阶梯计费
+      final resp = await widget.controller.api.rollFortune();
       if (!mounted) return;
-      final value = _rand.nextInt(101);
+      final value = (resp['value'] as num?)?.toInt() ?? 0;
+      final cost = (resp['cost'] as num?)?.toDouble() ?? 0;
       setState(() {
-        _fortune = FortuneResult(value, FortuneResult.commentFor(value));
+        _fortune = FortuneResult(value, resp['comment'] as String? ?? FortuneResult.commentFor(value));
+        final payload = resp['user'] as Map<String, dynamic>?;
+        if (payload != null) _user = UserRecord.fromJson(payload);
         _rolling = false;
       });
-    });
+      _toast(cost > 0 ? '本次消耗 ${formatPoints(cost)} 积分' : '今日首次免费');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _rolling = false);
+      _toast(e.toString());
+    }
   }
 
   // ---------------------------------------------------------------- 二选一
 
-  void _pickRandom() {
+  Future<void> _pickRandom() async {
     final a = _option1Ctrl.text.trim();
     final b = _option2Ctrl.text.trim();
     if (a.isEmpty || b.isEmpty) {
       _toast(T('user.fillOptions'));
       return;
     }
-    setState(() => _randomResult = _rand.nextBool() ? a : b);
+    if (_user == null) {
+      _toast(T('user.loginFirst'));
+      return;
+    }
+    try {
+      // 服务端随机 + 计费：当天第一次免费，之后每次 0.5 积分
+      final resp = await widget.controller.api.pickOne(a, b);
+      if (!mounted) return;
+      final cost = (resp['cost'] as num?)?.toDouble() ?? 0;
+      setState(() {
+        _randomResult = resp['choice'] as String?;
+        final payload = resp['user'] as Map<String, dynamic>?;
+        if (payload != null) _user = UserRecord.fromJson(payload);
+      });
+      _toast(cost > 0 ? '本次消耗 ${formatPoints(cost)} 积分' : '今日首次免费');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(e.toString());
+    }
   }
 
   // ---------------------------------------------------------------- 主题色
@@ -412,7 +438,7 @@ class _UserPageState extends State<UserPage> {
                     Text(
                       user == null
                           ? T('user.loginHint')
-                          : '${T('user.points')} ${user.points} · '
+                          : '${T('user.points')} ${formatPoints(user.points)} · '
                               '${T('user.days')} ${user.consecutiveDays}',
                       style: TextStyle(color: GcColors.muted, fontSize: 13),
                     ),

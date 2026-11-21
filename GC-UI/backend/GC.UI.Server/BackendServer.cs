@@ -36,15 +36,26 @@ public static class BackendServer
     /// 构建后端。返回的 <see cref="WebApplication"/> 尚未启动：
     /// 独立进程直接 <c>Run()</c>，启动器用 <c>StartAsync()</c> 之后继续拉起界面。
     ///
-    /// 模型渲染已全部交给 Flutter，本进程只提供 HTTP API，不再有窗口宿主。
+    /// 界面是 Flutter，但**模型窗口仍由 Avalonia 承载**（模型契约返回的是 Avalonia Control）。
     /// </summary>
     public static WebApplication Start(string[] args, int port)
+        => Start(args, port, out _);
+
+    /// <summary>
+    /// 构建后端，并通过 <paramref name="uiHost"/> 交出模型窗口宿主。
+    ///
+    /// 调用方（启动器）必须在**主线程**调用 <see cref="AvaloniaHost.RunOnCurrentThread"/>：
+    /// macOS 的 AppKit 要求 NSApplication 运行在主线程，否则打开模型窗口时整个进程会崩溃。
+    /// </summary>
+    public static WebApplication Start(string[] args, int port, out AvaloniaHost uiHost)
     {
         // 下载模块（GC-DOWNLOAD）通过宿主钩子注入，和 GC-BOOT 的做法一致。
         DownloadModuleHost.Factory = new DownloadModuleFactory();
 
         var services = AppServices.Create();
         var userService = new UserService(services.Paths.HomeRoot);
+        var host = new AvaloniaHost(services);
+        uiHost = host;
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args });
         builder.Logging.ClearProviders();
@@ -214,6 +225,20 @@ public static class BackendServer
             await next();
         });
 
+        // 人品值评语（与前端 FortuneResult.commentFor 保持一致）
+        static string FortuneComment(int value)
+        {
+            if (value >= 96) return "欧皇附体，今天买彩票吧";
+            if (value >= 90) return "运气爆棚，适合干大事";
+            if (value >= 80) return "手气不错，稳";
+            if (value >= 65) return "中上水平，稍微努一下";
+            if (value >= 50) return "普普通通，够用";
+            if (value >= 35) return "有点背，低调点";
+            if (value >= 20) return "今天别赌任何东西";
+            if (value >= 8) return "极差，建议躺平";
+            return "非酋之王，明天再来";
+        }
+
         // 统一的用户响应体：前端一次拿齐签到 / 主题色需要的所有字段
         object UserPayload(UserRecord r)
         {
@@ -310,6 +335,42 @@ public static class BackendServer
             });
         });
 
+        app.MapPost("/api/user/fortune", (HttpContext ctx) =>
+        {
+            var username = ctx.Items["user"] as string;
+            if (string.IsNullOrEmpty(username))
+                return Results.Json(new { error = "未登录" }, statusCode: 401);
+
+            var ok = userService.RollFortune(username, out var err, out var value,
+                out var cost, out var rec);
+            if (!ok) return Results.BadRequest(new { error = err });
+
+            return Results.Ok(new {
+                value,
+                cost,
+                comment = FortuneComment(value),
+                user = UserPayload(rec!)
+            });
+        });
+
+        app.MapPost("/api/user/pick", (HttpContext ctx, PickRequest? req) =>
+        {
+            var username = ctx.Items["user"] as string;
+            if (string.IsNullOrEmpty(username))
+                return Results.Json(new { error = "未登录" }, statusCode: 401);
+            if (req == null) return Results.BadRequest(new { error = "请求体为空" });
+
+            var ok = userService.PickOne(username, req.OptionA, req.OptionB, out var err,
+                out var choice, out var cost, out var rec);
+            if (!ok) return Results.BadRequest(new { error = err });
+
+            return Results.Ok(new {
+                choice,
+                cost,
+                user = UserPayload(rec!)
+            });
+        });
+
         app.MapPost("/api/user/theme", (HttpContext ctx, ThemeRequest? req) =>
         {
             var username = ctx.Items["user"] as string;
@@ -355,13 +416,23 @@ app.MapGet("/api/health", () => Results.Ok(new HealthDto(
 
         // 模型改为客户端内渲染（Flutter）：这里只确认模型存在并把 id 交回去，
         // 不再拉起 Avalonia 窗口。保留接口是为了老客户端不至于 404。
-        app.MapPost("/api/models/{id}/launch", (string id) =>
+        app.MapPost("/api/models/{id}/launch", async (string id) =>
         {
             if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "模型标识无效"));
             var package = services.Models.Find(id);
             if (package == null) return Results.NotFound(new LaunchResultDto(false, $"没有找到模型 {id}"));
 
-            return Results.Ok(new LaunchResultDto(true, $"在应用内打开 {package.Manifest.Name}"));
+            try
+            {
+                services.Memory.Refresh();
+                var message = await host.LaunchAsync(package);
+                return Results.Ok(new LaunchResultDto(true, message));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[launch] 启动模型 {id} 失败: {ex}");
+                return Results.Json(new LaunchResultDto(false, "模型启动失败，请查看后端日志"), statusCode: 503);
+            }
         });
 
         app.MapDelete("/api/models/{id}", (string id) =>

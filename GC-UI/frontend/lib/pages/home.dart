@@ -89,6 +89,8 @@ class _HomePageViewState extends State<HomePageView> {
   Future<void> _launch(ModelInfo model) async {
     setState(() => _notice = null);
     try {
+      // 模型窗口由后端用 Avalonia 打开（模型契约返回的是 Avalonia Control），
+      // 前端只负责发这条指令并显示结果。
       final result = await widget.controller.api.launchModel(model.id);
       if (!mounted) return;
       setState(() => _notice = result.message);

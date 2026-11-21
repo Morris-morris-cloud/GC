@@ -13,6 +13,8 @@ public sealed class AppServices
     public IDownloadCenter Downloads { get; }
     public MemoryBudget Memory { get; }
     public IModelSourceClient Sources { get; }
+    /// <summary>模型加载器：只负责把模型程序集跑起来，不渲染（渲染在 Avalonia PlayerWindow）。</summary>
+    public ModelHost ModelHost { get; }
     /// <summary>启动时检查模型 / 启动器更新。</summary>
     public IUpdateService Updates { get; }
     /// <summary>双源测速选择器（Xhmcl / GitCode 取最快）。</summary>
@@ -32,6 +34,7 @@ public sealed class AppServices
         Sources = DownloadModule.Sources;
         Downloads = DownloadModule.Downloads;
         Memory = new MemoryBudget();
+        ModelHost = new ModelHost(paths, Settings, Memory);
         Selector = DownloadModule.Selector;
         Updates = DownloadModule.Updates;
         LauncherUpdates = DownloadModule.LauncherUpdates;

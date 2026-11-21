@@ -135,6 +135,9 @@ public sealed record LoginRequest(string Username, string Password);
 /// <summary>换主题色：只传颜色，价格由服务端按预置/自定义判定。</summary>
 public sealed record ThemeRequest(string Color, int? Cost = null);
 
+/// <summary>二选一：两个候选选项，服务端随机挑一个并计费。</summary>
+public sealed record PickRequest(string OptionA, string OptionB);
+
 public sealed record CaptchaDto(string Id, string Question);
 
 

@@ -9,16 +9,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 界面与模型渲染都已迁到 Flutter，这里只剩纯服务代码：
-         不再引用 Avalonia / MVVM / GC.ModelSdk -->
+    <!-- 界面仍是 Flutter，但模型由 Avalonia 承载（模型契约返回 Avalonia Control），
+         所以核心库需要 Avalonia + 模型 SDK，并把 GC-DRAW 的窗口一起编译进来。 -->
+    <Compile Include="..\..\GC-DRAW\PlayerWindow.cs" />
     <Compile Remove="test\**\*.cs" />
+    <AvaloniaResource Include="Assets\**" />
     <!-- 多语言表原先通过 Avalonia 的 avares:// 读取，改为嵌入资源 -->
     <EmbeddedResource Include="Assets\i18n\*.json"
                       LogicalName="GC.Core.Assets.i18n.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="$(MvvmVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\model\_sdk\GC.ModelSdk\GC.ModelSdk.csproj" />
   </ItemGroup>
 
 </Project>
