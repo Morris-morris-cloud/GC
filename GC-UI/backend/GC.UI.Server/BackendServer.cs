@@ -193,7 +193,7 @@ public static class BackendServer
         // 简单 session 存储：key = username(lower), value = session token
         var userSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
 
-        // 中间件：从 header 提取当前用户
+        // 中间件：从 header 提取当前用户；没有 token 时回退到 user.yaml 记住的用户（自动登录）
         app.Use(async (context, next) =>
         {
             context.Items["user"] = null as string;
@@ -209,14 +209,52 @@ public static class BackendServer
                     }
                 }
             }
+            if (context.Items["user"] is not string u || string.IsNullOrEmpty(u))
+                context.Items["user"] = userService.RestoredUser;
             await next();
+        });
+
+        // 统一的用户响应体：前端一次拿齐签到 / 主题色需要的所有字段
+        object UserPayload(UserRecord r)
+        {
+            var today = DateTime.UtcNow.Date;
+            int nextConsecutive;
+            if (!r.LastSignIn.HasValue) nextConsecutive = 1;
+            else
+            {
+                var diff = (today - r.LastSignIn.Value.Date).Days;
+                nextConsecutive = diff <= 1 ? r.ConsecutiveDays + 1 : 1;
+            }
+            var refund = UserService.RefundRemaining(r);
+
+            return new
+            {
+                username = r.Username,
+                points = r.Points,
+                consecutive_days = r.ConsecutiveDays,
+                cycle_day = UserService.CycleDay(r.ConsecutiveDays),
+                cycle_days = UserService.SignInCycleDays,
+                today_signed = r.LastSignIn.HasValue && r.LastSignIn.Value.Date == today,
+                next_reward = UserService.GetSignInReward(UserService.CycleDay(nextConsecutive)),
+                last_sign_in = r.LastSignIn?.ToString("yyyy-MM-dd") ?? "",
+                theme_color = r.ThemeColor ?? UserService.DefaultThemeColor,
+                theme_paid = r.ThemePaid,
+                refund_seconds = refund.HasValue ? (int)refund.Value.TotalSeconds : 0
+            };
+        }
+
+        // 人机验证：算术题，5 分钟有效、一次性
+        app.MapGet("/api/user/captcha", () =>
+        {
+            var (id, question) = userService.IssueCaptcha();
+            return Results.Ok(new CaptchaDto(id, question));
         });
 
         app.MapPost("/api/user/register", (RegisterRequest? req) => {
             if (req == null) return Results.BadRequest(new { error = "请求体为空" });
             if (string.IsNullOrWhiteSpace(req.Username)) return Results.BadRequest(new { error = "用户名不能为空" });
             if (string.IsNullOrWhiteSpace(req.Password)) return Results.BadRequest(new { error = "密码不能为空" });
-            var ok = userService.Register(req.Username, req.Password, out var err);
+            var ok = userService.Register(req.Username, req.Password, req.CaptchaId, req.Captcha, out var err);
             return ok ? Results.Ok(new { message = "注册成功" }) : Results.BadRequest(new { error = err });
         });
 
@@ -226,7 +264,9 @@ public static class BackendServer
             if (!ok) return Results.BadRequest(new { error = err });
             // 生成 session token
             var sessionToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).Replace("/", "_").Replace("+", "-").Substring(0, 32);
-            userSessions[rec!.Username.ToLower()] = sessionToken;
+            userSessions[rec!.Username.ToLowerInvariant()] = sessionToken;
+            // 记住登录：写 .GC/user/user.yaml，下次启动自动登录
+            userService.SaveSession(rec.Username, sessionToken);
             return Results.Ok(new {
                 username = rec.Username,
                 points = rec.Points,
@@ -237,18 +277,19 @@ public static class BackendServer
             });
         });
 
+        app.MapPost("/api/user/logout", (HttpContext ctx) => {
+            var username = ctx.Items["user"] as string;
+            if (!string.IsNullOrEmpty(username)) userSessions.TryRemove(username, out _);
+            userService.ClearSession();
+            return Results.Ok(new { message = "已退出登录" });
+        });
+
         app.MapGet("/api/user/me", (HttpContext ctx) =>
         {
             var username = ctx.Items["user"] as string;
             if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
                 return Results.Json(new { error = "未登录" }, statusCode: 401);
-            return Results.Ok(new {
-                username = rec.Username,
-                points = rec.Points,
-                consecutive_days = rec.ConsecutiveDays,
-                last_sign_in = rec.LastSignIn?.ToString("yyyy-MM-dd") ?? "",
-                theme_color = rec.ThemeColor ?? ""
-            });
+            return Results.Ok(UserPayload(rec));
         });
 
         app.MapPost("/api/user/signin", (HttpContext ctx) =>
@@ -256,18 +297,16 @@ public static class BackendServer
             var username = ctx.Items["user"] as string;
             if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
                 return Results.Json(new { error = "未登录" }, statusCode: 401);
-            var ok = userService.UpdateSignIn(username, out var err);
+            var ok = userService.UpdateSignIn(username, out var err, out var reward);
             if (!ok)
             {
                 if (err == "今日已签到")
-                    return Results.Ok(new { message = err, points = rec.Points, consecutive_days = rec.ConsecutiveDays });
+                    return Results.Ok(new { message = err, user = UserPayload(rec) });
                 return Results.BadRequest(new { error = err });
             }
             return Results.Ok(new {
-                points = rec.Points,
-                consecutive_days = rec.ConsecutiveDays,
-                reward = userService.GetSignInReward(rec.ConsecutiveDays),
-                last_sign_in = rec.LastSignIn?.ToString("yyyy-MM-dd") ?? ""
+                reward,
+                user = UserPayload(rec)
             });
         });
 
@@ -277,8 +316,15 @@ public static class BackendServer
             if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
                 return Results.Json(new { error = "未登录" }, statusCode: 401);
             if (req == null) return Results.BadRequest(new { error = "请求体为空" });
-            var ok = userService.ChangeThemeColor(username, req.Color, req.Cost, out var err);
-            return ok ? Results.Ok(new { message = "主题已更新", points = rec.Points, theme_color = rec.ThemeColor }) : Results.BadRequest(new { error = err });
+
+            var ok = userService.ChangeThemeColor(username, req.Color, out var err, out var refunded);
+            if (!ok) return Results.BadRequest(new { error = err });
+
+            return Results.Ok(new {
+                message = "主题已更新",
+                refunded,
+                user = UserPayload(rec)
+            });
         });
 
 app.MapGet("/api/health", () => Results.Ok(new HealthDto(

@@ -514,46 +514,11 @@ class GcApi {
   /// 是否拿到了会话令牌（诊断用）。
   bool get hasSessionToken => _sessionToken != null;
 
-  /// 用户 session token（登录时后端返回，持久化到 ~/.GC/user/user.yaml）
+  /// 用户 session token：登录时后端返回，只放内存。
+  /// 持久化由后端负责（写 .GC/user/user.yaml），下次启动后端会用它自动登录，
+  /// 前端不需要自己去猜 .GC 在哪。
   static String? _userToken;
-  static String? _username;
-
   static String? get userToken => _userToken;
-  static String? get username => _username;
-
-  static Future<void> _loadUserToken() async {
-    try {
-      final dir = Directory('${Platform.environment['HOME'] ?? '.'}/.GC/user');
-      if (!dir.existsSync()) return;
-      final file = File('${dir.path}/user.yaml');
-      if (!file.existsSync()) return;
-      final lines = file.readAsLinesSync();
-      for (var line in lines) {
-        if (line.startsWith('username:')) _username = line.split(':').skip(1).join(':').trim();
-        if (line.startsWith('session_token:')) _userToken = line.split(':').skip(1).join(':').trim();
-      }
-    } catch (_) {}
-  }
-
-  static Future<void> _saveUserToken(String username, String token) async {
-    try {
-      final dir = Directory('${Platform.environment['HOME'] ?? '.'}/.GC/user');
-      dir.createSync(recursive: true);
-      final file = File('${dir.path}/user.yaml');
-      file.writeAsStringSync('username: $username\nsession_token: $token\n');
-      _username = username;
-      _userToken = token;
-    } catch (_) {}
-  }
-
-  static Future<void> clearUserToken() async {
-    _username = null;
-    _userToken = null;
-    try {
-      final file = File('${Platform.environment['HOME'] ?? '.'}/.GC/user/user.yaml');
-      if (file.existsSync()) file.deleteSync();
-    } catch (_) {}
-  }
 
   /// 带会话令牌的请求头；没有令牌时返回 const 空 map（调试/独立后端模式）。
   Map<String, String> get _authHeaders => {
@@ -705,27 +670,34 @@ class GcApi {
 
   // ==================== 用户系统 ====================
 
-  /// 初始化：加载本地保存的用户token
-  Future<void> initUserSession() async {
-    await _loadUserToken();
+  /// 取一个人机验证题（算术题，5 分钟内有效、一次性）。
+  Future<CaptchaInfo> captcha() async {
+    final r = await _send('GET', '/api/user/captcha');
+    return CaptchaInfo.fromJson(r as Map<String, dynamic>);
   }
 
+  /// 当前登录用户；未登录返回 null（后端会用 .GC/user/user.yaml 自动登录）。
   Future<Map<String, dynamic>?> me() async {
     try {
       final r = await _send('GET', '/api/user/me');
       return r as Map<String, dynamic>?;
     } on ApiException catch (e) {
       if (e.statusCode == 401 || e.statusCode == 403) {
-        await clearUserToken();
+        _userToken = null;
         return null;
       }
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> register(String username, String password) async {
-    final r = await _send('POST', '/api/user/register',
-        body: {'username': username, 'password': password});
+  Future<Map<String, dynamic>> register(String username, String password,
+      {required String captchaId, required String captchaAnswer}) async {
+    final r = await _send('POST', '/api/user/register', body: {
+      'username': username,
+      'password': password,
+      'captchaId': captchaId,
+      'captcha': captchaAnswer,
+    });
     return r as Map<String, dynamic>;
   }
 
@@ -733,15 +705,18 @@ class GcApi {
     final r = await _send('POST', '/api/user/login',
         body: {'username': username, 'password': password});
     final result = r as Map<String, dynamic>;
-    // 保存 session token
-    if (result.containsKey('session_token')) {
-      await _saveUserToken(username, result['session_token'] as String);
-    }
+    _userToken = result['session_token'] as String?;
     return result;
   }
 
+  /// 退出登录：清掉后端的 user.yaml 与内存 token。
   Future<void> logout() async {
-    await clearUserToken();
+    try {
+      await _send('POST', '/api/user/logout');
+    } catch (_) {
+      // 后端连不上也要让界面退出
+    }
+    _userToken = null;
   }
 
   Future<Map<String, dynamic>> signin() async {
@@ -749,9 +724,22 @@ class GcApi {
     return r as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> changeTheme(String color, int cost) async {
-    final r = await _send('POST', '/api/user/theme',
-        body: {'color': color, 'cost': cost});
+  /// 换主题色：只传颜色，价格由后端判定（预置 50 / 自定义 150）。
+  Future<Map<String, dynamic>> changeTheme(String color) async {
+    final r = await _send('POST', '/api/user/theme', body: {'color': color});
     return r as Map<String, dynamic>;
   }
+}
+
+/// 人机验证题
+class CaptchaInfo {
+  const CaptchaInfo({required this.id, required this.question});
+
+  final String id;
+  final String question;
+
+  factory CaptchaInfo.fromJson(Map<String, dynamic> json) => CaptchaInfo(
+        id: json['id'] as String? ?? '',
+        question: json['question'] as String? ?? '',
+      );
 }

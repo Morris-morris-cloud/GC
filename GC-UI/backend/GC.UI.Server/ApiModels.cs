@@ -124,9 +124,18 @@ public sealed record UpdateCheckDto(
 public sealed record ContributorDto(string Name, int Contributions, string? AvatarUrl);
 
 // ---- 用户 API DTO ----
-public sealed record RegisterRequest(string Username, string Password);
+public sealed record RegisterRequest(
+    string Username,
+    string Password,
+    string? CaptchaId = null,
+    string? Captcha = null);
+
 public sealed record LoginRequest(string Username, string Password);
-public sealed record ThemeRequest(string Color, int Cost);
+
+/// <summary>换主题色：只传颜色，价格由服务端按预置/自定义判定。</summary>
+public sealed record ThemeRequest(string Color, int? Cost = null);
+
+public sealed record CaptchaDto(string Id, string Question);
 
 
 /// <summary>「重新下载启动器」结果：State = Ready / UpToDate / Failed。</summary>
