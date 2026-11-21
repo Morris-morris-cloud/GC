@@ -13,11 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
-    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- 后端以库的方式编进启动器：发布包只需要一个 exe，不用再带一份运行时 -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

@@ -1,0 +1,145 @@
+name: nightly-prerelease
+
+# 每晚 21:00（亚洲/上海）自动编译 macOS + Windows 并发布 nightly 预发布。
+# 21:00 UTC+8 == 13:00 UTC。
+# 注意：夜间构建发的是 `nightly`；`@build-bot` 手动触发的发 `ip-prerelease`。
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: release-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Shanghai
+  NIGHTLY_TAG: nightly
+  DOTNET_VERSION: '8.0.x'
+  FLUTTER_VERSION: '3.24.5'
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      stamp: ${{ steps.ver.outputs.stamp }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: ver
+        name: 读取版本号
+        run: |
+          VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)
+          [ -n "$VERSION" ] || VERSION=1.0.0
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "stamp=$(date +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "版本 $VERSION"
+
+  build-mac:
+    needs: meta
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 编译 macOS
+        env:
+          GC_TARGETS: mac
+          GC_NO_CODESIGN: '1'
+          GC_NO_PROGRESS: '1'
+        run: ./build.sh build --targets=mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-zip
+          path: dist/mac-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
+  build-win:
+    needs: meta
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 编译 Windows（amd64 + arm64）
+        run: ./build.ps1 build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-zip
+          path: |
+            dist/win-amd64/*.zip
+            dist/win-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [meta, build-mac, build-win]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 汇总产物
+        run: |
+          mkdir -p out
+          find artifacts -name '*.zip' -exec cp {} out/ \;
+          ls -lh out
+
+      - name: 发布 nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          STAMP: ${{ needs.meta.outputs.stamp }}
+          TAG: ${{ env.NIGHTLY_TAG }}
+        run: |
+          set -e
+          cat > notes.md <<EOF
+          每夜自动构建（${STAMP}，Asia/Shanghai）。
+
+          基于提交 \`${GITHUB_SHA:0:7}\`，版本号 ${VERSION}。
+
+          - macOS（arm64）
+          - Windows（amd64 / arm64）
+
+          > 预发布版本：仅供测试，不保证稳定。
+          EOF
+
+          # 同一 tag 滚动更新：先删旧 release 与 tag，再按当前提交重建
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" out/*.zip \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Nightly ${VERSION} (${STAMP})" \
+            --notes-file notes.md

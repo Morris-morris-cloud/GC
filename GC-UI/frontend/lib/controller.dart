@@ -87,7 +87,11 @@ class ShellController extends ChangeNotifier {
     _retryAttempt++;
     _retryTimer?.cancel();
     _retryTimer = Timer(Duration(seconds: seconds), () {
-      if (settings == null) bootstrap();
+      if (settings == null) {
+        // 后端可能刚换端口（端口占用）或刚写好握手文件：重试前重新解析一次
+        api.rediscover();
+        bootstrap();
+      }
     });
   }
 
@@ -100,6 +104,25 @@ class ShellController extends ChangeNotifier {
   void goTo(int value) {
     if (index == value) return;
     index = value;
+    activeModelId = null;      // 切页时收起模型视图
+    notifyListeners();
+  }
+
+  /// 当前在壳内打开的模型（null 表示在看普通页面）。
+  ///
+  /// 模型全部由 Flutter 自绘，不再由后端开 Avalonia 窗口：
+  /// 点「启动模型」只是把内容区换成模型视图，标题栏与侧栏保持可用。
+  String? activeModelId;
+
+  void openModel(String id) {
+    if (activeModelId == id) return;
+    activeModelId = id;
+    notifyListeners();
+  }
+
+  void closeModel() {
+    if (activeModelId == null) return;
+    activeModelId = null;
     notifyListeners();
   }
 

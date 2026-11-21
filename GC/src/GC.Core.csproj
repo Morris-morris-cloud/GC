@@ -5,25 +5,20 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>GC</RootNamespace>
     <AssemblyName>GC.Core</AssemblyName>
-    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**" />
-    <Compile Include="..\..\GC-DRAW\PlayerWindow.cs" />
+    <!-- 界面与模型渲染都已迁到 Flutter，这里只剩纯服务代码：
+         不再引用 Avalonia / MVVM / GC.ModelSdk -->
     <Compile Remove="test\**\*.cs" />
+    <!-- 多语言表原先通过 Avalonia 的 avares:// 读取，改为嵌入资源 -->
+    <EmbeddedResource Include="Assets\i18n\*.json"
+                      LogicalName="GC.Core.Assets.i18n.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
-    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="$(MvvmVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\model\_sdk\GC.ModelSdk\GC.ModelSdk.csproj" />
   </ItemGroup>
 
 </Project>

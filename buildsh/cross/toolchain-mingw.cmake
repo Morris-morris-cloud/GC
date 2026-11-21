@@ -34,3 +34,14 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 # 和系统 DLL，拷到干净机器上也能跑。
 set(CMAKE_CXX_FLAGS_INIT "-DUNICODE -D_UNICODE -DNOMINMAX -D_HAS_EXCEPTIONS=1")
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static -static-libgcc -static-libstdc++")
+
+# GCC 16 兼容性
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-compound-token-split-by-macro -Wno-deprecated-attributes")
+
+# 强制 C++17，避免 GCC 16 的 C++20 三路比较问题
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 兼容 mingw-w64 14 + GCC 16 的问题
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wno-error -D__STDC_CONSTANT_MACROS")

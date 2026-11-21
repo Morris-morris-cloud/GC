@@ -10,33 +10,28 @@
 
 bs_verify_release() {
   ROOT_DIR="$1"; shift
+  GC_ROOT="${GC_ROOT:-$ROOT_DIR}"; export GC_ROOT
   TAG="${1:-$VERSION}"
   if [ "$#" -gt 0 ]; then shift; fi
 
   WORK="$ROOT_DIR/build/release-verify"
   mkdir -p "$WORK"
 
-  echo "==> 核对 Release ${TAG}"
-  rc=0
+  say "核对 Release ${TAG}"
+  _rc=0
   python3 "$ROOT_DIR/buildsh/lib/verify_release.py" \
     --tag "$TAG" \
     --manifest "$ROOT_DIR/version.json" \
     --dump-manifest "$WORK/$TAG.json" \
-    "$@" || rc=$?
-
-  if [ "$rc" -ne 0 ]; then
-    return "$rc"
-  fi
+    "$@" || _rc=$?
+  [ "$_rc" -eq 0 ] || return "$_rc"
 
   # 资产对得上还不够：清单本身必须是我签的，否则客户端一样会拒
-  echo ""
-  echo "==> 校验 tag 清单签名"
-  if dotnet run --project "$ROOT_DIR/GC-SAVEDOG/GC-SAVEDOG.csproj" -c Release -- \
-       verify --manifest "$WORK/$TAG.json"; then
-    echo "结论: 签名可信，可以发布 / 已经发布正确"
+  say "校验 tag 清单签名"
+  if dt_tool savedog "$SAVEDOG_PROJ" GC-SAVEDOG verify --manifest "$WORK/$TAG.json"; then
+    step_ok "签名可信，可以发布 / 已经发布正确"
     return 0
   fi
-
-  echo "!! 签名校验未通过，客户端会拒绝这次更新"
+  err "签名校验未通过，客户端会拒绝这次更新"
   return 1
 }

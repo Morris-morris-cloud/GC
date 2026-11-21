@@ -9,22 +9,18 @@ using System.Threading.Tasks;
 namespace GC.Services;
 
 /// <summary>
-/// 双源选择：Xhmcl 与 GitCode 是同一份仓库的两个镜像。
+/// 多源选择：Xhmcl 与 GitHub 是同一份仓库的两个镜像。
 ///
-/// 启动更新 / 下载页面 / 检查更新时，先并发探测两边的 version.json 响应时间，
+/// 启动更新 / 下载页面 / 检查更新时，先并发探测各源的 version.json 响应时间，
 /// 取**最快且内容可用**的那个作为本次下载源；探测结果缓存一段时间，
-/// 避免每次点下载都重新测速。
+/// 避免每次点下载都重新测速。单个源探测超时 2 秒，慢源不会拖住整体。
 /// </summary>
 public sealed class SourceSelector : ISourceSelector
 {
-    private static readonly HttpClient Http = CreateHttp();
-
-    private static HttpClient CreateHttp()
-    {
-        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("GC-Probe/1.0");
-        return c;
-    }
+    /// <summary>单源探测超时：超过 2 秒视为不可用（用户可见的「ping 2s」）。</summary>
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2);
+    // 使用共享 HttpClient 工厂，统一连接管理，避免端口耗尽
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetDefault();
 
     private readonly object _lock = new();
     private SourcePreset? _cached;
@@ -71,7 +67,8 @@ public sealed class SourceSelector : ISourceSelector
         var chosen = usable.Count > 0 ? usable[0].Preset : fallback;
 
         if (usable.Count == 0)
-            Console.WriteLine($"[selector] 所有源探测失败，退回主源 {chosen.Name}（稍后由实际请求再判定）");
+            GcLog.Warn($"所有源探测失败，退回主源 {chosen.Name}",
+                       $"All probes failed, fallback to {chosen.Name}");
 
         lock (_lock)
         {
@@ -81,17 +78,19 @@ public sealed class SourceSelector : ISourceSelector
             _cachedAt = usable.Count > 0 ? DateTime.UtcNow : DateTime.MinValue;
         }
 
-        Console.WriteLine("[selector] 测速：" + string.Join("  ",
-            results.Select(r => $"{r.Preset.Name}={r.Ms}ms{(r.Ok ? "" : "(不可用)")}"))
-            + $"  → 选择 {chosen.Name}");
+        GcLog.Info($"测速结果：{string.Join("  ",
+            results.Select(r => $"{r.Preset.Name}={r.Ms}ms{(r.Ok ? "" : "(不可用)")}"))}  → 选择 {chosen.Name}",
+            $"Probe results: {string.Join(", ",
+            results.Select(r => $"{r.Preset.Name}={r.Ms}ms{(r.Ok ? "" : "(unavailable)")}"))}  -> chosen: {chosen.Name}");
 
         return chosen;
     }
 
     /// <summary>
     /// 探测：能拿到合法 JSON 才算可用。
-    /// 注意两个平台取文件的方式不同：
+    /// 注意各平台取文件的方式不同：
     ///   · Gitea(Xhmcl)：raw/branch/{b}/{path} 直接返回文件内容
+    ///   · GitHub：raw.githubusercontent.com/{b}/{path} 直接返回文件内容
     ///   · GitCode：raw 地址返回的是 HTML 页面，必须走 API（内容为 base64）
     /// 因此 GitCode 用 api/v5 contents + Accept: application/json 探测。
     /// </summary>
@@ -102,7 +101,7 @@ public sealed class SourceSelector : ISourceSelector
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(5));
+                cts.CancelAfter(ProbeTimeout);
                 var api = $"{preset.ApiBase}/repos/{preset.Owner}/{preset.Repo}/contents/version.json?ref={preset.Branch}";
                 using var req = new HttpRequestMessage(HttpMethod.Get, api);
                 req.Headers.Accept.ParseAdd("application/json");
@@ -121,7 +120,7 @@ public sealed class SourceSelector : ISourceSelector
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                cts.CancelAfter(TimeSpan.FromSeconds(5));
+                cts.CancelAfter(ProbeTimeout);
                 var text = await Http.GetStringAsync(url, cts.Token);
                 if (text.TrimStart().StartsWith('{')) return true;
             }
@@ -134,6 +133,9 @@ public sealed class SourceSelector : ISourceSelector
     public static IModelRemote CreateRemote(SourcePreset preset) => preset.Kind switch
     {
         "gitea" => new GiteaRemote(preset),
-        _ => new GitCodeReleaseRemote(null, preset.HomeUrl)
+        // GitHub 的 contents / releases API 与 Gitea 同构，复用同一实现
+        "github" => new GiteaRemote(preset),
+        "gitcode" => new GitCodeReleaseRemote(null, preset.HomeUrl),
+        _ => throw new InvalidOperationException($"未知的源类型: {preset.Kind}")
     };
 }

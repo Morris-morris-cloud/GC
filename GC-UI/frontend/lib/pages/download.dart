@@ -114,25 +114,41 @@ class _DownloadPageViewState extends State<DownloadPageView> {
       _error = null;
     });
     try {
-      final sources = await widget.controller.api.sources();
+      // 三个请求互不依赖，一起发出去：
+      //   源列表（本地，几乎即时）、任务列表、模型索引（要打远端，最慢）
+      // 以前是 sources → models → jobs 串行等三轮，进页面白等多一秒。
+      final sourcesFuture = widget.controller.api.sources();
+      final jobsFuture = widget.controller.api.jobs();
+      final indexFuture = widget.controller.api.remoteModels(
+        sourceId: _selectedSourceId,
+      );
+
+      final sources = await sourcesFuture;
       final preferred = sources.where((s) => s.enabled).toList();
       final selected = _selectedSourceId ??
           (preferred.isNotEmpty
               ? preferred.first.id
               : (sources.isNotEmpty ? sources.first.id : ''));
 
-      final index = selected.isEmpty
-          ? null
-          : await widget.controller.api.remoteModels(sourceId: selected);
+      // 源列表是本地的，先画出来：右侧模型列表还在等远端索引，左侧不必陪着转圈
+      if (mounted) {
+        setState(() {
+          _sources = sources;
+          _selectedSourceId = selected;
+        });
+      }
+
+      final index = await indexFuture;
+      final jobs = await jobsFuture;
 
       if (!mounted) return;
       setState(() {
         _sources = sources;
         _selectedSourceId = selected;
         _index = index;
+        _jobs = jobs;
         _loading = false;
       });
-      await _refreshJobs();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -440,16 +456,97 @@ class _DownloadPageViewState extends State<DownloadPageView> {
             ),
           ),
           const SizedBox(width: GcSpace.lg),
-          if (model.installed)
-            OutlinedButton(
-              onPressed: () => _download(model),
-              child: Text(T('dl.reinstall')),
-            )
-          else
-            FilledButton(
-              onPressed: () => _download(model),
-              child: Text(T('dl.download')),
+          _downloadAction(model),
+        ],
+      ),
+    );
+  }
+
+  /// 该模型是否有进行中的下载任务。
+  JobInfo? _activeJobFor(String modelId) {
+    for (final job in _jobs) {
+      if (job.isActive && job.modelId == modelId) return job;
+    }
+    return null;
+  }
+
+  /// 按钮位：空闲时是「下载 / 重新下载」，下载中就变成这一行的进度条。
+  Widget _downloadAction(RemoteModelInfo model) {
+    final job = _activeJobFor(model.id);
+    if (job == null) {
+      if (model.installed) {
+        return OutlinedButton(
+          onPressed: () => _download(model),
+          child: Text(T('dl.reinstall')),
+        );
+      }
+      return FilledButton(
+        onPressed: () => _download(model),
+        child: Text(T('dl.download')),
+      );
+    }
+
+    final value = job.progress.clamp(0.0, 1.0).toDouble();
+    final percent = (value * 100).round();
+    final detail = job.detailText.isNotEmpty ? job.detailText : job.statusText;
+
+    return SizedBox(
+      width: 148,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                '$percent%',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  color: GcColors.accent,
+                ),
+              ),
+              const SizedBox(width: GcSpace.xs + 2),
+              if (detail.isNotEmpty)
+                Expanded(
+                  child: Text(
+                    detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.2,
+                      color: GcColors.faint,
+                    ),
+                  ),
+                ),
+              TextButton(
+                onPressed: () =>
+                    _jobAction(widget.controller.api.cancelJob, job.id),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 22),
+                  padding: const EdgeInsets.symmetric(horizontal: GcSpace.sm),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  T('dl.cancel'),
+                  style: const TextStyle(fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              // 还没拿到进度时走不确定态，避免显示 0% 让人以为卡住
+              value: value > 0 ? value : null,
+              minHeight: 6,
+              backgroundColor: GcColors.surfaceAlt,
             ),
+          ),
         ],
       ),
     );

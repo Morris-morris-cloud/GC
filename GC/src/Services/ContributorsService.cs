@@ -51,7 +51,8 @@ public static class ContributorsService
     private const int MaxShown = 8;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
-    private static readonly HttpClient Http = CreateHttp();
+    // 使用共享 HttpClient
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetDefault();
 
     /// <summary>同一作者的多个 git 身份 -> 统一展示名。</summary>
     private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
@@ -61,6 +62,9 @@ public static class ContributorsService
         ["2509_92447106"] = "Morris",
         ["chenmoyuan1214@qq.com"] = "Morris",
         ["morris@xhmcl.com"] = "Morris",
+        // 远影科技是 Morris 的另一个 git 身份（同一邮箱），归并到 Morris
+        ["远影科技"] = "Morris",
+        ["yuanying@yuanying.tech"] = "Morris",
         // 早期提交用的是 xhgit 这个账号，展示名统一成 itxiaohui
         ["xhgit"] = "itxiaohui",
         ["itxiaohui"] = "itxiaohui",
@@ -74,14 +78,6 @@ public static class ContributorsService
 
     private static readonly object Gate = new();
     private static (DateTimeOffset At, string Key, List<Contributor> Items)? _cache;
-
-    private static HttpClient CreateHttp()
-    {
-        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("GC/1.0");
-        c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return c;
-    }
 
     /// <summary>按仓库地址推导接口：Xhmcl(Gitea) 与 GitCode 结构不同。</summary>
     public static string BuildUrl(string repository)

@@ -6,3 +6,5 @@ export 'pages/courseware.dart';
 export 'pages/download.dart';
 export 'pages/settings.dart';
 export 'pages/about.dart';
+export 'pages/treasure.dart';
+export 'pages/user_page.dart';
