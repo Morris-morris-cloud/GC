@@ -84,8 +84,9 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          dotnet restore GC.sln > dotnet-restore.log 2>&1
-          dotnet build GC.sln -c Release --no-restore 2>&1 | tee dotnet-build.log
+          dotnet restore GC.sln > "$GITHUB_WORKSPACE/dotnet-restore.log" 2>&1
+          dotnet build GC.sln -c Release --no-restore 2>&1 \
+            | tee "$GITHUB_WORKSPACE/dotnet-build.log"
           exit ${PIPESTATUS[0]}
 
       - id: flutter
@@ -94,10 +95,12 @@ jobs:
         working-directory: GC-UI/frontend
         run: |
           set -o pipefail
-          flutter pub get 2>&1 | tee ../flutter-pubget.log
+          # 日志统一写到仓库根目录：后面的汇总步骤在根目录读，路径必须一致
+          flutter pub get 2>&1 | tee "$GITHUB_WORKSPACE/flutter-pubget.log"
           # 仓库里已有历史 warning / info，不应该让它们卡住合并；
           # 只把真正的 error 当失败。
-          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ../flutter-analyze.log
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 \
+            | tee "$GITHUB_WORKSPACE/flutter-analyze.log"
           exit ${PIPESTATUS[0]}
 
       - id: summary
@@ -165,10 +168,17 @@ jobs:
             echo
             echo '```'
             echo "== dotnet build（尾部 40 行）=="
-            tail -40 dotnet-build.log 2>/dev/null || echo "(无日志)"
+            tail -40 dotnet-build.log 2>/dev/null || echo "(日志缺失：编译步骤可能未执行)"
             echo
             echo "== flutter analyze（尾部 40 行）=="
-            tail -40 flutter-analyze.log 2>/dev/null || echo "(无日志)"
+            if [ -f flutter-analyze.log ]; then
+              tail -40 flutter-analyze.log
+            elif [ -f flutter-pubget.log ]; then
+              echo "(analyze 未产生日志，pub get 输出如下)"
+              tail -20 flutter-pubget.log
+            else
+              echo "(日志缺失：Flutter 步骤可能未执行)"
+            fi
             echo '```'
             echo
             echo "</details>"
