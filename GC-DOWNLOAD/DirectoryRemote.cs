@@ -34,7 +34,7 @@ public sealed class DirectoryRemote : IModelRemote
 
         // 离线目录同样验签：U 盘 / 共享盘里的清单也可能是被替换过的。
         // 验签结论随 version.SignatureTrust 一起上送，由 UpdateService 按策略裁决；
-        // 这里至少要把失败如实记下来，不能静默丢弃（与其他远程源行为一致）。
+        // 这里至少要把失败如实记下来，不能静默丢弃（与 GiteaRemote/GitCodeRemote 保持一致）。
         var text = File.ReadAllText(file);
         _rawManifest = text;
         var version = ManifestLoader.Parse(text, out var verification);

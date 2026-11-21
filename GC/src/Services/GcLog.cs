@@ -28,7 +28,9 @@ namespace GC.Services;
 public static class GcLog
 {
     /// <summary>日志保留天数。</summary>
-    public const int RetentionDays = 14;
+    /// <remarks>14 天对日常排障够用，但双语言 + 高活跃度时容易触及总量上限导致批量删除；
+    /// 7 天更合理：用户反馈问题时最近 3 天就够，7 天能覆盖一周内的连续问题。</remarks>
+    public const int RetentionDays = 7;
 
     /// <summary>日志目录总量上限（中英两份合计）。</summary>
     public const long MaxTotalBytes = 64L * 1024 * 1024;

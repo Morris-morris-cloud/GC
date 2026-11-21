@@ -24,6 +24,9 @@ public sealed class MemoryBudget
     /// <summary>
     /// 自动预算：取设备可用物理内存的一部分（约 1/4），
     /// 夹在 512–8192 MB 之间，低配设备也不会因为预算过大而卡顿。
+    /// 注意：这里用的是 GC 托管堆预算（TotalAvailableMemoryBytes），
+    /// 不是整机物理内存。模型进程（Avalonia）单独消耗内存，
+    /// 所以这个值偏保守是安全的——宁可让模型窗口慢一点，也不要 OOM。
     /// </summary>
     public static int AutoComputeMb()
     {
