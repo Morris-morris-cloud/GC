@@ -30,33 +30,21 @@ public static class BackendServer
 {
     /// <summary>按命令行 / GC_UI_PORT 解析端口并构建（未启动）的后端。</summary>
     public static WebApplication StartFromCommandLine(string[] args)
-        => Start(args, ResolvePort(args), out _);
-
-    /// <summary>同上，并交出模型窗口宿主（独立进程入口用：主线程留给 Avalonia）。</summary>
-    public static WebApplication StartFromCommandLine(string[] args, out AvaloniaHost uiHost)
-        => Start(args, ResolvePort(args), out uiHost);
+        => Start(args, ResolvePort(args));
 
     /// <summary>
     /// 构建后端。返回的 <see cref="WebApplication"/> 尚未启动：
     /// 独立进程直接 <c>Run()</c>，启动器用 <c>StartAsync()</c> 之后继续拉起界面。
+    ///
+    /// 模型渲染已全部交给 Flutter，本进程只提供 HTTP API，不再有窗口宿主。
     /// </summary>
     public static WebApplication Start(string[] args, int port)
-        => Start(args, port, out _);
-
-    /// <summary>
-    /// 构建后端，并通过 <paramref name="uiHost"/> 交出模型窗口宿主。
-    ///
-    /// 调用方（启动器）必须在**主线程**调用 <see cref="AvaloniaHost.RunOnCurrentThread"/>：
-    /// macOS 的 AppKit 要求 NSApplication 运行在主线程，否则打开模型窗口时整个进程会崩溃。
-    /// </summary>
-    public static WebApplication Start(string[] args, int port, out AvaloniaHost uiHost)
     {
         // 下载模块（GC-DOWNLOAD）通过宿主钩子注入，和 GC-BOOT 的做法一致。
         DownloadModuleHost.Factory = new DownloadModuleFactory();
 
         var services = AppServices.Create();
-        var host = new AvaloniaHost(services);
-        uiHost = host;
+        var userService = new UserService(services.Paths.HomeRoot);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args });
         builder.Logging.ClearProviders();
@@ -200,12 +188,106 @@ public static class BackendServer
 
         // ---- 健康检查 -------------------------------------------------------------
 
-        app.MapGet("/api/health", () => Results.Ok(new HealthDto(
+                // ---- 用户系统 -----------------------------------------------------------------
+
+        // 简单 session 存储：key = username(lower), value = session token
+        var userSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+
+        // 中间件：从 header 提取当前用户
+        app.Use(async (context, next) =>
+        {
+            context.Items["user"] = null as string;
+            if (context.Request.Headers.TryGetValue("X-User-Token", out var tokens) && tokens.Count > 0)
+            {
+                var token = tokens[0];
+                foreach (var kv in userSessions)
+                {
+                    if (kv.Value == token)
+                    {
+                        context.Items["user"] = kv.Key;
+                        break;
+                    }
+                }
+            }
+            await next();
+        });
+
+        app.MapPost("/api/user/register", (RegisterRequest? req) => {
+            if (req == null) return Results.BadRequest(new { error = "请求体为空" });
+            if (string.IsNullOrWhiteSpace(req.Username)) return Results.BadRequest(new { error = "用户名不能为空" });
+            if (string.IsNullOrWhiteSpace(req.Password)) return Results.BadRequest(new { error = "密码不能为空" });
+            var ok = userService.Register(req.Username, req.Password, out var err);
+            return ok ? Results.Ok(new { message = "注册成功" }) : Results.BadRequest(new { error = err });
+        });
+
+        app.MapPost("/api/user/login", (LoginRequest? req) => {
+            if (req == null) return Results.BadRequest(new { error = "请求体为空" });
+            var ok = userService.Login(req.Username, req.Password, out var err, out var rec);
+            if (!ok) return Results.BadRequest(new { error = err });
+            // 生成 session token
+            var sessionToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).Replace("/", "_").Replace("+", "-").Substring(0, 32);
+            userSessions[rec!.Username.ToLower()] = sessionToken;
+            return Results.Ok(new {
+                username = rec.Username,
+                points = rec.Points,
+                consecutive_days = rec.ConsecutiveDays,
+                last_sign_in = rec.LastSignIn?.ToString("yyyy-MM-dd") ?? "",
+                theme_color = rec.ThemeColor ?? "",
+                session_token = sessionToken
+            });
+        });
+
+        app.MapGet("/api/user/me", (HttpContext ctx) =>
+        {
+            var username = ctx.Items["user"] as string;
+            if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
+                return Results.Json(new { error = "未登录" }, statusCode: 401);
+            return Results.Ok(new {
+                username = rec.Username,
+                points = rec.Points,
+                consecutive_days = rec.ConsecutiveDays,
+                last_sign_in = rec.LastSignIn?.ToString("yyyy-MM-dd") ?? "",
+                theme_color = rec.ThemeColor ?? ""
+            });
+        });
+
+        app.MapPost("/api/user/signin", (HttpContext ctx) =>
+        {
+            var username = ctx.Items["user"] as string;
+            if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
+                return Results.Json(new { error = "未登录" }, statusCode: 401);
+            var ok = userService.UpdateSignIn(username, out var err);
+            if (!ok)
+            {
+                if (err == "今日已签到")
+                    return Results.Ok(new { message = err, points = rec.Points, consecutive_days = rec.ConsecutiveDays });
+                return Results.BadRequest(new { error = err });
+            }
+            return Results.Ok(new {
+                points = rec.Points,
+                consecutive_days = rec.ConsecutiveDays,
+                reward = userService.GetSignInReward(rec.ConsecutiveDays),
+                last_sign_in = rec.LastSignIn?.ToString("yyyy-MM-dd") ?? ""
+            });
+        });
+
+        app.MapPost("/api/user/theme", (HttpContext ctx, ThemeRequest? req) =>
+        {
+            var username = ctx.Items["user"] as string;
+            if (string.IsNullOrEmpty(username) || !userService.TryGetUser(username, out var rec))
+                return Results.Json(new { error = "未登录" }, statusCode: 401);
+            if (req == null) return Results.BadRequest(new { error = "请求体为空" });
+            var ok = userService.ChangeThemeColor(username, req.Color, req.Cost, out var err);
+            return ok ? Results.Ok(new { message = "主题已更新", points = rec.Points, theme_color = rec.ThemeColor }) : Results.BadRequest(new { error = err });
+        });
+
+app.MapGet("/api/health", () => Results.Ok(new HealthDto(
             true,
             LauncherRuntimeInfo.CurrentLauncherVersion,
             LauncherRuntimeInfo.CurrentRid,
-            host.IsAvailable,
-            host.LastError,
+            // 界面在客户端内渲染，后端不存在「窗口宿主不可用」的状态
+            true,
+            (string?)null,
             GcUiContract.DeriveSessionProof(sessionToken))));
 
         // ---- 已安装模型 -----------------------------------------------------------
@@ -225,24 +307,15 @@ public static class BackendServer
             return Results.File(package.PreviewPath, GuessImageContentType(package.PreviewPath));
         });
 
-        app.MapPost("/api/models/{id}/launch", async (string id) =>
+        // 模型改为客户端内渲染（Flutter）：这里只确认模型存在并把 id 交回去，
+        // 不再拉起 Avalonia 窗口。保留接口是为了老客户端不至于 404。
+        app.MapPost("/api/models/{id}/launch", (string id) =>
         {
             if (!IsSafeId(id)) return Results.BadRequest(new LaunchResultDto(false, "模型标识无效"));
             var package = services.Models.Find(id);
             if (package == null) return Results.NotFound(new LaunchResultDto(false, $"没有找到模型 {id}"));
 
-            try
-            {
-                services.Memory.Refresh();
-                var message = await host.LaunchAsync(package);
-                return Results.Ok(new LaunchResultDto(true, message));
-            }
-            catch (Exception ex)
-            {
-                // 细节只写日志，不回显给调用方，避免泄漏本机路径等内部信息。
-                Console.Error.WriteLine($"[launch] 启动模型 {id} 失败: {ex}");
-                return Results.Json(new LaunchResultDto(false, "模型启动失败，请查看后端日志"), statusCode: 503);
-            }
+            return Results.Ok(new LaunchResultDto(true, $"在应用内打开 {package.Manifest.Name}"));
         });
 
         app.MapDelete("/api/models/{id}", (string id) =>
@@ -435,6 +508,45 @@ public static class BackendServer
                     .ToList()));
         });
 
+        // ---- 重新下载启动器 -------------------------------------------------------
+        // 「关于」页的按钮：本地程序文件被误删 / 损坏后，重新拉一份发布包。
+        // DownloadAsync 内部会按清单里的 sha256 逐块校验，清单缺 sha256 直接拒绝下载，
+        // 所以「下载完确认完整性」是这条链路的固有动作，不是这里另加的一次比对。
+        app.MapPost("/api/launcher/redownload", async () =>
+        {
+            try
+            {
+                var fastest = await services.Selector.PickFastestAsync(false, CancellationToken.None);
+                services.Updates.UseRemote(services.DownloadModule.CreateRemote(fastest));
+
+                var steps = new List<string>();
+                var progress = new Progress<UpdateProgressInfo>(p =>
+                {
+                    if (string.IsNullOrWhiteSpace(p.Stage)) return;
+                    lock (steps) steps.Add(p.Stage);
+                });
+
+                var result = await services.LauncherUpdates.DownloadAsync(
+                    services.Paths, services.Updates.Remote, progress, CancellationToken.None);
+
+                lock (steps)
+                {
+                    return Results.Ok(new LauncherRedownloadDto(
+                        result.State.ToString(),
+                        result.Version,
+                        result.Message,
+                        steps.ToList()));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[launcher] 重新下载失败: {ex}");
+                return Results.Json(
+                    ErrorDto.Of($"重新下载启动器失败：{ex.Message}"),
+                    statusCode: 503);
+            }
+        });
+
         // ---- 关于 -----------------------------------------------------------------
 
         app.MapGet("/api/about", async () =>
@@ -497,7 +609,7 @@ public static class BackendServer
 
         // ---- 启动 -----------------------------------------------------------------
 
-        WriteEndpointFile(services, port);
+        WriteEndpointFile(services, port, sessionToken);
         Console.WriteLine($"[GC-UI] 后端已启动: http://127.0.0.1:{port}");
         Console.WriteLine($"[GC-UI] 模型库: {services.Paths.ModelRoot}");
 
@@ -509,7 +621,7 @@ public static class BackendServer
 
 
 
-        static void WriteEndpointFile(AppServices services, int port)
+        static void WriteEndpointFile(AppServices services, int port, string? token)
         {
             try
             {
@@ -521,10 +633,19 @@ public static class BackendServer
                     url = $"http://127.0.0.1:{port}",
                     version = LauncherRuntimeInfo.CurrentLauncherVersion,
                     platform = LauncherRuntimeInfo.CurrentRid,
-                    startedAt = DateTimeOffset.UtcNow.ToString("o")
+                    startedAt = DateTimeOffset.UtcNow.ToString("o"),
+                    // 令牌也写进来：前端如果是被 Finder 直接打开（没有继承环境变量），
+                    // 只能从这里拿到会话令牌，否则每个 /api 都会 401 —— 表现为「无法连接后端」。
+                    token
                 }, new JsonSerializerOptions { WriteIndented = true });
 
                 File.WriteAllText(file, payload);
+                if (!OperatingSystem.IsWindows())
+                {
+                    // 同机其他用户不该读到会话令牌
+                    try { File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
+                    catch { /* 文件系统不支持时忽略 */ }
+                }
             }
             catch (Exception ex)
             {

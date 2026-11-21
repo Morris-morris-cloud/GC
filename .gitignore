@@ -62,3 +62,9 @@ courseware/
 .GC/UI/frontend/courseware/assets/*.png
 .workbuddy/
 
+
+# 课程离线课件的单文件产物（79MB，由构建生成，不入库）
+等高线.html
+
+# 工具链临时备份
+buildsh/cross/*.cmake.bak

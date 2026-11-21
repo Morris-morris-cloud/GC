@@ -1,0 +1,185 @@
+name: pr-review
+
+# PR 发起 / 有新提交时自动审查：
+#   1) 是否能编译（.NET 全解决方案 + Flutter 静态分析）
+#   2) 是否有编译错误 / 分析错误
+#   3) 与目标分支是否有冲突
+#   4) 是否落后目标分支提交
+# 结果写进一条评论，重复运行只更新不刷屏。
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  FLUTTER_VERSION: '3.24.5'
+  MARKER: '<!-- gc-pr-review -->'
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - id: branch
+        name: 检查冲突与落后提交
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -e
+          BASE="origin/${BASE_REF}"
+          git fetch --no-tags origin "$BASE_REF" >/dev/null 2>&1 || true
+
+          BEHIND=$(git rev-list --count "HEAD..${BASE}" 2>/dev/null || echo 0)
+          AHEAD=$(git rev-list --count "${BASE}..HEAD" 2>/dev/null || echo 0)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "ahead=$AHEAD" >> "$GITHUB_OUTPUT"
+
+          # GitHub 的 mergeable 字段是异步计算的，前几次可能为 null，重试几次
+          STATE="unknown"
+          CONFLICT="unknown"
+          for i in 1 2 3 4 5; do
+            INFO=$(gh api "repos/${{ github.repository }}/pulls/${PR}" --jq '.mergeable, .mergeable_state' 2>/dev/null || true)
+            CONFLICT=$(printf '%s\n' "$INFO" | sed -n '1p')
+            STATE=$(printf '%s\n' "$INFO" | sed -n '2p')
+            if [ "$CONFLICT" = "true" ] || [ "$CONFLICT" = "false" ]; then break; fi
+            sleep 3
+          done
+
+          case "$CONFLICT" in
+            false) echo "conflict=ok" >> "$GITHUB_OUTPUT" ;;
+            true)  echo "conflict=conflict" >> "$GITHUB_OUTPUT" ;;
+            *)     echo "conflict=unknown" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "merge_state=$STATE" >> "$GITHUB_OUTPUT"
+
+      - id: dotnet
+        name: 编译 .NET
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          dotnet restore GC.sln > dotnet-restore.log 2>&1
+          dotnet build GC.sln -c Release --no-restore 2>&1 | tee dotnet-build.log
+          exit ${PIPESTATUS[0]}
+
+      - id: flutter
+        name: Flutter 静态分析
+        continue-on-error: true
+        working-directory: GC-UI/frontend
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee ../flutter-pubget.log
+          flutter analyze 2>&1 | tee ../flutter-analyze.log
+          exit ${PIPESTATUS[0]}
+
+      - id: summary
+        name: 生成审查结论
+        if: always()
+        env:
+          DOTNET_OUTCOME: ${{ steps.dotnet.outcome }}
+          FLUTTER_OUTCOME: ${{ steps.flutter.outcome }}
+          CONFLICT: ${{ steps.branch.outputs.conflict }}
+          BEHIND: ${{ steps.branch.outputs.behind }}
+          AHEAD: ${{ steps.branch.outputs.ahead }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -e
+          bad=0
+
+          case "$DOTNET_OUTCOME" in
+            success) DOTNET_LINE="✅ .NET 编译通过" ;;
+            *)       DOTNET_LINE="❌ .NET 编译失败"; bad=1 ;;
+          esac
+          case "$FLUTTER_OUTCOME" in
+            success) FLUTTER_LINE="✅ Flutter 静态分析通过" ;;
+            *)       FLUTTER_LINE="❌ Flutter 静态分析有问题"; bad=1 ;;
+          esac
+          case "$CONFLICT" in
+            ok)       CONFLICT_LINE="✅ 与目标分支无冲突" ;;
+            conflict) CONFLICT_LINE="❌ 与目标分支存在冲突，需要先解决"; bad=1 ;;
+            *)        CONFLICT_LINE="⚠️ 冲突状态暂时无法判断（稍后重跑）" ;;
+          esac
+
+          if [ "${BEHIND:-0}" -gt 0 ] 2>/dev/null; then
+            BEHIND_LINE="⚠️ 落后目标分支 **${BEHIND}** 个提交，建议先 rebase / merge"
+          else
+            BEHIND_LINE="✅ 已包含目标分支最新提交"
+          fi
+
+          if [ "$bad" = 0 ]; then
+            HEAD="## ✅ PR 自动审查通过"
+          else
+            HEAD="## ❌ PR 自动审查未通过"
+          fi
+
+          {
+            echo "$HEAD"
+            echo
+            echo "| 检查项 | 结果 |"
+            echo "| --- | --- |"
+            echo "| 能否编译 | $DOTNET_LINE |"
+            echo "| 代码检查 | $FLUTTER_LINE |"
+            echo "| 合并冲突 | $CONFLICT_LINE |"
+            echo "| 分支同步 | $BEHIND_LINE |"
+            echo
+            echo "本次提交领先目标分支 ${AHEAD:-0} 个提交。"
+            echo
+            echo "<details><summary>详细日志</summary>"
+            echo
+            echo '```'
+            echo "== dotnet build（尾部 40 行）=="
+            tail -40 dotnet-build.log 2>/dev/null || echo "(无日志)"
+            echo
+            echo "== flutter analyze（尾部 40 行）=="
+            tail -40 flutter-analyze.log 2>/dev/null || echo "(无日志)"
+            echo '```'
+            echo
+            echo "</details>"
+            echo
+            echo "_由 PR 自动审查生成；推送新提交后会更新本条评论。_"
+            echo
+            echo "$MARKER"
+          } > body.md
+
+      - name: 写入 / 更新 PR 评论
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -e
+          [ -f body.md ] || exit 0
+          CID=$(gh api "repos/${{ github.repository }}/issues/${PR}/comments" --paginate \
+                  --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1 || true)
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/${CID}" \
+              -F body=@body.md >/dev/null
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/${PR}/comments" \
+              -F body=@body.md >/dev/null
+          fi

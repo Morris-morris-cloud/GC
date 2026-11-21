@@ -4,6 +4,7 @@ import 'controller.dart';
 import 'i18n.dart';
 import 'pages.dart';
 import 'theme.dart';
+import 'window_chrome.dart';
 
 /// 侧边栏导航项。
 class _NavItem {
@@ -19,6 +20,8 @@ const List<_NavItem> _navItems = <_NavItem>[
   _NavItem(Icons.download_rounded, 'nav.download'),
   _NavItem(Icons.tune_rounded, 'nav.settings'),
   _NavItem(Icons.info_outline_rounded, 'nav.about'),
+  _NavItem(Icons.auto_awesome_rounded, 'nav.treasure'),
+  _NavItem(Icons.person_rounded, 'nav.user'),
 ];
 
 /// 桌面端滚动行为：去掉移动端的拉伸回弹和边缘光晕，滚轮更跟手。
@@ -69,16 +72,24 @@ class _ShellPageState extends State<ShellPage> {
         final controller = widget.controller;
         return Scaffold(
           backgroundColor: GcColors.appBg,
-          body: Row(
+          body: Column(
             children: <Widget>[
-              _Sidebar(controller: controller),
-              Container(width: 1, color: GcColors.line),
+              // 自绘标题栏（macOS）：系统标题栏已隐藏，最小化/最大化/关闭在这里画
+              const GcTitleBar(),
               Expanded(
-                child: Column(
+                child: Row(
                   children: <Widget>[
-                    Expanded(child: _content(controller)),
-                    if (controller.updateBarVisible)
-                      _UpdateBar(controller: controller),
+                    _Sidebar(controller: controller),
+                    Container(width: 1, color: GcColors.line),
+                    Expanded(
+                      child: Column(
+                        children: <Widget>[
+                          Expanded(child: _content(controller)),
+                          if (controller.updateBarVisible)
+                            _UpdateBar(controller: controller),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -136,6 +147,10 @@ class _ShellPageState extends State<ShellPage> {
         return SettingsPageView(controller: controller);
       case 4:
         return AboutPageView(controller: controller);
+      case 5:
+        return TreasurePage(controller: controller);
+      case 6:
+        return UserPage(controller: controller);
       default:
         return HomePageView(controller: controller);
     }
@@ -445,7 +460,8 @@ class _BackendDown extends StatelessWidget {
               const SizedBox(height: GcSpace.md),
               GcHint(controller.loadError ?? ''),
               const SizedBox(height: GcSpace.xs),
-              GcHint('${T('set.backend')}: ${controller.api.baseUrl}'),
+              GcHint('${T('set.backend')}: ${controller.api.baseUrl}'
+                  ' · ${controller.api.hasSessionToken ? '令牌已就绪' : '缺少会话令牌'}'),
               const SizedBox(height: GcSpace.lg),
               FilledButton(
                 onPressed: controller.bootstrap,

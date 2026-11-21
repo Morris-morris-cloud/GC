@@ -42,9 +42,8 @@ public sealed class GitCodeRemote : IModelRemote
         _displayName = string.IsNullOrWhiteSpace(repository)
             ? DefaultRepository : repository!.TrimEnd('/');
 
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("GC-Updater/1.0");
-        _http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        // 使用共享 HttpClient，统一连接池管理
+        _http = SharedHttpClientFactory.GetDefault();
 
         if (string.IsNullOrWhiteSpace(manifestUrl))
         {
@@ -136,7 +135,8 @@ public sealed class GitCodeRemote : IModelRemote
 
             if (verification.Trust == ManifestTrust.Invalid)
             {
-                Console.Error.WriteLine($"[gitcode] 清单验签失败，已拒绝: {verification.Error}");
+                GcLog.Warn($"清单验签失败，已拒绝: {verification.Error}",
+                           $"Manifest signature check failed: {verification.Error}");
                 return null;
             }
 
@@ -146,7 +146,8 @@ public sealed class GitCodeRemote : IModelRemote
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"版本清单解析失败 {url}: {ex.Message}");
+            GcLog.Warn($"版本清单解析失败 {url}: {ex.Message}",
+                       $"Failed to parse version manifest {url}: {ex.Message}");
             return null;
         }
     }
@@ -179,7 +180,8 @@ public sealed class GitCodeRemote : IModelRemote
         try { text = await GetWithRetryAsync(url, ct); }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"列目录失败 {repoPath}: {ex.Message}");
+            GcLog.Warn($"列目录失败 {repoPath}: {ex.Message}",
+                       $"Failed to list directory {repoPath}: {ex.Message}");
             return;
         }
         if (!text.TrimStart().StartsWith("[", StringComparison.Ordinal)) return;
@@ -338,7 +340,8 @@ public sealed class GitCodeRemote : IModelRemote
             if (bytes != null) return bytes;
         }
 
-        Console.Error.WriteLine("[gitcode] 找不到可用的启动器包（Release 附件与 dist 目录都没对上）");
+        GcLog.Warn("找不到可用的启动器包（Release 附件与 dist 目录都没对上）",
+                   "Could not find a usable launcher package");
         return null;
     }
 
@@ -351,7 +354,8 @@ public sealed class GitCodeRemote : IModelRemote
         try { bytes = await _http.GetByteArrayAsync(url!, ct); }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[gitcode] 下载失败 {Short(url!)}: {ex.Message}");
+            GcLog.Warn($"下载失败 {Short(url!)}: {ex.Message}",
+                       $"Download failed {Short(url!)}: {ex.Message}");
             return null;
         }
         if (bytes.Length == 0) return null;
@@ -361,12 +365,14 @@ public sealed class GitCodeRemote : IModelRemote
             var actual = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             if (!string.Equals(actual, sha256.Trim(), StringComparison.OrdinalIgnoreCase))
             {
-                Console.Error.WriteLine($"[gitcode] 包校验不符，换下一个来源: {Short(url!)}");
+                GcLog.Warn($"包校验不符，换下一个来源: {Short(url!)}",
+                           $"Package hash mismatch, trying next source: {Short(url!)}");
                 return null;
             }
         }
 
-        Console.WriteLine($"[gitcode] 启动器包来源: {Short(url!)}");
+        GcLog.Info($"启动器包来源: {Short(url!)}",
+                   $"Launcher package source: {Short(url!)}");
         return bytes;
     }
 
@@ -431,7 +437,8 @@ public sealed class GitCodeRemote : IModelRemote
                 match = 0;
             }
 
-            Console.WriteLine($"[gitcode] 在 {dir} 找到编译产物: {zips[match].Name}");
+            GcLog.Info($"在 {dir} 找到编译产物: {zips[match].Name}",
+                       $"Found build artifact in {dir}: {zips[match].Name}");
             return await ResolveFileUrlAsync(zips[match].Path, ct);
         }
         catch (Exception)

@@ -4,9 +4,6 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
-using Avalonia.Markup.Xaml;
-using Avalonia.Data;
-using Avalonia.Platform;
 
 namespace GC.Services;
 
@@ -75,8 +72,10 @@ public sealed class L : INotifyPropertyChanged
     {
         try
         {
-            var uri = new Uri($"avares://GC.Core/Assets/i18n/{code}.json");
-            using var stream = AssetLoader.Open(uri);
+            // 界面已迁到 Flutter，这里不能再依赖 Avalonia 的 avares:// 资源加载
+            var asm = typeof(L).Assembly;
+            using var stream = asm.GetManifestResourceStream($"GC.Core.Assets.i18n.{code}.json");
+            if (stream == null) return null;
             using var reader = new StreamReader(stream);
             return JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd(),
                 new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
@@ -131,13 +130,3 @@ public sealed class LocalizedString : INotifyPropertyChanged
     internal void Refresh() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
 }
 
-/// <summary>XAML 用法：Text="{loc:Loc nav.home}"</summary>
-public sealed class LocExtension : MarkupExtension
-{
-    public LocExtension() { }
-    public LocExtension(string key) => Key = key;
-    public string Key { get; set; } = "";
-
-    public override object ProvideValue(IServiceProvider serviceProvider)
-        => new Binding(nameof(LocalizedString.Value)) { Source = L.I.For(Key) };
-}

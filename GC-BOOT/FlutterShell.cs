@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using GC.Services;
 using GC.UI.Server;
 using Microsoft.AspNetCore.Builder;
 
@@ -20,15 +21,16 @@ namespace GC;
 /// 后端跑在进程内而不是单独一个 exe：两者用的是同一套 .NET 运行时，
 /// 拆成两个自包含进程等于把 60MB 运行时复制两份，发布包会白白大一倍。
 ///
-/// 缺 Flutter 前端时返回 <c>false</c>，由调用方回退到内置 Avalonia 界面——
-/// 这样 `dotnet run`、只编了启动器的开发场景都能正常打开。
+/// 缺 Flutter 前端时返回 <c>false</c>，由调用方提示用户安装完整发布包
+/// （内置 Avalonia 界面已移除，界面只有 Flutter 一套）。
 /// </summary>
 internal static class FlutterShell
 {
     /// <summary>与前端、后端共用的默认端口（定义在 GC.Services.GcUiContract）。</summary>
     private const int Port = Services.GcUiContract.DefaultPort;
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(1.5) };
+    // 使用共享 HttpClient（短超时，仅用于健康检查）
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetDefault();
 
     private static WebApplication? _backend;
 
@@ -38,6 +40,12 @@ internal static class FlutterShell
         var uiPath = FindUi(dir);
         if (uiPath == null) return false;
 
+        // 确定要用 Flutter 界面了：本进程只当后端宿主，不要另占一个 Dock 图标
+        // （否则「后端 + UI」会出现两个图标）。回退 Avalonia 的分支不会走到这里。
+        MacDock.HideFromDock();
+        if (OperatingSystem.IsMacOS())
+            Console.WriteLine("[shell] 启动器以 UIElement 运行（不占 Dock，界面由 GC-UI.app 显示）");
+
         // 本次会话的一次性令牌：进程内后端与 Flutter 前端都从这里拿到同一个值。
         // 只有我们拉起的后端才持有它，同机其他进程伪造的健康响应过不了 IsHealthy 的身份校验。
         // 允许外部预设（自动化测试 / 高级部署固定令牌），未预设才现场生成随机值。
@@ -46,7 +54,6 @@ internal static class FlutterShell
         Environment.SetEnvironmentVariable(Services.GcUiContract.TokenEnvVar, token);
 
         var port = Port;
-        AvaloniaHost? uiHost = null;
 
         // 用户可能重复启动：只有当端口上已有一个「持有同一令牌」的后端时才复用。
         // 同机其他程序即便占端口并返回 200，也没有令牌，会被 IsHealthy 拒绝，
@@ -60,14 +67,13 @@ internal static class FlutterShell
 
             for (var candidate = start; candidate < start + Services.GcUiContract.PortScanRange; candidate++)
             {
-                var app = TryStartBackend(args, candidate, out var host);
+                var app = TryStartBackend(args, candidate);
                 if (app == null) continue;
 
                 if (WaitHealthy(candidate, token, TimeSpan.FromSeconds(25)))
                 {
                     port = candidate;
                     _backend = app;
-                    uiHost = host;
                     break;
                 }
 
@@ -87,32 +93,43 @@ internal static class FlutterShell
             return false;
         }
 
-        // 前端窗口已拉起。模型窗口由 Avalonia 承载，而 macOS 的 AppKit 要求
-        // NSApplication 必须在**主线程**——所以事件循环要跑在这里（当前正是主线程），
-        // 不能再丢到副线程，否则一点「启动模型」就会把整个后端带崩。
+        // 前端窗口已拉起。这里不再需要 AppKit 事件循环：模型已经全部在 Flutter 里渲染，
+        // 后端只是纯 HTTP 服务，主线程阻塞等它退出即可。
         ui.EnableRaisingEvents = true;
-        var closed = 0;
-        void RequestClose()
-        {
-            if (Interlocked.Exchange(ref closed, 1) == 1) return;
-            uiHost?.Shutdown();
-        }
-
-        ui.Exited += (_, _) => RequestClose();
-        if (ui.HasExited) RequestClose();
-
-        if (!ui.HasExited && uiHost != null)
-        {
-            // 阻塞直到界面退出（或图形环境初始化失败）。
-            uiHost.RunOnCurrentThread();
-        }
-
-        // Avalonia 起不来（无桌面会话）时仍要等界面退出，避免后端被提前收掉。
         if (!ui.HasExited) ui.WaitForExit();
 
         StopBackend(_backend);
         _backend = null;
         return true;
+    }
+
+    /// <summary>
+    /// 找不到 Flutter 前端时的提示。
+    /// 已经没有任何内置界面可以回退，所以必须在终端/弹窗里说清楚，
+    /// 否则用户只会看到一个进程一闪而过。
+    /// </summary>
+    public static void ReportMissingUi()
+    {
+        const string message = "找不到 Flutter 前端（GC-UI.app / GC-UI.exe）。请使用完整发布包。";
+        Console.Error.WriteLine(message);
+
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            // 发布包是从 Finder 双击启动的，没有终端可看：用系统弹窗告知
+            var psi = new ProcessStartInfo("/usr/bin/osascript")
+            {
+                UseShellExecute = false,
+                RedirectStandardError = true,
+            };
+            psi.ArgumentList.Add("-e");
+            psi.ArgumentList.Add($"display alert \"{message}\" as critical");
+            Process.Start(psi);
+        }
+        catch
+        {
+            // 提示失败也不影响退出码
+        }
     }
 
     // ---------------------------------------------------------------- 产物定位
@@ -141,14 +158,11 @@ internal static class FlutterShell
     // ---------------------------------------------------------------- 进程管理
 
     /// <summary>在本进程内启动后端；端口被占用等失败情况返回 null。</summary>
-    /// <param name="uiHost">成功时交出模型窗口宿主，由调用方在主线程跑事件循环。</param>
-    private static WebApplication? TryStartBackend(string[] args, int port, out AvaloniaHost? uiHost)
+    private static WebApplication? TryStartBackend(string[] args, int port)
     {
-        uiHost = null;
         try
         {
-            var app = BackendServer.Start(args, port, out var host);
-            uiHost = host;
+            var app = BackendServer.Start(args, port);
             app.StartAsync().GetAwaiter().GetResult();
             return app;
         }

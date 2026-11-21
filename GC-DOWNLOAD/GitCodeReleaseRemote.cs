@@ -25,17 +25,8 @@ public sealed class GitCodeReleaseRemote : IModelRemote
     private readonly string _releasesUrl;
     private readonly Dictionary<string, (string Url, string? Sha256, long Size, string Name)> _assets = new();
 
-    // 共享静态 HttpClient：避免每次检查更新都创建新实例导致端口耗尽；
-    // headers 只在一处设置，多个线程并发读取是线程安全的。
-    private static readonly HttpClient Http = CreateHttp();
-
-    private static HttpClient CreateHttp()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("GC-Updater/1.0");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return client;
-    }
+    // 使用共享 HttpClient 工厂，统一连接池管理
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetDefault();
 
     public GitCodeReleaseRemote(string? manifestUrl, string? repository)
     {
@@ -80,7 +71,8 @@ public sealed class GitCodeReleaseRemote : IModelRemote
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[gitcode] 读取 Release 失败: {ex.Message}");
+            GcLog.Warn($"读取 Release 失败: {ex.Message}",
+                       $"Failed to read Release: {ex.Message}");
             gotRelease = false;
         }
 
@@ -93,12 +85,13 @@ public sealed class GitCodeReleaseRemote : IModelRemote
             var n = version?.Launcher.Packages.Count ?? 0;
             if (v.Length == 0 || n == 0)
             {
-                Console.WriteLine($"[gitcode] {DisplayName}: 没有 Release，清单里也没有启动器包");
+                GcLog.Warn($"{DisplayName}: 没有 Release，清单里也没有启动器包",
+                           $"{DisplayName}: No Release, no launcher packages in manifest");
             }
             else
             {
-                Console.WriteLine(
-                    $"[gitcode] {DisplayName}: 没有 Release，改用清单声明的 v{v}（{n} 个平台包，去 dist/ 找产物）");
+                GcLog.Info($"没有 Release，改用清单声明的 v{v}（{n} 个平台包，去 dist/ 找产物）",
+                           $"No Release; using manifest version v{v} ({n} platform packages, looking in dist/)");
             }
         }
         return version;

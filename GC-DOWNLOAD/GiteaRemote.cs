@@ -22,16 +22,9 @@ namespace GC.Services;
 public sealed class GiteaRemote : IModelRemote
 {
     private readonly SourcePreset _preset;
-    private static readonly HttpClient Http = CreateHttp();
+    // 使用共享 HttpClient，统一连接池管理
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetDefault();
     private string? _rawManifest;
-
-    private static HttpClient CreateHttp()
-    {
-        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("GC-Updater/1.0");
-        c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        return c;
-    }
 
     public GiteaRemote(SourcePreset preset)
     {
@@ -43,6 +36,18 @@ public sealed class GiteaRemote : IModelRemote
     public string SourceId => _preset.Id;
 
     private string RepoApi => $"{_preset.ApiBase}/repos/{_preset.Owner}/{_preset.Repo}";
+
+    /// <summary>GitHub 的 contents API 必须显式带 ref；Gitea 默认就读默认分支。</summary>
+    private string ContentsUrl(string path)
+    {
+        var p = path.Trim('/');
+        var head = string.IsNullOrEmpty(p) ? $"{RepoApi}/contents" : $"{RepoApi}/contents/{p}";
+        return _preset.Kind == "github" ? $"{head}?ref={_preset.Branch}" : head;
+    }
+
+    /// <summary>Releases 列表地址：GitHub 默认只返回 30 条，需要显式拉满一页。</summary>
+    private string ReleasesUrl() =>
+        _preset.Kind == "github" ? $"{RepoApi}/releases?per_page=100" : $"{RepoApi}/releases";
 
     // ---------------------------------------------------------------- 清单
 
@@ -86,7 +91,8 @@ public sealed class GiteaRemote : IModelRemote
         }
 
         // 没有 Release：清空启动器版本，让上层知道"这个源没有可升级的启动器"
-        Console.WriteLine($"[gitea] {_preset.Name}: Release 为空（模型清单仍可用）");
+        GcLog.Warn($"{_preset.Name}: Release 为空（模型清单仍可用）",
+                   $"{_preset.Name}: No Release found (model manifest still available)");
         result.Launcher.Version = "";
         result.Launcher.Packages.Clear();
 
@@ -110,7 +116,8 @@ public sealed class GiteaRemote : IModelRemote
                 // 清单验签失败或格式不对时直接返回 null，不再把不可信清单交给上层
                 if (verification.Trust == ManifestTrust.Invalid)
                 {
-                    Console.Error.WriteLine($"[gitea] 清单验签失败，已拒绝: {verification.Error}");
+                    GcLog.Warn($"清单验签失败，已拒绝: {verification.Error}",
+                               $"Manifest signature verification failed: {verification.Error}");
                     return null;
                 }
                 if (doc != null)
@@ -121,7 +128,8 @@ public sealed class GiteaRemote : IModelRemote
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[gitea] version.json 读取失败 {url}: {ex.Message}");
+                GcLog.Warn($"version.json 读取失败 {url}: {ex.Message}",
+                           $"Failed to read version.json {url}: {ex.Message}");
             }
         }
         return null;
@@ -135,7 +143,7 @@ public sealed class GiteaRemote : IModelRemote
     {
         try
         {
-            var json = await Http.GetStringAsync($"{RepoApi}/releases", ct);
+            var json = await Http.GetStringAsync(ReleasesUrl(), ct);
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind != JsonValueKind.Array) return null;
 
@@ -152,7 +160,8 @@ public sealed class GiteaRemote : IModelRemote
             if (candidates.Count == 0)
             {
                 // 还没发布 Release 是正常状态：交给上层去问另一个源
-                Console.WriteLine($"[gitea] {_preset.Name}: Release 列表为空");
+                GcLog.Info($"{_preset.Name}: Release 列表为空",
+                           $"{_preset.Name}: Empty Release list");
                 return null;
             }
 
@@ -194,7 +203,8 @@ public sealed class GiteaRemote : IModelRemote
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[gitea] Release 读取失败（{_preset.Name}）: {ex.Message}");
+            GcLog.Warn($"Release 读取失败（{_preset.Name}）: {ex.Message}",
+                       $"Failed to read Release ({_preset.Name}): {ex.Message}");
             return null;
         }
     }
@@ -226,12 +236,13 @@ public sealed class GiteaRemote : IModelRemote
     {
         if (depth > 8) return;
 
-        var url = $"{RepoRepoContentsUrl()}/{apiPath}";
+        var url = ContentsUrl(apiPath);
         string json;
         try { json = await Http.GetStringAsync(url, ct); }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[gitea] 列目录失败 {apiPath}: {ex.Message}");
+            GcLog.Warn($"列目录失败 {apiPath}: {ex.Message}",
+                       $"Failed to list directory {apiPath}: {ex.Message}");
             return;
         }
 
@@ -267,8 +278,6 @@ public sealed class GiteaRemote : IModelRemote
         foreach (var (p, rel) in subdirs)
             await WalkAsync(p, rel, sink, ct, depth + 1);
     }
-
-    private string RepoRepoContentsUrl() => $"{RepoApi}/contents";
 
     private static void AddFile(JsonElement item, string relPrefix, List<RepoEntry> sink)
     {
@@ -329,12 +338,14 @@ public sealed class GiteaRemote : IModelRemote
                     System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
                 if (!string.Equals(actual, package.Sha256.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.Error.WriteLine($"[gitea] 包校验不符，换下一个来源: {candidate}");
+                    GcLog.Warn($"包校验不符，换下一个来源: {candidate}",
+                               $"Package hash mismatch, trying next source: {candidate}");
                     continue;
                 }
             }
 
-            Console.WriteLine($"[gitea] 启动器包来源: {candidate}");
+            GcLog.Info($"启动器包来源: {candidate}",
+                       $"Launcher package source: {candidate}");
             return bytes;
         }
         return null;

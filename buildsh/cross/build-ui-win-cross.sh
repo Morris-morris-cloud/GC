@@ -87,7 +87,7 @@ resolve_flutter() {
   # pubspec 要求 Dart 3.5+（Flutter 3.24+），版本不对直接提醒
   local dart_ver
   dart_ver=$("$root/bin/cache/dart-sdk/bin/dart" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) || dart_ver=""
-  say "Flutter SDK: $root（engine ${ENGINE_HASH:0:10}${dart_ver:+, dart $dart_ver}）"
+  say "Flutter SDK: ${root}（engine ${ENGINE_HASH:0:10}${dart_ver:+, dart $dart_ver}）"
 }
 
 # ---------------------------------------------------------------- 引擎产物
@@ -96,14 +96,18 @@ ENGINE_DIR=""   # 由 resolve_flutter 填充
 
 fetch_engine() {
   local base="$MIRROR/flutter/$ENGINE_HASH"
-  local cache="${TMPDIR:-/tmp}/gc-win-engine"
+  # 缓存放仓库内 build/cache（原来放 ${TMPDIR}，系统会清理，导致每次构建都重下 200MB+）
+  local cache="${GC_WIN_ENGINE_CACHE:-$ROOT_DIR/build/cache/win-engine}"
+  mkdir -p "$cache" 2>/dev/null || cache="${TMPDIR:-/tmp}/gc-win-engine"
   mkdir -p "$cache"
 
   # 每个条目：远端相对路径 | 落地目录 | 落地后的标志文件
+  # 注意 flutter-cpp-client-wrapper.zip 内部已经带一层 cpp_client_wrapper/，
+  # 所以落地目录只能是 windows-x64，否则会解成 cpp_client_wrapper/cpp_client_wrapper。
   local -a items=(
     "windows-x64-release/windows-x64-flutter.zip|$ENGINE_DIR/windows-x64-release|flutter_windows.dll.lib"
     "windows-x64/artifacts.zip|$ENGINE_DIR/windows-x64|frontend_server_aot.dart.snapshot"
-    "windows-x64/flutter-cpp-client-wrapper.zip|$ENGINE_DIR/windows-x64/cpp_client_wrapper|core_implementations.cc"
+    "windows-x64/flutter-cpp-client-wrapper.zip|$ENGINE_DIR/windows-x64|cpp_client_wrapper/core_implementations.cc"
   )
 
   local item remote dest marker zip
@@ -114,7 +118,11 @@ fetch_engine() {
     zip="$cache/$(echo "$remote" | tr '/' '_')"
     if [ ! -s "$zip" ]; then
       say "下载 $(basename "$remote")"
-      curl -fL --retry 3 --retry-delay 2 -o "$zip.part" "$base/$remote" \
+      # -C - 断点续传：中断后重跑接着下，不从头开始
+      # --speed-limit/--speed-time：网速掉到 4KB/s 持续 30 秒就放弃重试，避免无限挂住
+      curl -fL -sS -C - --retry 5 --retry-delay 2 \
+        --connect-timeout 20 --speed-limit 4096 --speed-time 30 \
+        -o "$zip.part" "$base/$remote" \
         || die "下载失败：$base/$remote
 可设置 WIN_ENGINE_MIRROR=https://storage.flutter-io.cn/flutter_infra_release 走国内镜像"
       mv "$zip.part" "$zip"

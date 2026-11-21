@@ -1,0 +1,240 @@
+name: build-bot
+
+# 在 Issue / PR 里评论触发编译：
+#   @build-bot build mac       编译 macOS
+#   @build-bot build win-amd   编译 Windows amd64
+#   @build-bot build win-arm   编译 Windows arm64
+#   @build-bot build all       三个平台全编
+# 产物发布到 ip-prerelease 预发布（同一 tag 滚动更新，不删别的平台资产）。
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: release-ip-prerelease
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  TZ: Asia/Shanghai
+  BOT_TAG: ip-prerelease
+  DOTNET_VERSION: '8.0.x'
+  FLUTTER_VERSION: '3.24.5'
+
+jobs:
+  prepare:
+    # 只处理带 @build-bot build 的评论，且只允许仓库成员触发
+    if: |
+      contains(github.event.comment.body, '@build-bot') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.parse.outputs.target }}
+      ref: ${{ steps.parse.outputs.ref }}
+      is_pr: ${{ steps.parse.outputs.is_pr }}
+      version: ${{ steps.parse.outputs.version }}
+      ok: ${{ steps.parse.outputs.ok }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: parse
+        name: 解析指令
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY: ${{ github.event.comment.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -e
+          # 抓 @build-bot build <target>，target 白名单外一律忽略
+          TARGET=$(printf '%s' "$BODY" \
+            | grep -oiE '@build-bot[[:space:]]+build[[:space:]]+(mac|win-amd|win-arm|all)' \
+            | head -1 \
+            | awk '{print tolower($NF)}' || true)
+
+          if [ -z "$TARGET" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "没有匹配到合法目标，忽略"
+            exit 0
+          fi
+
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+
+          VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)
+          [ -n "$VERSION" ] || VERSION=1.0.0
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Issue 评论挂在 PR 上时，用 PR 的 head 提交；否则用默认分支最新
+          IS_PR=$(gh api "repos/${{ github.repository }}/issues/${ISSUE_NUMBER}" \
+                    --jq '.pull_request != null' 2>/dev/null || echo false)
+          echo "is_pr=$IS_PR" >> "$GITHUB_OUTPUT"
+
+          if [ "$IS_PR" = "true" ]; then
+            REF=$(gh api "repos/${{ github.repository }}/pulls/${ISSUE_NUMBER}" --jq '.head.sha')
+          else
+            REF="${{ github.event.repository.default_branch }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "目标=$TARGET 提交=$REF 是否PR=$IS_PR"
+
+  build-mac:
+    needs: prepare
+    if: needs.prepare.outputs.ok == 'true' && (needs.prepare.outputs.target == 'mac' || needs.prepare.outputs.target == 'all')
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 编译 macOS
+        env:
+          GC_NO_CODESIGN: '1'
+          GC_NO_PROGRESS: '1'
+        run: ./build.sh build --targets=mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-zip
+          path: dist/mac-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
+  build-win:
+    needs: prepare
+    if: needs.prepare.outputs.ok == 'true' && (needs.prepare.outputs.target == 'win-amd' || needs.prepare.outputs.target == 'win-arm' || needs.prepare.outputs.target == 'all')
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 编译 Windows
+        run: ./build.ps1 build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-zip
+          path: |
+            dist/win-amd64/*.zip
+            dist/win-arm64/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [prepare, build-mac, build-win]
+    if: |
+      always() &&
+      needs.prepare.outputs.ok == 'true' &&
+      (needs.build-mac.result == 'success' || needs.build-win.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 汇总产物
+        env:
+          TARGET: ${{ needs.prepare.outputs.target }}
+        run: |
+          set -e
+          mkdir -p out
+          case "$TARGET" in
+            mac)     PATTERN='*-mac-arm64.zip' ;;
+            win-amd) PATTERN='*-win-amd64.zip' ;;
+            win-arm) PATTERN='*-win-arm64.zip' ;;
+            *)       PATTERN='*.zip' ;;
+          esac
+          # Windows 作业一次会编译 amd64 + arm64，这里只挑本次请求的平台
+          find artifacts -name '*.zip' | while read -r f; do
+            case "$f" in
+              $PATTERN) cp "$f" out/ ;;
+            esac
+          done
+          [ -n "$(ls -A out 2>/dev/null)" ] || { echo "没有匹配 $PATTERN 的产物"; exit 1; }
+          ls -lh out
+
+      - id: publish_step
+        name: 发布到 ip-prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TARGET: ${{ needs.prepare.outputs.target }}
+          REF: ${{ needs.prepare.outputs.ref }}
+          TAG: ${{ env.BOT_TAG }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -e
+          cat > notes.md <<EOF
+          手动触发构建（\`@build-bot build ${TARGET}\`）。
+
+          触发人：@${ACTOR}
+          来源：#${ISSUE}
+          提交：\`${REF:0:7}\`，版本号 ${VERSION}
+
+          > 预发布版本：仅供测试，不保证稳定。
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # 已有预发布：只覆盖本次编译出来的资产，别的平台保留
+            gh release upload "$TAG" out/*.zip --clobber
+            gh release edit "$TAG" --prerelease --notes-file notes.md
+          else
+            gh release create "$TAG" out/*.zip \
+              --prerelease \
+              --target "$REF" \
+              --title "Prerelease ${VERSION}" \
+              --notes-file notes.md
+          fi
+
+          echo "https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 回帖
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ needs.prepare.outputs.target }}
+          ISSUE: ${{ github.event.issue.number }}
+          STATE: ${{ steps.publish_step.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$STATE" = "success" ]; then
+            MSG="已编译 **${TARGET}** 并发布到预发布：https://github.com/${{ github.repository }}/releases/tag/ip-prerelease"
+          else
+            MSG="编译 **${TARGET}** 失败，见日志：${RUN_URL}"
+          fi
+          gh issue comment "$ISSUE" --body "$MSG"

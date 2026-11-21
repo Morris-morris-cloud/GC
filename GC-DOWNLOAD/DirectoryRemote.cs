@@ -17,7 +17,8 @@ namespace GC.Services;
 public sealed class DirectoryRemote : IModelRemote
 {
     private readonly string _root;
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(5) };
+    // 使用共享 HttpClient（长超时版本）
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetLongTimeout();
     private string? _rawManifest;
     private string _launcherVersion = "";
 

@@ -123,6 +123,19 @@ public sealed record UpdateCheckDto(
 
 public sealed record ContributorDto(string Name, int Contributions, string? AvatarUrl);
 
+// ---- 用户 API DTO ----
+public sealed record RegisterRequest(string Username, string Password);
+public sealed record LoginRequest(string Username, string Password);
+public sealed record ThemeRequest(string Color, int Cost);
+
+
+/// <summary>「重新下载启动器」结果：State = Ready / UpToDate / Failed。</summary>
+public sealed record LauncherRedownloadDto(
+    string State,
+    string Version,
+    string Message,
+    IReadOnlyList<string> Steps);
+
 public sealed record AboutDto(
     string AppName,
     string Version,

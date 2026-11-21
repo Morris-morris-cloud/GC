@@ -1,5 +1,4 @@
 using System;
-using Avalonia;
 using GC.Services;
 using GC.Download;
 
@@ -21,14 +20,11 @@ internal static class Program
         // 上次下载的启动器新版，到这次启动才应用
         if (DownloadModuleHost.Factory.TryApplyPending(paths)) return;
 
-        // 发布包带 Flutter 前端时，界面交给它；没带则回退到内置 Avalonia 界面。
+        // 界面只有 Flutter 一套（内置 Avalonia 界面已移除）。
         if (FlutterShell.TryRun(args)) return;
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        // 找不到前端：给出明确提示后退出，不要静默启动一个没有界面的后端进程。
+        FlutterShell.ReportMissingUi();
+        Environment.Exit(1);
     }
-
-    public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .LogToTrace();
 }

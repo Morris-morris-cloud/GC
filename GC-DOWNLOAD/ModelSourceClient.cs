@@ -21,16 +21,11 @@ namespace GC.Services;
 public sealed class ModelSourceClient : IModelSourceClient
 {
     private readonly AppPaths _paths;
-    private static readonly HttpClient Http = CreateHttp();
 
     public ModelSourceClient(AppPaths paths) => _paths = paths;
 
-    private static HttpClient CreateHttp()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("GC/1.0 (+model-source)");
-        return client;
-    }
+    // 使用共享 HttpClient（长超时版本用于大文件下载）
+    private static readonly HttpClient Http = SharedHttpClientFactory.GetLongTimeout();
 
     public async Task<SourceIndex> FetchAsync(ModelSource source, bool force, IProgress<string>? log, CancellationToken ct)
     {

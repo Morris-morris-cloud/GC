@@ -32,6 +32,11 @@ class _AboutPageViewState extends State<AboutPageView> {
   bool _loading = true;
   String? _error;
 
+  /// 重新下载启动器的进行状态与结果
+  bool _redownloading = false;
+  String? _redownloadMsg;
+  bool? _redownloadOk;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +66,34 @@ class _AboutPageViewState extends State<AboutPageView> {
       setState(() {
         _error = error.toString();
         _loading = false;
+      });
+    }
+  }
+
+  /// 重新下载启动器包：后端下完会用清单里的 sha256 逐块校验，
+  /// 校验不过会直接返回失败，不会留下半个坏包。
+  Future<void> _redownloadLauncher() async {
+    setState(() {
+      _redownloading = true;
+      _redownloadMsg = null;
+      _redownloadOk = null;
+    });
+    try {
+      final result = await widget.controller.api.redownloadLauncher();
+      if (!mounted) return;
+      setState(() {
+        _redownloading = false;
+        _redownloadOk = result.ok;
+        _redownloadMsg = result.ok
+            ? T('about.redownloadOk', <Object?>[result.version])
+            : (result.message.isEmpty ? T('about.redownloadFail') : result.message);
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _redownloading = false;
+        _redownloadOk = false;
+        _redownloadMsg = error.toString();
       });
     }
   }
@@ -175,18 +208,67 @@ class _AboutPageViewState extends State<AboutPageView> {
           ],
         ),
         const SizedBox(height: GcSpace.lg),
-        OutlinedButton(
-          onPressed: () async {
-            final url = about?.repository;
-            if (url == null || url.isEmpty) return;
-            try {
-              await widget.controller.api.openUrl(url);
-            } catch (_) {
-              // 忽略
-            }
-          },
-          child: Text(T('about.openRepository')),
+        Wrap(
+          spacing: GcSpace.sm,
+          runSpacing: GcSpace.sm,
+          children: <Widget>[
+            OutlinedButton(
+              onPressed: () async {
+                final url = about?.repository;
+                if (url == null || url.isEmpty) return;
+                try {
+                  await widget.controller.api.openUrl(url);
+                } catch (_) {
+                  // 忽略
+                }
+              },
+              child: Text(T('about.openRepository')),
+            ),
+            OutlinedButton.icon(
+              onPressed: _redownloading ? null : _redownloadLauncher,
+              icon: _redownloading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(
+                _redownloading
+                    ? T('about.redownloading')
+                    : T('about.redownload'),
+              ),
+            ),
+          ],
         ),
+        if (_redownloadMsg != null) ...<Widget>[
+          const SizedBox(height: GcSpace.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(
+                _redownloadOk == true
+                    ? Icons.verified_rounded
+                    : Icons.error_outline_rounded,
+                size: 16,
+                color: _redownloadOk == true ? GcColors.ok : GcColors.danger,
+              ),
+              const SizedBox(width: GcSpace.xs + 2),
+              Expanded(
+                child: Text(
+                  _redownloadMsg!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: _redownloadOk == true
+                        ? GcColors.muted
+                        : GcColors.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
 
