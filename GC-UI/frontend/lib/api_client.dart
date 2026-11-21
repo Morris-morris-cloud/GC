@@ -533,6 +533,26 @@ class GcApi {
       {Map<String, String>? query,
       Object? body,
       Duration? timeout}) async {
+    try {
+      return await _sendOnce(method, path,
+          query: query, body: body, timeout: timeout);
+    } on ApiException catch (e) {
+      // HTTP 层错误（后端明确回了 4xx/5xx）不是连接问题，直接抛。
+      if (e.statusCode != null) rethrow;
+      // 连接层失败：可能是电脑睡眠唤醒后旧连接已死，或后端换了端口。
+      // 重新解析地址后重试一次。只对 GET 自动重试——POST（签到/扣积分）
+      // 在连接不确定的情况下重发可能重复计费，宁可让用户手动再点。
+      if (method != 'GET') rethrow;
+      if (!rediscover()) rethrow;
+      return await _sendOnce(method, path,
+          query: query, body: body, timeout: timeout);
+    }
+  }
+
+  Future<dynamic> _sendOnce(String method, String path,
+      {Map<String, String>? query,
+      Object? body,
+      Duration? timeout}) async {
     final uri = _uri(path, query);
     final auth = _authHeaders;
     late http.Response response;

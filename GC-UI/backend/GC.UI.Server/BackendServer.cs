@@ -242,7 +242,8 @@ public static class BackendServer
         // 统一的用户响应体：前端一次拿齐签到 / 主题色需要的所有字段
         object UserPayload(UserRecord r)
         {
-            var today = DateTime.UtcNow.Date;
+            // 与 UserService 保持一致：本地日历日，不能用 UTC
+            var today = DateTime.Today;
             int nextConsecutive;
             if (!r.LastSignIn.HasValue) nextConsecutive = 1;
             else

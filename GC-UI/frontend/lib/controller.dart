@@ -82,10 +82,11 @@ class ShellController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 后端没起来时自动重试（2s、4s、8s…最多 5 次），不必让用户手动点。
+  /// 后端没起来时自动重试（1s、2s、4s、之后每次 8s，共 10 次 ≈ 70 秒），
+  /// 不必让用户手动点。重试前 rediscover() 重新解析地址与令牌。
   void _scheduleRetry() {
-    if (_retryAttempt >= 5) return;
-    final seconds = 1 << _retryAttempt; // 1,2,4,8,16
+    if (_retryAttempt >= 10) return;
+    final seconds = 1 << _retryAttempt.clamp(0, 3); // 1,2,4,8,8,8…（封顶 8s）
     _retryAttempt++;
     _retryTimer?.cancel();
     _retryTimer = Timer(Duration(seconds: seconds), () {

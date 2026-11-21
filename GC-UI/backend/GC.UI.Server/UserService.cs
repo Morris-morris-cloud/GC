@@ -396,7 +396,9 @@ public sealed class UserService
             return false;
         }
 
-        var today = DateTime.UtcNow.Date;
+        // 本地日历日：签到按用户机器上的「今天」算（0 点翻篇），不能用 UTC——
+        // 否则东八区用户要到早上 8 点才算新的一天，会出现同一天签到两次。
+        var today = DateTime.Today;
         if (rec.LastSignIn.HasValue)
         {
             var diff = (today - rec.LastSignIn.Value.Date).Days;
@@ -536,7 +538,9 @@ public sealed class UserService
         error = "";
         cost = 0;
 
-        var today = DateTime.UtcNow.Date;
+        // 本地日历日：签到按用户机器上的「今天」算（0 点翻篇），不能用 UTC——
+        // 否则东八区用户要到早上 8 点才算新的一天，会出现同一天签到两次。
+        var today = DateTime.Today;
         // 跨天了先重置计数
         if (featureDate.HasValue && featureDate.Value.Date != today)
             featureCount = 0;
@@ -572,7 +576,9 @@ public sealed class UserService
             return false;
         }
 
-        var today = DateTime.UtcNow.Date;
+        // 本地日历日：签到按用户机器上的「今天」算（0 点翻篇），不能用 UTC——
+        // 否则东八区用户要到早上 8 点才算新的一天，会出现同一天签到两次。
+        var today = DateTime.Today;
         var count = rec.FortuneDate.HasValue && rec.FortuneDate.Value.Date == today
             ? rec.FortuneCount : 0;
 
@@ -608,7 +614,9 @@ public sealed class UserService
             return false;
         }
 
-        var today = DateTime.UtcNow.Date;
+        // 本地日历日：签到按用户机器上的「今天」算（0 点翻篇），不能用 UTC——
+        // 否则东八区用户要到早上 8 点才算新的一天，会出现同一天签到两次。
+        var today = DateTime.Today;
         var count = rec.PickDate.HasValue && rec.PickDate.Value.Date == today
             ? rec.PickCount : 0;
 
