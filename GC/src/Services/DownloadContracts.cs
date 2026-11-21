@@ -167,7 +167,8 @@ public static class GcUiContract
     public const int DefaultPort = 17890;
 
     /// <summary>端口被占用时最多向后尝试几个。</summary>
-    public const int PortScanRange = 10;
+    /// <remarks>现代机器上端口占用较频繁，30 个端口足够覆盖常见冲突场景。</remarks>
+    public const int PortScanRange = 30;
 
     /// <summary>传给后端与前端的环境变量名。</summary>
     public const string PortEnvVar = "GC_UI_PORT";

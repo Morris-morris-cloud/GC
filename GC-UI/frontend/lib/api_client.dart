@@ -250,13 +250,16 @@ class HealthInfo {
         version = json['version'] as String? ?? '',
         platform = json['platform'] as String? ?? '',
         uiAvailable = json['uiAvailable'] as bool? ?? false,
-        uiError = json['uiError'] as String?;
+        uiError = json['uiError'] as String?,
+        sessionProof = json['sessionProof'] as String?;
 
   final bool ok;
   final String version;
   final String platform;
   final bool uiAvailable;
   final String? uiError;
+  /// 后端会话令牌的指纹；前端可用于诊断「是否连到了正确的后端」。
+  final String? sessionProof;
 }
 
 /// 一次更新检查的结果。

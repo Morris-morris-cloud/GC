@@ -135,7 +135,10 @@ public sealed class GitCodeRemote : IModelRemote
             if (string.IsNullOrWhiteSpace(version.Generated)) return null;
 
             if (verification.Trust == ManifestTrust.Invalid)
-                Console.Error.WriteLine($"[gitcode] 清单验签失败: {verification.Error}");
+            {
+                Console.Error.WriteLine($"[gitcode] 清单验签失败，已拒绝: {verification.Error}");
+                return null;
+            }
 
             if (version != null && !string.IsNullOrWhiteSpace(version.Generated))
                 _rawManifest = payload;

@@ -90,7 +90,13 @@ public static class LauncherUpdater
             }
         }
 
-        if (candidates.Count == 0) return null;
+        if (candidates.Count == 0)
+        {
+            // 两个源都连不上或都没发 Release：返回一个带明确语义的信号，
+            // 让上层能区分「检查失败」和「已是最新」。用 null 版本 + 特殊标记表达。
+            Console.WriteLine("[update] 所有源都不可达，无法检查启动器更新");
+            return null;
+        }
 
         // 取版本号最高的（第 7 项）
         var best = candidates.OrderByDescending(c => VersionUtil.Parse(c.Version)).First();

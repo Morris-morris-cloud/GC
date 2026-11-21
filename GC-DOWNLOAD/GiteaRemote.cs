@@ -107,8 +107,12 @@ public sealed class GiteaRemote : IModelRemote
                 var text = await Http.GetStringAsync(url, ct);
                 if (!text.TrimStart().StartsWith('{')) continue;   // 可能返回 HTML
                 var doc = ManifestLoader.Parse(text, out var verification);
+                // 清单验签失败或格式不对时直接返回 null，不再把不可信清单交给上层
                 if (verification.Trust == ManifestTrust.Invalid)
-                    Console.Error.WriteLine($"[gitea] 清单验签失败: {verification.Error}");
+                {
+                    Console.Error.WriteLine($"[gitea] 清单验签失败，已拒绝: {verification.Error}");
+                    return null;
+                }
                 if (doc != null)
                 {
                     _rawManifest = text;

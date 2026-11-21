@@ -112,8 +112,13 @@ public static class SavedogLauncher
                 catch { }
             }
 
-            Process.Start(psi);
-            Console.WriteLine($"[update] GC-SAVEDOG 已启动: {exe}");
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                error = "无法启动 GC-SAVEDOG：Process.Start 返回 null（参数或路径问题）";
+                return false;
+            }
+            Console.WriteLine($"[update] GC-SAVEDOG 已启动: {exe}（PID {process.Id}）");
             return true;
         }
         catch (Exception ex)
